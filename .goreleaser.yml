@@ -1,0 +1,40 @@
+version: 2
+
+builds:
+  - main: ./cmd/partio
+    binary: partio
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+
+brews:
+  - repository:
+      owner: jcleira
+      name: homebrew-tap
+    homepage: https://github.com/jcleira/ai-workflow-core
+    description: Capture the why behind your code changes
+    license: MIT
+    install: |
+      bin.install "partio"
