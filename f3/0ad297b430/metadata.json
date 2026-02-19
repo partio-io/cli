@@ -1,0 +1,10 @@
+{
+  "id": "f30ad297b430",
+  "session_id": "",
+  "commit_hash": "de1e92f467547cf9a22e3599b943e7f9627cb255",
+  "branch": "enable-partio",
+  "created_at": "2026-02-19T15:47:57+01:00",
+  "agent": "claude-code",
+  "agent_percent": 100,
+  "content_hash": "de1e92f467547cf9a22e3599b943e7f9627cb255"
+}
