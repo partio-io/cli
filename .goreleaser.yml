@@ -31,10 +31,16 @@ changelog:
 
 brews:
   - repository:
-      owner: jcleira
+      owner: partio-io
       name: homebrew-tap
-    homepage: https://github.com/jcleira/ai-workflow-core
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    homepage: https://github.com/partio-io/cli
     description: Capture the why behind your code changes
     license: MIT
     install: |
       bin.install "partio"
+    test: |
+      system "#{bin}/partio", "version"

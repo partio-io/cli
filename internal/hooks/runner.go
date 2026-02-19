@@ -1,8 +1,8 @@
 package hooks
 
 import (
-	"github.com/jcleira/ai-workflow-core/internal/config"
-	"github.com/jcleira/ai-workflow-core/internal/git"
+	"github.com/partio-io/cli/internal/config"
+	"github.com/partio-io/cli/internal/git"
 )
 
 // Runner executes hook logic.

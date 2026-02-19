@@ -7,9 +7,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/jcleira/ai-workflow-core/internal/config"
-	"github.com/jcleira/ai-workflow-core/internal/git"
-	githooks "github.com/jcleira/ai-workflow-core/internal/git/hooks"
+	"github.com/partio-io/cli/internal/config"
+	"github.com/partio-io/cli/internal/git"
+	githooks "github.com/partio-io/cli/internal/git/hooks"
 )
 
 func newDisableCmd() *cobra.Command {

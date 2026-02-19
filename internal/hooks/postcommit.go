@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/jcleira/ai-workflow-core/internal/agent/claude"
-	"github.com/jcleira/ai-workflow-core/internal/attribution"
-	"github.com/jcleira/ai-workflow-core/internal/checkpoint"
-	"github.com/jcleira/ai-workflow-core/internal/config"
-	"github.com/jcleira/ai-workflow-core/internal/git"
+	"github.com/partio-io/cli/internal/agent/claude"
+	"github.com/partio-io/cli/internal/attribution"
+	"github.com/partio-io/cli/internal/checkpoint"
+	"github.com/partio-io/cli/internal/config"
+	"github.com/partio-io/cli/internal/git"
 )
 
 // PostCommit runs post-commit hook logic.

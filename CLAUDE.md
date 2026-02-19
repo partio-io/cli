@@ -4,7 +4,7 @@
 
 Partio captures the *why* behind code changes by hooking into Git workflows to preserve AI agent sessions (currently Claude Code) alongside the code changes tracked by Git. It stores checkpoints on an orphan branch (`partio/checkpoints/v1`) using git plumbing commands.
 
-**Module:** `github.com/jcleira/ai-workflow-core`
+**Module:** `github.com/partio-io/cli`
 **Go version:** 1.25.0
 **CLI framework:** Cobra
 

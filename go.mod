@@ -1,4 +1,4 @@
-module github.com/jcleira/ai-workflow-core
+module github.com/partio-io/cli
 
 go 1.25.0
 

@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jcleira/ai-workflow-core/internal/git"
+	"github.com/partio-io/cli/internal/git"
 )
 
 // Calculate computes attribution for a commit based on whether an agent was active.
