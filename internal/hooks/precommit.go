@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jcleira/ai-workflow-core/internal/agent/claude"
-	"github.com/jcleira/ai-workflow-core/internal/config"
-	"github.com/jcleira/ai-workflow-core/internal/git"
+	"github.com/partio-io/cli/internal/agent/claude"
+	"github.com/partio-io/cli/internal/config"
+	"github.com/partio-io/cli/internal/git"
 )
 
 // preCommitState records the state captured during pre-commit for use by post-commit.

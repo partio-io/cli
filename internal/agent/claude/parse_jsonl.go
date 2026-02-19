@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/jcleira/ai-workflow-core/internal/agent"
+	"github.com/partio-io/cli/internal/agent"
 )
 
 // ParseJSONL reads a Claude Code JSONL transcript and extracts session data.

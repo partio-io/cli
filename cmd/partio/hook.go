@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/jcleira/ai-workflow-core/internal/hooks"
+	"github.com/partio-io/cli/internal/hooks"
 )
 
 func newHookCmd() *cobra.Command {

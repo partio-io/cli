@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jcleira/ai-workflow-core/internal/git"
+	"github.com/partio-io/cli/internal/git"
 )
 
 // Install installs partio git hooks into the repository, backing up existing hooks.

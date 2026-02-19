@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jcleira/ai-workflow-core/internal/agent"
+	"github.com/partio-io/cli/internal/agent"
 )
 
 // FindLatestSession finds the most recently modified JSONL session file.

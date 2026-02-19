@@ -9,13 +9,13 @@ The "partial" version of [entire.io](https://entire.io).
 ## Install
 
 ```bash
-go install github.com/jcleira/ai-workflow-core/cmd/partio@latest
+go install github.com/partio-io/cli/cmd/partio@latest
 ```
 
 Or with Homebrew:
 
 ```bash
-brew install jcleira/tap/partio
+brew install partio-io/tap/partio
 ```
 
 ## Quick Start
