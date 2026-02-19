@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "strategy": "manual-commit",
+  "agent": "claude-code",
+  "log_level": "info",
+  "strategy_options": {
+    "push_sessions": true
+  }
+}
