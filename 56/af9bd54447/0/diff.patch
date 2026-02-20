@@ -1,0 +1,340 @@
+diff --git a/internal/agent/claude/find_session_dir.go b/internal/agent/claude/find_session_dir.go
+index 4df2052..9c7d3b3 100644
+--- a/internal/agent/claude/find_session_dir.go
++++ b/internal/agent/claude/find_session_dir.go
+@@ -4,12 +4,17 @@ import (
+ 	"fmt"
+ 	"os"
+ 	"path/filepath"
++	"strings"
++	"time"
+ )
+ 
+ // FindSessionDir returns the Claude Code session directory for the given repo.
+ // Claude stores sessions at ~/.claude/projects/<sanitized-path>/
+-// where the path is the cwd where Claude was launched, which may be a parent
+-// of the git repo root (e.g. in monorepos or worktrees).
++// where the path is the cwd where Claude was launched, which may be the
++// immediate parent of the git repo root (e.g. in monorepos or worktrees).
++//
++// When both the repo root and its parent have matching directories, the one
++// containing the most recently modified JSONL file is returned.
+ func (d *Detector) FindSessionDir(repoRoot string) (string, error) {
+ 	home, err := os.UserHomeDir()
+ 	if err != nil {
+@@ -18,23 +23,52 @@ func (d *Detector) FindSessionDir(repoRoot string) (string, error) {
+ 
+ 	projectsDir := filepath.Join(home, ".claude", "projects")
+ 
+-	// Try the repo root first, then walk up to parent directories.
+-	// Claude Code keys sessions to the cwd where it was launched, which
+-	// may be a parent of the git repo root.
+-	dir := repoRoot
+-	for {
++	// Check the repo root and its immediate parent directory.
++	var candidates []string
++	dirs := []string{repoRoot, filepath.Dir(repoRoot)}
++	for _, dir := range dirs {
+ 		sanitized := sanitizePath(dir)
+ 		sessionDir := filepath.Join(projectsDir, sanitized)
+ 		if _, err := os.Stat(sessionDir); err == nil {
+-			return sessionDir, nil
++			candidates = append(candidates, sessionDir)
+ 		}
++	}
++
++	if len(candidates) == 0 {
++		return "", fmt.Errorf("no Claude session directory found for %s", repoRoot)
++	}
++
++	if len(candidates) == 1 {
++		return candidates[0], nil
++	}
+ 
+-		parent := filepath.Dir(dir)
+-		if parent == dir {
+-			break
++	// Pick the candidate with the most recently modified JSONL file.
++	var bestDir string
++	var bestTime time.Time
++	for _, c := range candidates {
++		entries, err := os.ReadDir(c)
++		if err != nil {
++			continue
++		}
++		for _, e := range entries {
++			if e.IsDir() || !strings.HasSuffix(e.Name(), ".jsonl") {
++				continue
++			}
++			info, err := e.Info()
++			if err != nil {
++				continue
++			}
++			if info.ModTime().After(bestTime) {
++				bestTime = info.ModTime()
++				bestDir = c
++			}
+ 		}
+-		dir = parent
+ 	}
+ 
+-	return "", fmt.Errorf("no Claude session directory found for %s", repoRoot)
++	if bestDir == "" {
++		// No JSONL files found in any candidate — fall back to first (closest to repo root).
++		return candidates[0], nil
++	}
++
++	return bestDir, nil
+ }
+diff --git a/internal/agent/claude/find_session_dir_test.go b/internal/agent/claude/find_session_dir_test.go
+new file mode 100644
+index 0000000..88b8ead
+--- /dev/null
++++ b/internal/agent/claude/find_session_dir_test.go
+@@ -0,0 +1,137 @@
++package claude
++
++import (
++	"os"
++	"path/filepath"
++	"testing"
++	"time"
++)
++
++func TestFindSessionDir(t *testing.T) {
++	tests := []struct {
++		name string
++		// dirs maps sanitized directory names to JSONL filenames and their age
++		// relative to "now". Positive means older (subtracted from now).
++		dirs    map[string][]fileAge
++		wantIdx int // index into dirs iteration isn't stable, so we use wantDir name
++		wantDir string
++		wantErr bool
++	}{
++		{
++			name: "single candidate returns it",
++			dirs: map[string][]fileAge{
++				"child": {{name: "session.jsonl", age: time.Hour}},
++			},
++			wantDir: "child",
++		},
++		{
++			name: "picks directory with freshest JSONL",
++			dirs: map[string][]fileAge{
++				"child":  {{name: "old.jsonl", age: 24 * time.Hour}},
++				"parent": {{name: "fresh.jsonl", age: time.Minute}},
++			},
++			wantDir: "parent",
++		},
++		{
++			name: "multiple files per directory — picks freshest overall",
++			dirs: map[string][]fileAge{
++				"child": {
++					{name: "a.jsonl", age: 48 * time.Hour},
++					{name: "b.jsonl", age: 2 * time.Hour},
++				},
++				"parent": {
++					{name: "c.jsonl", age: 24 * time.Hour},
++				},
++			},
++			wantDir: "child", // b.jsonl at 2h is fresher than c.jsonl at 24h
++		},
++		{
++			name: "no JSONL files falls back to first candidate",
++			dirs: map[string][]fileAge{
++				"child":  {},
++				"parent": {},
++			},
++			wantDir: "child",
++		},
++		{
++			name:    "no candidates returns error",
++			dirs:    map[string][]fileAge{},
++			wantErr: true,
++		},
++	}
++
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			// Build a fake filesystem:
++			//   tmpDir/home/.claude/projects/<dir>/  — session directories
++			//   tmpDir/repo/child/                   — fake repo root
++			//   tmpDir/repo/                         — parent directory
++			tmpDir := t.TempDir()
++			home := filepath.Join(tmpDir, "home")
++			projectsDir := filepath.Join(home, ".claude", "projects")
++
++			// We simulate two path levels: tmpDir/repo/child (repoRoot)
++			// and tmpDir/repo (parent). Their sanitized forms are computed
++			// by sanitizePath, so we create directories matching those.
++			repoParent := filepath.Join(tmpDir, "repo")
++			repoRoot := filepath.Join(repoParent, "child")
++			if err := os.MkdirAll(repoRoot, 0o755); err != nil {
++				t.Fatal(err)
++			}
++
++			// Map logical names to actual paths
++			pathMap := map[string]string{
++				"child":  sanitizePath(repoRoot),
++				"parent": sanitizePath(repoParent),
++			}
++
++			now := time.Now()
++			for dirName, files := range tt.dirs {
++				sanitized, ok := pathMap[dirName]
++				if !ok {
++					t.Fatalf("unknown dir name %q", dirName)
++				}
++				sessionDir := filepath.Join(projectsDir, sanitized)
++				if err := os.MkdirAll(sessionDir, 0o755); err != nil {
++					t.Fatal(err)
++				}
++				for _, f := range files {
++					p := filepath.Join(sessionDir, f.name)
++					if err := os.WriteFile(p, []byte("{}"), 0o644); err != nil {
++						t.Fatal(err)
++					}
++					modTime := now.Add(-f.age)
++					if err := os.Chtimes(p, modTime, modTime); err != nil {
++						t.Fatal(err)
++					}
++				}
++			}
++
++			// Override HOME so FindSessionDir looks in our temp directory.
++			t.Setenv("HOME", home)
++
++			d := &Detector{}
++			got, err := d.FindSessionDir(repoRoot)
++			if tt.wantErr {
++				if err == nil {
++					t.Fatal("expected error, got nil")
++				}
++				return
++			}
++			if err != nil {
++				t.Fatalf("unexpected error: %v", err)
++			}
++
++			wantSanitized := pathMap[tt.wantDir]
++			want := filepath.Join(projectsDir, wantSanitized)
++			if got != want {
++				t.Errorf("got %s, want %s", got, want)
++			}
++		})
++	}
++}
++
++type fileAge struct {
++	name string
++	age  time.Duration
++}
+diff --git a/internal/checkpoint/store.go b/internal/checkpoint/store.go
+index 3f761de..5d3c195 100644
+--- a/internal/checkpoint/store.go
++++ b/internal/checkpoint/store.go
+@@ -22,6 +22,7 @@ func NewStore(repoRoot string) *Store {
+ type SessionFiles struct {
+ 	ContentHash string
+ 	Context     string
++	Diff        string
+ 	FullJSONL   string
+ 	Metadata    SessionMetadata
+ 	Prompt      string
+diff --git a/internal/checkpoint/write.go b/internal/checkpoint/write.go
+index 882277b..8de4972 100644
+--- a/internal/checkpoint/write.go
++++ b/internal/checkpoint/write.go
+@@ -50,10 +50,16 @@ func (s *Store) Write(cp *Checkpoint, sessionData *SessionFiles) error {
+ 		return fmt.Errorf("hashing prompt: %w", err)
+ 	}
+ 
++	diffHash, err := s.hashObject(sessionData.Diff)
++	if err != nil {
++		return fmt.Errorf("hashing diff: %w", err)
++	}
++
+ 	// Build session subtree (0/)
+ 	sessionTree, err := s.mktree([]treeEntry{
+ 		{mode: "100644", typ: "blob", hash: contentHashHash, name: "content_hash.txt"},
+ 		{mode: "100644", typ: "blob", hash: contextHash, name: "context.md"},
++		{mode: "100644", typ: "blob", hash: diffHash, name: "diff.patch"},
+ 		{mode: "100644", typ: "blob", hash: fullHash, name: "full.jsonl"},
+ 		{mode: "100644", typ: "blob", hash: sessionMetaHash, name: "metadata.json"},
+ 		{mode: "100644", typ: "blob", hash: promptHash, name: "prompt.txt"},
+diff --git a/internal/git/diff.go b/internal/git/diff.go
+new file mode 100644
+index 0000000..d9cff9b
+--- /dev/null
++++ b/internal/git/diff.go
+@@ -0,0 +1,6 @@
++package git
++
++// Diff returns the unified diff for a specific commit.
++func Diff(commitHash string) (string, error) {
++	return execGit("diff", commitHash+"~1", commitHash)
++}
+diff --git a/internal/hooks/postcommit.go b/internal/hooks/postcommit.go
+index 6d655bd..d870337 100644
+--- a/internal/hooks/postcommit.go
++++ b/internal/hooks/postcommit.go
+@@ -62,8 +62,26 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
+ 		slog.Warn("could not read agent session", "error", err)
+ 	}
+ 
+-	// Create checkpoint
++	// Generate checkpoint ID and amend commit with trailers BEFORE writing
++	// the checkpoint, so we capture the post-amend commit hash.
+ 	cpID := checkpoint.NewID()
++
++	trailers := map[string]string{
++		"Partio-Checkpoint":  cpID,
++		"Partio-Attribution": fmt.Sprintf("%d%% agent", attr.AgentPercent),
++	}
++
++	if err := git.AmendTrailers(trailers); err != nil {
++		slog.Warn("could not add trailers to commit", "error", err)
++	}
++
++	// Get the post-amend commit hash (this is the hash that gets pushed)
++	commitHash, err = git.CurrentCommit()
++	if err != nil {
++		return fmt.Errorf("getting post-amend commit: %w", err)
++	}
++
++	// Create checkpoint with the post-amend hash
+ 	cp := &checkpoint.Checkpoint{
+ 		ID:          cpID,
+ 		CommitHash:  commitHash,
+@@ -89,6 +107,10 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
+ 		Prompt: "",
+ 	}
+ 
++	if d, err := git.Diff(commitHash); err == nil {
++		sessionFiles.Diff = d
++	}
++
+ 	if sessionData != nil {
+ 		sessionFiles.Context = sessionData.Context
+ 		sessionFiles.Prompt = sessionData.Prompt
+@@ -109,16 +131,6 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
+ 		return fmt.Errorf("writing checkpoint: %w", err)
+ 	}
+ 
+-	// Add trailers to commit
+-	trailers := map[string]string{
+-		"Partio-Checkpoint":  cpID,
+-		"Partio-Attribution": fmt.Sprintf("%d%% agent", attr.AgentPercent),
+-	}
+-
+-	if err := git.AmendTrailers(trailers); err != nil {
+-		slog.Warn("could not add trailers to commit", "error", err)
+-	}
+-
+ 	slog.Debug("checkpoint created", "id", cpID, "agent_pct", attr.AgentPercent)
+ 	return nil
+ }
+diff --git a/partio b/partio
+new file mode 100755
+index 0000000..b1c4cc8
+Binary files /dev/null and b/partio differ
