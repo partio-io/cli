@@ -1,0 +1,22 @@
+diff --git a/.goreleaser.yml b/.goreleaser.yml
+index da46245..c3f70e7 100644
+--- a/.goreleaser.yml
++++ b/.goreleaser.yml
+@@ -1,5 +1,7 @@
+ version: 2
+ 
++project_name: partio
++
+ builds:
+   - main: ./cmd/partio
+     binary: partio
+@@ -30,7 +32,8 @@ changelog:
+       - "^ci:"
+ 
+ brews:
+-  - repository:
++  - name: partio
++    repository:
+       owner: partio-io
+       name: homebrew-tap
+       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
