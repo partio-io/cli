@@ -50,10 +50,16 @@ func (s *Store) Write(cp *Checkpoint, sessionData *SessionFiles) error {
 		return fmt.Errorf("hashing prompt: %w", err)
 	}
 
+	diffHash, err := s.hashObject(sessionData.Diff)
+	if err != nil {
+		return fmt.Errorf("hashing diff: %w", err)
+	}
+
 	// Build session subtree (0/)
 	sessionTree, err := s.mktree([]treeEntry{
 		{mode: "100644", typ: "blob", hash: contentHashHash, name: "content_hash.txt"},
 		{mode: "100644", typ: "blob", hash: contextHash, name: "context.md"},
+		{mode: "100644", typ: "blob", hash: diffHash, name: "diff.patch"},
 		{mode: "100644", typ: "blob", hash: fullHash, name: "full.jsonl"},
 		{mode: "100644", typ: "blob", hash: sessionMetaHash, name: "metadata.json"},
 		{mode: "100644", typ: "blob", hash: promptHash, name: "prompt.txt"},

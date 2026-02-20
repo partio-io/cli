@@ -22,6 +22,7 @@ func NewStore(repoRoot string) *Store {
 type SessionFiles struct {
 	ContentHash string
 	Context     string
+	Diff        string
 	FullJSONL   string
 	Metadata    SessionMetadata
 	Prompt      string
