@@ -1,0 +1,11 @@
+diff --git a/.gitignore b/.gitignore
+index 7ee9f3e..63822e9 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1 +1,2 @@
+ .partio/settings.local.json
++partio
+diff --git a/partio b/partio
+deleted file mode 100755
+index b1c4cc8..0000000
+Binary files a/partio and /dev/null differ
