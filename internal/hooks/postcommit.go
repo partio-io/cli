@@ -62,8 +62,26 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		slog.Warn("could not read agent session", "error", err)
 	}
 
-	// Create checkpoint
+	// Generate checkpoint ID and amend commit with trailers BEFORE writing
+	// the checkpoint, so we capture the post-amend commit hash.
 	cpID := checkpoint.NewID()
+
+	trailers := map[string]string{
+		"Partio-Checkpoint":  cpID,
+		"Partio-Attribution": fmt.Sprintf("%d%% agent", attr.AgentPercent),
+	}
+
+	if err := git.AmendTrailers(trailers); err != nil {
+		slog.Warn("could not add trailers to commit", "error", err)
+	}
+
+	// Get the post-amend commit hash (this is the hash that gets pushed)
+	commitHash, err = git.CurrentCommit()
+	if err != nil {
+		return fmt.Errorf("getting post-amend commit: %w", err)
+	}
+
+	// Create checkpoint with the post-amend hash
 	cp := &checkpoint.Checkpoint{
 		ID:          cpID,
 		CommitHash:  commitHash,
@@ -89,6 +107,10 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		Prompt: "",
 	}
 
+	if d, err := git.Diff(commitHash); err == nil {
+		sessionFiles.Diff = d
+	}
+
 	if sessionData != nil {
 		sessionFiles.Context = sessionData.Context
 		sessionFiles.Prompt = sessionData.Prompt
@@ -107,16 +129,6 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	store := checkpoint.NewStore(repoRoot)
 	if err := store.Write(cp, sessionFiles); err != nil {
 		return fmt.Errorf("writing checkpoint: %w", err)
-	}
-
-	// Add trailers to commit
-	trailers := map[string]string{
-		"Partio-Checkpoint":  cpID,
-		"Partio-Attribution": fmt.Sprintf("%d%% agent", attr.AgentPercent),
-	}
-
-	if err := git.AmendTrailers(trailers); err != nil {
-		slog.Warn("could not add trailers to commit", "error", err)
 	}
 
 	slog.Debug("checkpoint created", "id", cpID, "agent_pct", attr.AgentPercent)
