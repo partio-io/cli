@@ -1,5 +1,7 @@
 version: 2
 
+project_name: partio
+
 builds:
   - main: ./cmd/partio
     binary: partio
@@ -30,7 +32,8 @@ changelog:
       - "^ci:"
 
 brews:
-  - repository:
+  - name: partio
+    repository:
       owner: partio-io
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
