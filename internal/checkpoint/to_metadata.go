@@ -13,5 +13,6 @@ func (c *Checkpoint) ToMetadata() Metadata {
 		Agent:        c.Agent,
 		AgentPercent: c.AgentPct,
 		ContentHash:  c.ContentHash,
+		PlanSlug:     c.PlanSlug,
 	}
 }

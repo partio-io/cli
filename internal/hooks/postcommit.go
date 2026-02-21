@@ -94,6 +94,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 
 	if sessionData != nil {
 		cp.SessionID = sessionData.SessionID
+		cp.PlanSlug = sessionData.PlanSlug
 	}
 
 	// Prepare session files
@@ -116,6 +117,15 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		sessionFiles.Prompt = sessionData.Prompt
 		sessionFiles.Metadata.TotalTokens = sessionData.TotalTokens
 		sessionFiles.Metadata.Duration = sessionData.Duration.String()
+	}
+
+	if sessionData != nil && sessionData.PlanSlug != "" {
+		planContent, err := claude.ReadPlanFile(sessionData.PlanSlug)
+		if err != nil {
+			slog.Warn("could not read plan file", "slug", sessionData.PlanSlug, "error", err)
+		} else {
+			sessionFiles.Plan = planContent
+		}
 	}
 
 	if sessionPath != "" {

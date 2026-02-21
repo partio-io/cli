@@ -22,6 +22,7 @@ func ParseJSONL(path string) (*agent.SessionData, error) {
 		messages    []agent.Message
 		prompt      string
 		sessionID   string
+		slug        string
 		totalTokens int
 		firstTS     time.Time
 		lastTS      time.Time
@@ -45,6 +46,10 @@ func ParseJSONL(path string) (*agent.SessionData, error) {
 
 		if entry.SessionID != "" && sessionID == "" {
 			sessionID = entry.SessionID
+		}
+
+		if entry.Slug != "" && slug == "" {
+			slug = entry.Slug
 		}
 
 		ts := time.Unix(int64(entry.Timestamp), 0)
@@ -91,6 +96,7 @@ func ParseJSONL(path string) (*agent.SessionData, error) {
 		Context:     generateContext(messages),
 		TotalTokens: totalTokens,
 		Duration:    duration,
+		PlanSlug:    slug,
 	}, nil
 }
 
