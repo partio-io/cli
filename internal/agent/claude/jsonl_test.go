@@ -87,6 +87,49 @@ func TestParseJSONLEmpty(t *testing.T) {
 	}
 }
 
+func TestParseJSONLWithSlug(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.jsonl")
+
+	lines := `{"type":"human","role":"human","message":"Build a todo app","timestamp":1700000000,"sessionId":"sess-456","slug":"noble-mixing-unicorn"}
+{"type":"assistant","role":"assistant","message":"I'll help you build a todo app.","timestamp":1700000010}
+`
+
+	if err := os.WriteFile(path, []byte(lines), 0o644); err != nil {
+		t.Fatalf("writing test file: %v", err)
+	}
+
+	data, err := ParseJSONL(path)
+	if err != nil {
+		t.Fatalf("ParseJSONL error: %v", err)
+	}
+
+	if data.PlanSlug != "noble-mixing-unicorn" {
+		t.Errorf("expected plan slug 'noble-mixing-unicorn', got %q", data.PlanSlug)
+	}
+}
+
+func TestParseJSONLWithoutSlug(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.jsonl")
+
+	lines := `{"type":"human","role":"human","message":"Hello","timestamp":1700000000,"sessionId":"sess-789"}
+`
+
+	if err := os.WriteFile(path, []byte(lines), 0o644); err != nil {
+		t.Fatalf("writing test file: %v", err)
+	}
+
+	data, err := ParseJSONL(path)
+	if err != nil {
+		t.Fatalf("ParseJSONL error: %v", err)
+	}
+
+	if data.PlanSlug != "" {
+		t.Errorf("expected empty plan slug, got %q", data.PlanSlug)
+	}
+}
+
 func TestSanitizePath(t *testing.T) {
 	tests := []struct {
 		input    string

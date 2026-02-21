@@ -16,6 +16,7 @@ type Checkpoint struct {
 	Agent       string    `json:"agent"`
 	AgentPct    int       `json:"agent_percent"`
 	ContentHash string    `json:"content_hash"`
+	PlanSlug    string    `json:"plan_slug,omitempty"`
 }
 
 // Metadata is the JSON schema for checkpoint metadata stored on the orphan branch.
@@ -28,6 +29,7 @@ type Metadata struct {
 	Agent        string `json:"agent"`
 	AgentPercent int    `json:"agent_percent"`
 	ContentHash  string `json:"content_hash"`
+	PlanSlug     string `json:"plan_slug,omitempty"`
 }
 
 // NewID generates a 12-character hex checkpoint ID.

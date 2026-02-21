@@ -25,6 +25,7 @@ type SessionFiles struct {
 	Diff        string
 	FullJSONL   string
 	Metadata    SessionMetadata
+	Plan        string
 	Prompt      string
 }
 

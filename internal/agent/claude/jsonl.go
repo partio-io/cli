@@ -10,6 +10,7 @@ type jsonlEntry struct {
 	Content   json.RawMessage `json:"content,omitempty"`
 	Timestamp float64         `json:"timestamp,omitempty"`
 	SessionID string          `json:"sessionId,omitempty"`
+	Slug      string          `json:"slug,omitempty"`
 
 	// For content blocks
 	ContentBlocks []contentBlock `json:"contentBlocks,omitempty"`
