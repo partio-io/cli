@@ -1,0 +1,11 @@
+{
+  "id": "335bb8b06d8a",
+  "session_id": "e0219953-b606-49f7-86b9-743d0dd64dbb",
+  "commit_hash": "0994cce019ebec8b7790d42a08cd59a7cb9b39e8",
+  "branch": "partio-app-checkpoint-fixes",
+  "created_at": "2026-02-22T10:48:47+01:00",
+  "agent": "claude-code",
+  "agent_percent": 100,
+  "content_hash": "0994cce019ebec8b7790d42a08cd59a7cb9b39e8",
+  "plan_slug": "logical-knitting-toast"
+}
