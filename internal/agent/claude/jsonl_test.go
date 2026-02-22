@@ -130,6 +130,40 @@ func TestParseJSONLWithoutSlug(t *testing.T) {
 	}
 }
 
+func TestParseJSONLWithStringTimestamps(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.jsonl")
+
+	lines := `{"type":"user","role":"user","slug":"logical-knitting-toast","sessionId":"sess-abc","message":{"role":"user","content":[{"type":"text","text":"Implement the plan"}]},"timestamp":"2026-02-21T06:14:47.736Z"}
+{"type":"assistant","role":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I'll implement that."}]},"timestamp":"2026-02-21T06:14:50.332Z"}
+`
+
+	if err := os.WriteFile(path, []byte(lines), 0o644); err != nil {
+		t.Fatalf("writing test file: %v", err)
+	}
+
+	data, err := ParseJSONL(path)
+	if err != nil {
+		t.Fatalf("ParseJSONL error: %v", err)
+	}
+
+	if data.PlanSlug != "logical-knitting-toast" {
+		t.Errorf("expected plan slug 'logical-knitting-toast', got %q", data.PlanSlug)
+	}
+
+	if data.SessionID != "sess-abc" {
+		t.Errorf("expected session ID 'sess-abc', got %q", data.SessionID)
+	}
+
+	if len(data.Transcript) != 2 {
+		t.Errorf("expected 2 messages, got %d", len(data.Transcript))
+	}
+
+	if data.Prompt != "Implement the plan" {
+		t.Errorf("expected prompt 'Implement the plan', got %q", data.Prompt)
+	}
+}
+
 func TestSanitizePath(t *testing.T) {
 	tests := []struct {
 		input    string
