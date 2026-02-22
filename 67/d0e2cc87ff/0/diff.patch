@@ -1,0 +1,142 @@
+diff --git a/internal/agent/claude/jsonl.go b/internal/agent/claude/jsonl.go
+index aade0a6..198af19 100644
+--- a/internal/agent/claude/jsonl.go
++++ b/internal/agent/claude/jsonl.go
+@@ -1,6 +1,42 @@
+ package claude
+ 
+-import "encoding/json"
++import (
++	"encoding/json"
++	"time"
++)
++
++// flexTimestamp handles both Unix epoch (float64) and ISO 8601 (string) timestamps
++// found in Claude Code JSONL entries.
++type flexTimestamp struct {
++	Time time.Time
++}
++
++func (ft *flexTimestamp) UnmarshalJSON(data []byte) error {
++	// Try as float64 (Unix epoch) first
++	var f float64
++	if err := json.Unmarshal(data, &f); err == nil {
++		ft.Time = time.Unix(int64(f), 0)
++		return nil
++	}
++
++	// Try as string (ISO 8601)
++	var s string
++	if err := json.Unmarshal(data, &s); err == nil {
++		t, err := time.Parse(time.RFC3339Nano, s)
++		if err == nil {
++			ft.Time = t
++			return nil
++		}
++		// Also try without nanoseconds
++		t, err = time.Parse(time.RFC3339, s)
++		if err == nil {
++			ft.Time = t
++			return nil
++		}
++	}
++
++	return nil
++}
+ 
+ // jsonlEntry represents a single line in Claude's JSONL transcript.
+ type jsonlEntry struct {
+@@ -8,7 +44,7 @@ type jsonlEntry struct {
+ 	Role      string          `json:"role,omitempty"`
+ 	Message   json.RawMessage `json:"message,omitempty"`
+ 	Content   json.RawMessage `json:"content,omitempty"`
+-	Timestamp float64         `json:"timestamp,omitempty"`
++	Timestamp flexTimestamp   `json:"timestamp"`
+ 	SessionID string          `json:"sessionId,omitempty"`
+ 	Slug      string          `json:"slug,omitempty"`
+ 
+diff --git a/internal/agent/claude/jsonl_test.go b/internal/agent/claude/jsonl_test.go
+index 9012533..64f8dc4 100644
+--- a/internal/agent/claude/jsonl_test.go
++++ b/internal/agent/claude/jsonl_test.go
+@@ -130,6 +130,40 @@ func TestParseJSONLWithoutSlug(t *testing.T) {
+ 	}
+ }
+ 
++func TestParseJSONLWithStringTimestamps(t *testing.T) {
++	dir := t.TempDir()
++	path := filepath.Join(dir, "test.jsonl")
++
++	lines := `{"type":"user","role":"user","slug":"logical-knitting-toast","sessionId":"sess-abc","message":{"role":"user","content":[{"type":"text","text":"Implement the plan"}]},"timestamp":"2026-02-21T06:14:47.736Z"}
++{"type":"assistant","role":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I'll implement that."}]},"timestamp":"2026-02-21T06:14:50.332Z"}
++`
++
++	if err := os.WriteFile(path, []byte(lines), 0o644); err != nil {
++		t.Fatalf("writing test file: %v", err)
++	}
++
++	data, err := ParseJSONL(path)
++	if err != nil {
++		t.Fatalf("ParseJSONL error: %v", err)
++	}
++
++	if data.PlanSlug != "logical-knitting-toast" {
++		t.Errorf("expected plan slug 'logical-knitting-toast', got %q", data.PlanSlug)
++	}
++
++	if data.SessionID != "sess-abc" {
++		t.Errorf("expected session ID 'sess-abc', got %q", data.SessionID)
++	}
++
++	if len(data.Transcript) != 2 {
++		t.Errorf("expected 2 messages, got %d", len(data.Transcript))
++	}
++
++	if data.Prompt != "Implement the plan" {
++		t.Errorf("expected prompt 'Implement the plan', got %q", data.Prompt)
++	}
++}
++
+ func TestSanitizePath(t *testing.T) {
+ 	tests := []struct {
+ 		input    string
+diff --git a/internal/agent/claude/parse_jsonl.go b/internal/agent/claude/parse_jsonl.go
+index d89db78..1901ecb 100644
+--- a/internal/agent/claude/parse_jsonl.go
++++ b/internal/agent/claude/parse_jsonl.go
+@@ -52,11 +52,13 @@ func ParseJSONL(path string) (*agent.SessionData, error) {
+ 			slug = entry.Slug
+ 		}
+ 
+-		ts := time.Unix(int64(entry.Timestamp), 0)
+-		if firstTS.IsZero() {
+-			firstTS = ts
++		ts := entry.Timestamp.Time
++		if !ts.IsZero() {
++			if firstTS.IsZero() {
++				firstTS = ts
++			}
++			lastTS = ts
+ 		}
+-		lastTS = ts
+ 
+ 		// Extract message content
+ 		text := extractText(entry)
+@@ -77,7 +79,7 @@ func ParseJSONL(path string) (*agent.SessionData, error) {
+ 		messages = append(messages, msg)
+ 
+ 		// First human message is the prompt
+-		if prompt == "" && role == "human" {
++		if prompt == "" && (role == "human" || role == "user") {
+ 			prompt = text
+ 		}
+ 	}
+@@ -165,7 +167,7 @@ func generateContext(messages []agent.Message) string {
+ 
+ 	summary := "AI coding session"
+ 	for _, m := range messages {
+-		if m.Role == "human" {
++		if m.Role == "human" || m.Role == "user" {
+ 			if len(m.Content) > 200 {
+ 				summary = m.Content[:200] + "..."
+ 			} else {
