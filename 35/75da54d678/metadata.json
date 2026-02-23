@@ -1,0 +1,11 @@
+{
+  "id": "3575da54d678",
+  "session_id": "494ac146-6c29-4152-8432-0b65868f058a",
+  "commit_hash": "5b5060dfa8f644e52328d0c3e5bf7404744188f0",
+  "branch": "partio-app-restart-conversation",
+  "created_at": "2026-02-23T16:26:51+01:00",
+  "agent": "claude-code",
+  "agent_percent": 100,
+  "content_hash": "5b5060dfa8f644e52328d0c3e5bf7404744188f0",
+  "plan_slug": "synchronous-crunching-sunbeam"
+}
