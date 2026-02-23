@@ -52,11 +52,13 @@ func ParseJSONL(path string) (*agent.SessionData, error) {
 			slug = entry.Slug
 		}
 
-		ts := time.Unix(int64(entry.Timestamp), 0)
-		if firstTS.IsZero() {
-			firstTS = ts
+		ts := entry.Timestamp.Time
+		if !ts.IsZero() {
+			if firstTS.IsZero() {
+				firstTS = ts
+			}
+			lastTS = ts
 		}
-		lastTS = ts
 
 		// Extract message content
 		text := extractText(entry)
@@ -77,7 +79,7 @@ func ParseJSONL(path string) (*agent.SessionData, error) {
 		messages = append(messages, msg)
 
 		// First human message is the prompt
-		if prompt == "" && role == "human" {
+		if prompt == "" && (role == "human" || role == "user") {
 			prompt = text
 		}
 	}
@@ -165,7 +167,7 @@ func generateContext(messages []agent.Message) string {
 
 	summary := "AI coding session"
 	for _, m := range messages {
-		if m.Role == "human" {
+		if m.Role == "human" || m.Role == "user" {
 			if len(m.Content) > 200 {
 				summary = m.Content[:200] + "..."
 			} else {
