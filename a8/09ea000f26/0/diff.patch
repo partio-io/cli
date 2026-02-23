@@ -1,0 +1,13 @@
+diff --git a/cmd/partio/main.go b/cmd/partio/main.go
+index 1dd74c6..19b3cc8 100644
+--- a/cmd/partio/main.go
++++ b/cmd/partio/main.go
+@@ -65,7 +65,7 @@ func newRootCmd() *cobra.Command {
+ 		newResetCmd(),
+ 		newCleanCmd(),
+ 		newRewindCmd(),
+-		newRestartCmd(),
++		newResumeCmd(),
+ 	)
+ 
+ 	return root
