@@ -1,0 +1,11 @@
+{
+  "id": "59d9e8b6efe3",
+  "session_id": "a7ddb6ff-f1df-443d-a979-c0db3043e899",
+  "commit_hash": "911f89c71451902904764e5b975266e7b8fb87b4",
+  "branch": "partio-change-branch",
+  "created_at": "2026-02-27T11:02:24+01:00",
+  "agent": "claude-code",
+  "agent_percent": 100,
+  "content_hash": "911f89c71451902904764e5b975266e7b8fb87b4",
+  "plan_slug": "delegated-snuggling-walrus"
+}

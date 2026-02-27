@@ -1,0 +1,35 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 2648e1b..2af464c 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -11,7 +11,7 @@ Partio captures the *why* behind code changes by hooking into Git workflows to p
+ ## Project Structure
+ 
+ ```
+-cmd/partio/          CLI commands (enable, disable, status, rewind, doctor, hook, etc.)
++cmd/partio/          CLI commands (enable, disable, status, rewind, resume, doctor, hook, etc.)
+ internal/
+   agent/             Agent detection interface + Claude Code implementation
+     claude/          Claude-specific: process detection, JSONL parsing, session discovery
+diff --git a/README.md b/README.md
+index 709d0e8..3efad3a 100644
+--- a/README.md
++++ b/README.md
+@@ -38,6 +38,9 @@ git show partio/checkpoints/v1:<shard>/<id>/0/full.jsonl
+ # Rewind to a checkpoint
+ partio rewind --to <id>
+ 
++# Resume a previous session with Claude Code
++partio resume <id>
++
+ # Check status
+ partio status
+ ```
+@@ -51,6 +54,7 @@ partio status
+ | `partio status` | Show current status |
+ | `partio rewind --list` | List all checkpoints |
+ | `partio rewind --to <id>` | Restore to a checkpoint |
++| `partio resume <id>` | Resume a session from a checkpoint |
+ | `partio doctor` | Check installation health |
+ | `partio reset` | Reset the checkpoint branch |
+ | `partio clean` | Remove orphaned data |
