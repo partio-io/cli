@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "dbeb360f50ab",
+  "session_id": "a7ddb6ff-f1df-443d-a979-c0db3043e899",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-27T10:02:24.099393Z",
+  "branch": "partio-change-branch",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "CLAUDE.md",
+    "README.md"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "35f181d25f4b",
+  "token_usage": {
+    "input_tokens": 16,
+    "cache_creation_tokens": 18971,
+    "cache_read_tokens": 443911,
+    "output_tokens": 2470,
+    "api_call_count": 10
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-27T10:02:24.072189Z",
+    "agent_lines": 5,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 5,
+    "agent_percentage": 100
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "dbeb360f50ab",
+  "strategy": "manual-commit",
+  "branch": "partio-change-branch",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "CLAUDE.md",
+    "README.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/db/eb360f50ab/0/metadata.json",
+      "transcript": "/db/eb360f50ab/0/full.jsonl",
+      "context": "/db/eb360f50ab/0/context.md",
+      "content_hash": "/db/eb360f50ab/0/content_hash.txt",
+      "prompt": "/db/eb360f50ab/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 16,
+    "cache_creation_tokens": 18971,
+    "cache_read_tokens": 443911,
+    "output_tokens": 2470,
+    "api_call_count": 10
+  }
+}
