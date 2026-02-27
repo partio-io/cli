@@ -1,0 +1,11 @@
+{
+  "id": "f38a01f21a8a",
+  "session_id": "f08e42e5-8425-4aee-ae1f-fcf2be8e545f",
+  "commit_hash": "38ae9b7252ea4368b2cda8b3c096798533ab5bed",
+  "branch": "partio-change-branch",
+  "created_at": "2026-02-27T09:14:52+01:00",
+  "agent": "claude-code",
+  "agent_percent": 100,
+  "content_hash": "38ae9b7252ea4368b2cda8b3c096798533ab5bed",
+  "plan_slug": "humble-prancing-giraffe"
+}

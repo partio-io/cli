@@ -1,0 +1,111 @@
+diff --git a/.claude/settings.json b/.claude/settings.json
+new file mode 100644
+index 0000000..5cfa585
+--- /dev/null
++++ b/.claude/settings.json
+@@ -0,0 +1,84 @@
++{
++  "hooks": {
++    "PostToolUse": [
++      {
++        "matcher": "Task",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "entire hooks claude-code post-task"
++          }
++        ]
++      },
++      {
++        "matcher": "TodoWrite",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "entire hooks claude-code post-todo"
++          }
++        ]
++      }
++    ],
++    "PreToolUse": [
++      {
++        "matcher": "Task",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "entire hooks claude-code pre-task"
++          }
++        ]
++      }
++    ],
++    "SessionEnd": [
++      {
++        "matcher": "",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "entire hooks claude-code session-end"
++          }
++        ]
++      }
++    ],
++    "SessionStart": [
++      {
++        "matcher": "",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "entire hooks claude-code session-start"
++          }
++        ]
++      }
++    ],
++    "Stop": [
++      {
++        "matcher": "",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "entire hooks claude-code stop"
++          }
++        ]
++      }
++    ],
++    "UserPromptSubmit": [
++      {
++        "matcher": "",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "entire hooks claude-code user-prompt-submit"
++          }
++        ]
++      }
++    ]
++  },
++  "permissions": {
++    "deny": [
++      "Read(./.entire/metadata/**)"
++    ]
++  }
++}
+diff --git a/.entire/.gitignore b/.entire/.gitignore
+new file mode 100644
+index 0000000..2cffdef
+--- /dev/null
++++ b/.entire/.gitignore
+@@ -0,0 +1,4 @@
++tmp/
++settings.local.json
++metadata/
++logs/
+diff --git a/.entire/settings.json b/.entire/settings.json
+new file mode 100644
+index 0000000..19d10fb
+--- /dev/null
++++ b/.entire/settings.json
+@@ -0,0 +1,5 @@
++{
++  "strategy": "manual-commit",
++  "enabled": true,
++  "telemetry": false
++}
