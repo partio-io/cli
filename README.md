@@ -38,6 +38,9 @@ git show partio/checkpoints/v1:<shard>/<id>/0/full.jsonl
 # Rewind to a checkpoint
 partio rewind --to <id>
 
+# Resume a previous session with Claude Code
+partio resume <id>
+
 # Check status
 partio status
 ```
@@ -51,6 +54,7 @@ partio status
 | `partio status` | Show current status |
 | `partio rewind --list` | List all checkpoints |
 | `partio rewind --to <id>` | Restore to a checkpoint |
+| `partio resume <id>` | Resume a session from a checkpoint |
 | `partio doctor` | Check installation health |
 | `partio reset` | Reset the checkpoint branch |
 | `partio clean` | Remove orphaned data |

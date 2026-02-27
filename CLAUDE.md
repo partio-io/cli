@@ -11,7 +11,7 @@ Partio captures the *why* behind code changes by hooking into Git workflows to p
 ## Project Structure
 
 ```
-cmd/partio/          CLI commands (enable, disable, status, rewind, doctor, hook, etc.)
+cmd/partio/          CLI commands (enable, disable, status, rewind, resume, doctor, hook, etc.)
 internal/
   agent/             Agent detection interface + Claude Code implementation
     claude/          Claude-specific: process detection, JSONL parsing, session discovery
