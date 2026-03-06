@@ -1,0 +1,298 @@
+diff --git a/.github/CONTRIBUTING.md b/.github/CONTRIBUTING.md
+new file mode 100644
+index 0000000..250cfa4
+--- /dev/null
++++ b/.github/CONTRIBUTING.md
+@@ -0,0 +1,68 @@
++# Contributing to Partio
++
++Thanks for your interest in contributing to partio! Here's how to get started.
++
++## Development Setup
++
++```bash
++git clone https://github.com/partio-io/cli.git
++cd cli
++make build
++```
++
++Requires Go 1.25+.
++
++## Running Tests
++
++```bash
++make test    # Run all tests
++make lint    # Run golangci-lint
++```
++
++## Project Structure
++
++```
++cmd/partio/       CLI commands (one file per command)
++internal/
++  agent/          Agent detection interface + Claude Code implementation
++  attribution/    Code attribution calculation
++  checkpoint/     Checkpoint domain type + git plumbing storage
++  config/         Layered configuration
++  git/            Git operations and hook management
++  hooks/          Git hook implementations (pre-commit, post-commit, pre-push)
++  session/        Session lifecycle and state persistence
++  log/            Logging setup
++```
++
++## Making Changes
++
++1. Fork the repo and create a feature branch
++2. Make your changes
++3. Run tests: `make test`
++4. Run linter: `make lint`
++5. Open a pull request with a clear description of the change
++
++## Code Style
++
++- **One primary concern per file** — e.g., `find_session_dir.go`, `parse_jsonl.go`
++- **Standard library `testing` only** — no external test frameworks
++- **Table-driven tests** with `t.TempDir()` for filesystem isolation
++- **Minimal dependencies** — currently only `cobra` and `google/uuid`
++- **Error resilience in hooks** — hooks should log warnings but never block Git operations on non-critical failures
++
++## Reporting Issues
++
++When reporting a bug, please include the output of:
++
++```bash
++partio doctor
++partio version
++```
++
++Along with:
++- Your OS and Go version
++- Steps to reproduce the issue
++
++## License
++
++By contributing, you agree that your contributions will be licensed under the [MIT License](../LICENSE).
+diff --git a/README.md b/README.md
+index 709d0e8..529044c 100644
+--- a/README.md
++++ b/README.md
+@@ -1,45 +1,52 @@
+ # partio
+ 
+-Capture the *why* behind your code changes.
++[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
++[![Go Report Card](https://goreportcard.com/badge/github.com/partio-io/cli)](https://goreportcard.com/report/github.com/partio-io/cli)
++[![Latest Release](https://img.shields.io/github/v/release/partio-io/cli)](https://github.com/partio-io/cli/releases/latest)
+ 
+-**partio** hooks into Git workflows to capture AI agent sessions (Claude Code), preserving the reasoning behind code changes alongside the *what* that Git already tracks.
++**Capture the *why* behind your code changes.**
+ 
+-The "partial" version of [entire.io](https://entire.io).
++partio hooks into Git to capture AI agent sessions (Claude Code) alongside your commits. When you commit, partio snapshots the full conversation — prompts, plans, tool calls — so your team can understand *why* code changed, not just *what* changed.
++
++Everything stays in your repo as Git objects. Nothing leaves your machine.
++
++![partio demo](assets/demo.gif)
+ 
+ ## Install
+ 
++### Homebrew
++
+ ```bash
+-go install github.com/partio-io/cli/cmd/partio@latest
++brew install partio-io/tap/partio
+ ```
+ 
+-Or with Homebrew:
++### Go
++
++Requires Go 1.25+.
+ 
+ ```bash
+-brew install partio-io/tap/partio
++go install github.com/partio-io/cli/cmd/partio@latest
+ ```
+ 
+ ## Quick Start
+ 
+ ```bash
+-# Enable in your repo
++# 1. Enable partio in your repo
+ cd your-project
+ partio enable
+ 
+-# Code with Claude Code as usual, then commit
++# 2. Code with Claude Code, then commit as usual
+ git commit -m "add new feature"
+ # partio automatically captures the AI session as a checkpoint
+ 
+-# View checkpoints
+-partio rewind --list
+-
+-# Inspect a checkpoint
+-git show partio/checkpoints/v1:<shard>/<id>/0/full.jsonl
++# 3. Check status
++partio status
+ 
+-# Rewind to a checkpoint
+-partio rewind --to <id>
++# 4. List all checkpoints
++partio rewind --list
+ 
+-# Check status
+-partio status
++# 5. Resume a previous session
++partio resume <checkpoint-id> --print
+ ```
+ 
+ ## Commands
+@@ -47,31 +54,32 @@ partio status
+ | Command | Description |
+ |---------|-------------|
+ | `partio enable` | Set up partio in the current repo |
+-| `partio disable` | Remove hooks (preserves data) |
++| `partio disable` | Remove hooks (preserves checkpoint data) |
+ | `partio status` | Show current status |
+ | `partio rewind --list` | List all checkpoints |
+-| `partio rewind --to <id>` | Restore to a checkpoint |
++| `partio rewind --to <id>` | Restore repo to a checkpoint's commit |
++| `partio resume <id>` | Launch Claude Code with checkpoint context |
++| `partio resume <id> --print` | Print the composed context to stdout |
++| `partio resume <id> --copy` | Copy the composed context to clipboard |
++| `partio resume <id> --branch` | Create a branch at the checkpoint's commit before launching |
+ | `partio doctor` | Check installation health |
+ | `partio reset` | Reset the checkpoint branch |
+-| `partio clean` | Remove orphaned data |
++| `partio clean` | Remove orphaned checkpoint data |
+ | `partio version` | Print version |
+ 
+ ## How It Works
+ 
+-1. `partio enable` installs git hooks (`pre-commit`, `post-commit`, `pre-push`)
+-2. When you commit, hooks detect if Claude Code is running
+-3. If active, it captures the JSONL transcript, calculates attribution, and creates a checkpoint
+-4. Checkpoints are stored on an orphan branch (`partio/checkpoints/v1`) using git plumbing
++1. `partio enable` installs Git hooks (`pre-commit`, `post-commit`, `pre-push`)
++2. When you commit, the pre-commit hook detects if Claude Code is running
++3. If active, the post-commit hook captures the JSONL transcript, calculates attribution, and creates a checkpoint
++4. Checkpoints are stored on an orphan branch (`partio/checkpoints/v1`) using Git plumbing — no working tree changes
+ 5. Commits are annotated with `Partio-Checkpoint` and `Partio-Attribution` trailers
+ 6. On push, the checkpoint branch is pushed alongside your code
+ 
+-## Git Worktrees
+-
+-partio fully supports git worktrees. Hooks are installed to the shared git directory (`git rev-parse --git-common-dir`) so they work across all worktrees. Session discovery walks up from the repo root to find the Claude Code session directory, which may be keyed to a parent workspace directory.
++<details>
++<summary><strong>Checkpoint Data Structure</strong></summary>
+ 
+-## Checkpoint Data
+-
+-Checkpoints are stored on the `partio/checkpoints/v1` orphan branch with this structure:
++Checkpoints are stored on the `partio/checkpoints/v1` orphan branch:
+ 
+ ```
+ <shard>/<checkpoint-id>/
+@@ -84,7 +92,7 @@ Checkpoints are stored on the `partio/checkpoints/v1` orphan branch with this st
+     content_hash.txt     # Commit hash reference
+ ```
+ 
+-You can inspect checkpoint data directly with git:
++Inspect checkpoint data directly with Git:
+ 
+ ```bash
+ # List all checkpoint files
+@@ -97,9 +105,13 @@ git show partio/checkpoints/v1:<shard>/<id>/metadata.json
+ git show partio/checkpoints/v1:<shard>/<id>/0/full.jsonl
+ ```
+ 
+-## Configuration
++</details>
++
++<details>
++<summary><strong>Configuration</strong></summary>
+ 
+ Config files (highest priority wins):
++
+ - Environment variables (`PARTIO_ENABLED`, `PARTIO_STRATEGY`, `PARTIO_LOG_LEVEL`)
+ - `.partio/settings.local.json` (git-ignored)
+ - `.partio/settings.json`
+@@ -115,6 +127,19 @@ Config files (highest priority wins):
+ }
+ ```
+ 
++</details>
++
++<details>
++<summary><strong>Git Worktrees</strong></summary>
++
++partio fully supports Git worktrees. Hooks are installed to the shared git directory (`git rev-parse --git-common-dir`) so they work across all worktrees. Session discovery walks up from the repo root to find the Claude Code session directory, which may be keyed to a parent workspace directory.
++
++</details>
++
++## Contributing
++
++Contributions are welcome! See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for development setup and guidelines.
++
+ ## License
+ 
+-MIT
++[MIT](LICENSE)
+diff --git a/assets/.gitkeep b/assets/.gitkeep
+new file mode 100644
+index 0000000..e69de29
+diff --git a/demo.tape b/demo.tape
+new file mode 100644
+index 0000000..d227bb8
+--- /dev/null
++++ b/demo.tape
+@@ -0,0 +1,50 @@
++# VHS tape file — https://github.com/charmbracelet/vhs
++#
++# Usage:
++#   vhs demo.tape
++#
++# Prerequisites:
++#   - partio installed (make install)
++#   - A git repo with at least one checkpoint
++#   - VHS installed (brew install vhs)
++
++Output assets/demo.gif
++
++Set FontSize 16
++Set Width 900
++Set Height 500
++Set Theme "Catppuccin Mocha"
++Set Padding 20
++
++# Setup: init a demo repo
++Type "mkdir /tmp/partio-demo && cd /tmp/partio-demo && git init"
++Enter
++Sleep 1s
++
++# Enable partio
++Type "partio enable"
++Enter
++Sleep 2s
++
++# Simulate a commit (user should have real checkpoint data)
++Type "echo 'hello world' > main.go && git add . && git commit -m 'add main.go'"
++Enter
++Sleep 2s
++
++# Check status
++Type "partio status"
++Enter
++Sleep 2s
++
++# List checkpoints
++Type "partio rewind --list"
++Enter
++Sleep 3s
++
++# Resume with --print
++Type "partio resume $(partio rewind --list | head -1 | awk '{print $1}') --print"
++Enter
++Sleep 4s
++
++# Done
++Sleep 2s
