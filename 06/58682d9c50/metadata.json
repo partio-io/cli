@@ -1,0 +1,11 @@
+{
+  "id": "0658682d9c50",
+  "session_id": "215c3fe9-2d5a-4462-9164-a02db6aa154a",
+  "commit_hash": "b4688e89545d3c52ad13434520382eeec1fe83af",
+  "branch": "partio-release",
+  "created_at": "2026-03-06T09:38:48+01:00",
+  "agent": "claude-code",
+  "agent_percent": 100,
+  "content_hash": "b4688e89545d3c52ad13434520382eeec1fe83af",
+  "plan_slug": "nested-snuggling-newt"
+}
