@@ -97,13 +97,25 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		cp.PlanSlug = sessionData.PlanSlug
 	}
 
+	// Collect modified files, filtering out gitignored paths.
+	var filesModified []string
+	if modFiles, err := git.DiffFiles(commitHash); err == nil {
+		filtered, ferr := git.FilterGitIgnored(repoRoot, modFiles)
+		if ferr == nil {
+			filesModified = filtered
+		} else {
+			filesModified = modFiles
+		}
+	}
+
 	// Prepare session files
 	sessionFiles := &checkpoint.SessionFiles{
 		ContentHash: commitHash,
 		Context:     "",
 		FullJSONL:   "",
 		Metadata: checkpoint.SessionMetadata{
-			Agent: cfg.Agent,
+			Agent:         cfg.Agent,
+			FilesModified: filesModified,
 		},
 		Prompt: "",
 	}
