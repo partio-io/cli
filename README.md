@@ -1,8 +1,8 @@
 # partio
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Go Report Card](https://goreportcard.com/badge/github.com/partio-io/cli)](https://goreportcard.com/report/github.com/partio-io/cli)
-[![Latest Release](https://img.shields.io/github/v/release/partio-io/cli)](https://github.com/partio-io/cli/releases/latest)
+[![Go](https://img.shields.io/badge/Go-1.25+-00ADD8.svg)](https://go.dev/)
+[![Release](https://img.shields.io/badge/release-v0.1.0-orange.svg)](https://github.com/partio-io/cli/releases/latest)
 
 **Capture the *why* behind your code changes.**
 
