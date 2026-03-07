@@ -8,13 +8,15 @@ import (
 
 // Session represents an AI agent coding session.
 type Session struct {
-	ID        string    `json:"id"`
-	Agent     string    `json:"agent"`
-	State     State     `json:"state"`
-	StartedAt time.Time `json:"started_at"`
-	EndedAt   time.Time `json:"ended_at,omitempty"`
-	Branch    string    `json:"branch"`
-	SourceDir string    `json:"source_dir"`
+	ID            string    `json:"id"`
+	Agent         string    `json:"agent"`
+	State         State     `json:"state"`
+	StartedAt     time.Time `json:"started_at"`
+	EndedAt       time.Time `json:"ended_at,omitempty"`
+	UpdatedAt     time.Time `json:"updated_at,omitempty"`
+	Branch        string    `json:"branch"`
+	SourceDir     string    `json:"source_dir"`
+	FilesModified int       `json:"files_modified,omitempty"`
 }
 
 // New creates a new session with a generated UUID.
