@@ -15,6 +15,8 @@ type Session struct {
 	EndedAt   time.Time `json:"ended_at,omitempty"`
 	Branch    string    `json:"branch"`
 	SourceDir string    `json:"source_dir"`
+	TurnCount int       `json:"turn_count"`
+	Model     string    `json:"model,omitempty"`
 }
 
 // New creates a new session with a generated UUID.
