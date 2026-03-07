@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/partio-io/cli/internal/agent/claude"
@@ -13,6 +14,7 @@ import (
 	"github.com/partio-io/cli/internal/checkpoint"
 	"github.com/partio-io/cli/internal/config"
 	"github.com/partio-io/cli/internal/git"
+	"github.com/partio-io/cli/internal/session"
 )
 
 // PostCommit runs post-commit hook logic.
@@ -141,6 +143,28 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		return fmt.Errorf("writing checkpoint: %w", err)
 	}
 
+	// Update session activity: count files changed in this commit
+	numstat, _ := git.DiffNumstat(commitHash)
+	filesChanged := countNumstatFiles(numstat)
+	mgr := session.NewManager(filepath.Join(repoRoot, config.PartioDir))
+	if err := mgr.RecordActivity(filesChanged); err != nil {
+		slog.Warn("could not update session activity", "error", err)
+	}
+
 	slog.Debug("checkpoint created", "id", cpID, "agent_pct", attr.AgentPercent)
 	return nil
+}
+
+// countNumstatFiles counts the number of files from git diff --numstat output.
+func countNumstatFiles(numstat string) int {
+	if numstat == "" {
+		return 0
+	}
+	count := 0
+	for _, line := range strings.Split(numstat, "\n") {
+		if strings.TrimSpace(line) != "" {
+			count++
+		}
+	}
+	return count
 }
