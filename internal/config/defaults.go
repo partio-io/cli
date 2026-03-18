@@ -10,5 +10,8 @@ func Defaults() Config {
 		StrategyOptions: StrategyOptions{
 			PushSessions: true,
 		},
+		HookOptions: HookOptions{
+			SessionRetryTimeoutMs: 3000,
+		},
 	}
 }
