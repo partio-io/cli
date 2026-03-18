@@ -5,4 +5,5 @@ type SessionMetadata struct {
 	Agent       string `json:"agent"`
 	TotalTokens int    `json:"total_tokens"`
 	Duration    string `json:"duration"`
+	PromptCount int    `json:"prompt_count,omitempty"`
 }
