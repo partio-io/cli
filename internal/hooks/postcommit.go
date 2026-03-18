@@ -55,9 +55,9 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		attr = &attribution.Result{AgentPercent: 100}
 	}
 
-	// Parse agent session data
-	detector := claude.New()
-	sessionPath, sessionData, err := detector.FindLatestSession(repoRoot)
+	// Parse agent session data, retrying if data is not yet flushed to disk.
+	retryTimeout := time.Duration(cfg.HookOptions.SessionRetryTimeoutMs) * time.Millisecond
+	sessionPath, sessionData, err := findSessionWithRetry(newSessionFinder(), repoRoot, retryTimeout)
 	if err != nil {
 		slog.Warn("could not read agent session", "error", err)
 	}
