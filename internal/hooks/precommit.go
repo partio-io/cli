@@ -13,10 +13,12 @@ import (
 
 // preCommitState records the state captured during pre-commit for use by post-commit.
 type preCommitState struct {
-	AgentActive   bool   `json:"agent_active"`
-	SessionPath   string `json:"session_path,omitempty"`
-	PreCommitHash string `json:"pre_commit_hash,omitempty"`
-	Branch        string `json:"branch"`
+	AgentActive   bool     `json:"agent_active"`
+	SessionPath   string   `json:"session_path,omitempty"`
+	PreCommitHash string   `json:"pre_commit_hash,omitempty"`
+	Branch        string   `json:"branch"`
+	AllAgentFiles []string `json:"all_agent_files,omitempty"` // staged + unstaged agent-modified files
+	IsCarryForward bool    `json:"is_carry_forward,omitempty"` // activated by carry-forward
 }
 
 // PreCommit runs pre-commit hook logic.
@@ -49,15 +51,47 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 	branch, _ := git.CurrentBranch()
 	commitHash, _ := git.CurrentCommit()
 
+	agentActive := running && sessionPath != ""
+
+	// Collect all agent-modified files (staged + unstaged) when agent is active.
+	var allAgentFiles []string
+	if agentActive {
+		staged, _ := git.StagedFiles()
+		unstaged, _ := git.UnstagedFiles()
+		allAgentFiles = mergeFiles(staged, unstaged)
+	}
+
+	// Check carry-forward state: if a previous partial commit left pending files
+	// that overlap with the current staged set, activate agent attribution.
+	isCarryForward := false
+	stateDir := filepath.Join(repoRoot, config.PartioDir, "state")
+	if cf, err := loadCarryForward(stateDir); err == nil && cf != nil {
+		staged, _ := git.StagedFiles()
+		if activate, cfSessionPath := checkCarryForwardActivation(cf, staged); activate {
+			if !agentActive {
+				// Agent not running but carry-forward applies: use carry-forward session.
+				agentActive = true
+				sessionPath = cfSessionPath
+				isCarryForward = true
+				allAgentFiles = cf.PendingFiles
+			} else {
+				// Both agent active and carry-forward: merge file sets.
+				isCarryForward = true
+				allAgentFiles = mergeFiles(allAgentFiles, cf.PendingFiles)
+			}
+		}
+	}
+
 	state := preCommitState{
-		AgentActive:   running && sessionPath != "",
-		SessionPath:   sessionPath,
-		PreCommitHash: commitHash,
-		Branch:        branch,
+		AgentActive:    agentActive,
+		SessionPath:    sessionPath,
+		PreCommitHash:  commitHash,
+		Branch:         branch,
+		AllAgentFiles:  allAgentFiles,
+		IsCarryForward: isCarryForward,
 	}
 
 	// Save state for post-commit
-	stateDir := filepath.Join(repoRoot, config.PartioDir, "state")
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {
 		return err
 	}

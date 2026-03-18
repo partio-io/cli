@@ -141,6 +141,32 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		return fmt.Errorf("writing checkpoint: %w", err)
 	}
 
+	// Update carry-forward state: persist any agent-modified files not in this commit.
+	stateDir := filepath.Join(repoRoot, config.PartioDir, "state")
+	if len(state.AllAgentFiles) > 0 {
+		committedFiles, err := git.CommittedFiles(commitHash)
+		if err != nil {
+			slog.Warn("could not get committed files for carry-forward", "error", err)
+		} else {
+			pending := computeCarryForward(state.AllAgentFiles, committedFiles)
+			if len(pending) > 0 {
+				cf := &carryForwardState{
+					SessionPath:  state.SessionPath,
+					PendingFiles: pending,
+					Branch:       state.Branch,
+				}
+				if err := saveCarryForward(stateDir, cf); err != nil {
+					slog.Warn("could not save carry-forward state", "error", err)
+				}
+			} else {
+				clearCarryForward(stateDir)
+			}
+		}
+	} else if state.IsCarryForward {
+		// Carry-forward was activated and all pending files were committed.
+		clearCarryForward(stateDir)
+	}
+
 	slog.Debug("checkpoint created", "id", cpID, "agent_pct", attr.AgentPercent)
 	return nil
 }
