@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -36,8 +37,8 @@ func TestInstallAndUninstall(t *testing.T) {
 		}
 
 		content := string(data)
-		if !isPartioHook(content) {
-			t.Errorf("hook %s missing partio marker", name)
+		if !hasPartioBlock(content) {
+			t.Errorf("hook %s missing partio block", name)
 		}
 
 		// Check executable permission
@@ -52,7 +53,7 @@ func TestInstallAndUninstall(t *testing.T) {
 		t.Fatalf("Uninstall error: %v", err)
 	}
 
-	// Verify hooks are removed
+	// Verify hooks are removed (no pre-existing hook, so file should be gone)
 	for _, name := range hookNames {
 		path := filepath.Join(hooksDir, name)
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
@@ -61,7 +62,7 @@ func TestInstallAndUninstall(t *testing.T) {
 	}
 }
 
-func TestInstallBackupChaining(t *testing.T) {
+func TestInstallChaining(t *testing.T) {
 	dir := initGitRepo(t)
 	hooksDir := filepath.Join(dir, ".git", "hooks")
 
@@ -77,36 +78,40 @@ func TestInstallBackupChaining(t *testing.T) {
 		t.Fatalf("Install error: %v", err)
 	}
 
-	// Original should be backed up
+	// No backup should be created
 	backupPath := hookPath + ".partio-backup"
-	data, err := os.ReadFile(backupPath)
-	if err != nil {
-		t.Fatalf("backup not found: %v", err)
-	}
-	if string(data) != existingHook {
-		t.Errorf("backup content mismatch: %q", string(data))
+	if _, err := os.Stat(backupPath); err == nil {
+		t.Error("backup file should not be created with chaining approach")
 	}
 
-	// New hook should be ours
-	data, err = os.ReadFile(hookPath)
+	// Hook should contain both original content and partio block
+	data, err := os.ReadFile(hookPath)
 	if err != nil {
 		t.Fatalf("reading hook: %v", err)
 	}
-	if !isPartioHook(string(data)) {
-		t.Error("installed hook missing partio marker")
+	content := string(data)
+	if !strings.Contains(content, "echo 'existing hook'") {
+		t.Error("hook missing original content")
+	}
+	if !hasPartioBlock(content) {
+		t.Error("hook missing partio block")
 	}
 
-	// Uninstall should restore original
+	// Uninstall should remove only the partio block, leaving original content
 	if err := Uninstall(dir); err != nil {
 		t.Fatalf("Uninstall error: %v", err)
 	}
 
 	data, err = os.ReadFile(hookPath)
 	if err != nil {
-		t.Fatalf("hook should exist after uninstall (restored): %v", err)
+		t.Fatalf("hook should exist after uninstall (original preserved): %v", err)
 	}
-	if string(data) != existingHook {
-		t.Errorf("original hook not restored: %q", string(data))
+	restored := string(data)
+	if hasPartioBlock(restored) {
+		t.Error("partio block should be removed after uninstall")
+	}
+	if !strings.Contains(restored, "echo 'existing hook'") {
+		t.Error("original hook content should be preserved after uninstall")
 	}
 }
 
@@ -152,26 +157,47 @@ func TestInstallWorktree(t *testing.T) {
 			t.Errorf("hook %s not found in worktree: %v", name, err)
 			continue
 		}
-		if !isPartioHook(string(data)) {
-			t.Errorf("hook %s missing partio marker in worktree", name)
+		if !hasPartioBlock(string(data)) {
+			t.Errorf("hook %s missing partio block in worktree", name)
 		}
 	}
 }
 
-func TestIsPartioHook(t *testing.T) {
+func TestHasPartioBlock(t *testing.T) {
 	tests := []struct {
 		content  string
 		expected bool
 	}{
-		{"#!/bin/bash\n# Installed by partio\npartio _hook pre-commit", true},
+		{"#!/bin/bash\n" + beginSentinel + "\npartio _hook pre-commit\n" + endSentinel, true},
 		{"#!/bin/bash\necho hello", false},
 		{"", false},
-		{partioMarker, true},
+		{beginSentinel, true},
 	}
 
 	for _, tt := range tests {
-		if got := isPartioHook(tt.content); got != tt.expected {
-			t.Errorf("isPartioHook(%q) = %v, want %v", tt.content, got, tt.expected)
+		if got := hasPartioBlock(tt.content); got != tt.expected {
+			t.Errorf("hasPartioBlock(%q) = %v, want %v", tt.content, got, tt.expected)
 		}
+	}
+}
+
+func TestRemovePartioBlock(t *testing.T) {
+	block := partioBlock("pre-commit")
+
+	// Test removal from a file that only has the partio block
+	onlyPartio := "#!/bin/bash\n" + block + "\n"
+	result := removePartioBlock(onlyPartio)
+	if strings.Contains(result, beginSentinel) {
+		t.Errorf("partio block not removed: %q", result)
+	}
+
+	// Test removal from a file that has existing content + partio block
+	withExisting := "#!/bin/bash\necho 'existing'\n\n" + block + "\n"
+	result = removePartioBlock(withExisting)
+	if strings.Contains(result, beginSentinel) {
+		t.Errorf("partio block not removed: %q", result)
+	}
+	if !strings.Contains(result, "echo 'existing'") {
+		t.Errorf("existing content removed: %q", result)
 	}
 }
