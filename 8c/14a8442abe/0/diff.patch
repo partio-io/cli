@@ -1,0 +1,100 @@
+diff --git a/Makefile b/Makefile
+index 3f98f4a..1f7a6b5 100644
+--- a/Makefile
++++ b/Makefile
+@@ -2,7 +2,7 @@ BINARY=partio
+ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+ LDFLAGS=-ldflags "-X main.version=$(VERSION)"
+ 
+-.PHONY: build run install test lint clean
++.PHONY: build run install test lint clean demo demo-raw
+ 
+ build:
+ 	go build $(LDFLAGS) -o $(BINARY) ./cmd/partio
+@@ -22,4 +22,12 @@ lint:
+ clean:
+ 	rm -f $(BINARY)
+ 
++demo:
++	vhs demo.tape
++	gifsicle assets/demo.gif "#0-539" -d1 "#540-" -o assets/demo.gif
++	gifsicle --unoptimize assets/demo.gif --delete "#420-469" "#470-519" "#520-559" -O2 -o assets/demo.gif
++
++demo-raw:
++	vhs demo.tape
++
+ .DEFAULT_GOAL := build
+diff --git a/assets/demo.gif b/assets/demo.gif
+new file mode 100644
+index 0000000..3f9978b
+Binary files /dev/null and b/assets/demo.gif differ
+diff --git a/demo.tape b/demo.tape
+index d227bb8..1e44e74 100644
+--- a/demo.tape
++++ b/demo.tape
+@@ -1,35 +1,27 @@
+ # VHS tape file — https://github.com/charmbracelet/vhs
+ #
+-# Usage:
+-#   vhs demo.tape
++# Records a demo GIF of partio's core workflow.
+ #
+ # Prerequisites:
+-#   - partio installed (make install)
+-#   - A git repo with at least one checkpoint
+-#   - VHS installed (brew install vhs)
++#   - partio installed and in PATH
++#   - Run from the cli/ directory (which has checkpoint data)
++#
++# Usage:
++#   cd cli && vhs demo.tape
+ 
+ Output assets/demo.gif
+ 
+-Set FontSize 16
+-Set Width 900
+-Set Height 500
++Set FontSize 18
++Set Width 1200
++Set Height 650
+ Set Theme "Catppuccin Mocha"
+ Set Padding 20
++Set TypingSpeed 50ms
+ 
+-# Setup: init a demo repo
+-Type "mkdir /tmp/partio-demo && cd /tmp/partio-demo && git init"
++# Show version
++Type "partio version"
+ Enter
+-Sleep 1s
+-
+-# Enable partio
+-Type "partio enable"
+-Enter
+-Sleep 2s
+-
+-# Simulate a commit (user should have real checkpoint data)
+-Type "echo 'hello world' > main.go && git add . && git commit -m 'add main.go'"
+-Enter
+-Sleep 2s
++Sleep 1.5s
+ 
+ # Check status
+ Type "partio status"
+@@ -41,10 +33,11 @@ Type "partio rewind --list"
+ Enter
+ Sleep 3s
+ 
+-# Resume with --print
+-Type "partio resume $(partio rewind --list | head -1 | awk '{print $1}') --print"
++# Resume a previous session (launches Claude Code)
++Type "partio resume 0658682d9c50"
+ Enter
+-Sleep 4s
++Sleep 7s
+ 
+-# Done
+-Sleep 2s
++# Accept Claude Code permission prompt
++Enter
++Sleep 30s
