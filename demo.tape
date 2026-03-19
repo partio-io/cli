@@ -1,35 +1,27 @@
 # VHS tape file — https://github.com/charmbracelet/vhs
 #
-# Usage:
-#   vhs demo.tape
+# Records a demo GIF of partio's core workflow.
 #
 # Prerequisites:
-#   - partio installed (make install)
-#   - A git repo with at least one checkpoint
-#   - VHS installed (brew install vhs)
+#   - partio installed and in PATH
+#   - Run from the cli/ directory (which has checkpoint data)
+#
+# Usage:
+#   cd cli && vhs demo.tape
 
 Output assets/demo.gif
 
-Set FontSize 16
-Set Width 900
-Set Height 500
+Set FontSize 18
+Set Width 1200
+Set Height 650
 Set Theme "Catppuccin Mocha"
 Set Padding 20
+Set TypingSpeed 50ms
 
-# Setup: init a demo repo
-Type "mkdir /tmp/partio-demo && cd /tmp/partio-demo && git init"
+# Show version
+Type "partio version"
 Enter
-Sleep 1s
-
-# Enable partio
-Type "partio enable"
-Enter
-Sleep 2s
-
-# Simulate a commit (user should have real checkpoint data)
-Type "echo 'hello world' > main.go && git add . && git commit -m 'add main.go'"
-Enter
-Sleep 2s
+Sleep 1.5s
 
 # Check status
 Type "partio status"
@@ -41,10 +33,11 @@ Type "partio rewind --list"
 Enter
 Sleep 3s
 
-# Resume with --print
-Type "partio resume $(partio rewind --list | head -1 | awk '{print $1}') --print"
+# Resume a previous session (launches Claude Code)
+Type "partio resume 0658682d9c50"
 Enter
-Sleep 4s
+Sleep 7s
 
-# Done
-Sleep 2s
+# Accept Claude Code permission prompt
+Enter
+Sleep 30s
