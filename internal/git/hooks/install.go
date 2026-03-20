@@ -10,6 +10,17 @@ import (
 
 // Install installs partio git hooks into the repository, backing up existing hooks.
 func Install(repoRoot string) error {
+	return installHooks(repoRoot, "")
+}
+
+// InstallAbsolute installs partio git hooks using an absolute path to the partio binary.
+// This is useful in environments where the shell PATH differs between interactive and hook
+// execution contexts (e.g., nix, asdf, mise, or system-level git hooks).
+func InstallAbsolute(repoRoot, binaryPath string) error {
+	return installHooks(repoRoot, binaryPath)
+}
+
+func installHooks(repoRoot, binaryPath string) error {
 	hooksDir, err := git.HooksDir(repoRoot)
 	if err != nil {
 		return fmt.Errorf("resolving hooks directory: %w", err)
@@ -34,7 +45,12 @@ func Install(repoRoot string) error {
 		}
 
 		// Write our hook
-		script := hookScript(name)
+		var script string
+		if binaryPath != "" {
+			script = hookScriptAbsolute(name, binaryPath)
+		} else {
+			script = hookScript(name)
+		}
 		if err := os.WriteFile(hookPath, []byte(script), 0o755); err != nil {
 			return fmt.Errorf("writing %s hook: %w", name, err)
 		}

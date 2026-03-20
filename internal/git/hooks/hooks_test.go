@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -154,6 +155,35 @@ func TestInstallWorktree(t *testing.T) {
 		}
 		if !isPartioHook(string(data)) {
 			t.Errorf("hook %s missing partio marker in worktree", name)
+		}
+	}
+}
+
+func TestInstallAbsolute(t *testing.T) {
+	dir := initGitRepo(t)
+	hooksDir := filepath.Join(dir, ".git", "hooks")
+
+	binaryPath := "/usr/local/bin/partio"
+	if err := InstallAbsolute(dir, binaryPath); err != nil {
+		t.Fatalf("InstallAbsolute error: %v", err)
+	}
+
+	for _, name := range hookNames {
+		path := filepath.Join(hooksDir, name)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Errorf("hook %s not found: %v", name, err)
+			continue
+		}
+		content := string(data)
+		if !isPartioHook(content) {
+			t.Errorf("hook %s missing partio marker", name)
+		}
+		if !strings.Contains(content, binaryPath) {
+			t.Errorf("hook %s missing absolute binary path %q", name, binaryPath)
+		}
+		if strings.Contains(content, "command -v partio") {
+			t.Errorf("hook %s should not use PATH lookup", name)
 		}
 	}
 }
