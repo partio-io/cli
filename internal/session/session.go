@@ -15,6 +15,13 @@ type Session struct {
 	EndedAt   time.Time `json:"ended_at,omitempty"`
 	Branch    string    `json:"branch"`
 	SourceDir string    `json:"source_dir"`
+
+	// Condensed is true when the session has been fully captured in a checkpoint
+	// and has ended. Post-commit sets this after creating a checkpoint so future
+	// commits with the same session can be skipped.
+	Condensed         bool      `json:"condensed,omitempty"`
+	CapturedSessionID string    `json:"captured_session_id,omitempty"`
+	CapturedAt        time.Time `json:"captured_at,omitempty"`
 }
 
 // New creates a new session with a generated UUID.

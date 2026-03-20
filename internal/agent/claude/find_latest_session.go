@@ -10,17 +10,17 @@ import (
 	"github.com/partio-io/cli/internal/agent"
 )
 
-// FindLatestSession finds the most recently modified JSONL session file.
-func (d *Detector) FindLatestSession(repoRoot string) (string, *agent.SessionData, error) {
+// FindLatestJSONLPath returns the path of the most recently modified JSONL file
+// without parsing its contents. This is cheaper than FindLatestSession.
+func (d *Detector) FindLatestJSONLPath(repoRoot string) (string, error) {
 	sessionDir, err := d.FindSessionDir(repoRoot)
 	if err != nil {
-		return "", nil, err
+		return "", err
 	}
 
-	// Find all .jsonl files
 	entries, err := os.ReadDir(sessionDir)
 	if err != nil {
-		return "", nil, fmt.Errorf("reading session directory: %w", err)
+		return "", fmt.Errorf("reading session directory: %w", err)
 	}
 
 	var jsonlFiles []os.DirEntry
@@ -31,17 +31,24 @@ func (d *Detector) FindLatestSession(repoRoot string) (string, *agent.SessionDat
 	}
 
 	if len(jsonlFiles) == 0 {
-		return "", nil, fmt.Errorf("no JSONL session files found in %s", sessionDir)
+		return "", fmt.Errorf("no JSONL session files found in %s", sessionDir)
 	}
 
-	// Sort by modification time (most recent first)
 	sort.Slice(jsonlFiles, func(i, j int) bool {
 		ii, _ := jsonlFiles[i].Info()
 		jj, _ := jsonlFiles[j].Info()
 		return ii.ModTime().After(jj.ModTime())
 	})
 
-	latestPath := filepath.Join(sessionDir, jsonlFiles[0].Name())
+	return filepath.Join(sessionDir, jsonlFiles[0].Name()), nil
+}
+
+// FindLatestSession finds the most recently modified JSONL session file.
+func (d *Detector) FindLatestSession(repoRoot string) (string, *agent.SessionData, error) {
+	latestPath, err := d.FindLatestJSONLPath(repoRoot)
+	if err != nil {
+		return "", nil, err
+	}
 
 	// Parse the JSONL file
 	data, err := ParseJSONL(latestPath)

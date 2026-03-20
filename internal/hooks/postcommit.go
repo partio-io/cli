@@ -13,6 +13,7 @@ import (
 	"github.com/partio-io/cli/internal/checkpoint"
 	"github.com/partio-io/cli/internal/config"
 	"github.com/partio-io/cli/internal/git"
+	"github.com/partio-io/cli/internal/session"
 )
 
 // PostCommit runs post-commit hook logic.
@@ -60,6 +61,15 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	sessionPath, sessionData, err := detector.FindLatestSession(repoRoot)
 	if err != nil {
 		slog.Warn("could not read agent session", "error", err)
+	}
+
+	// Skip if this session is already fully condensed and ended — re-processing
+	// it produces a redundant checkpoint with no new content.
+	if sessionData != nil && sessionData.SessionID != "" {
+		if shouldSkipSession(filepath.Join(repoRoot, config.PartioDir), sessionData.SessionID, sessionPath) {
+			slog.Debug("post-commit: skipping already-condensed ended session", "session_id", sessionData.SessionID)
+			return nil
+		}
 	}
 
 	// Generate checkpoint ID and amend commit with trailers BEFORE writing
@@ -139,6 +149,15 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	store := checkpoint.NewStore(repoRoot)
 	if err := store.Write(cp, sessionFiles); err != nil {
 		return fmt.Errorf("writing checkpoint: %w", err)
+	}
+
+	// Mark the session as condensed so subsequent commits with the same session
+	// are skipped. This is best-effort; failure is non-fatal.
+	if sessionData != nil && sessionData.SessionID != "" {
+		mgr := session.NewManager(filepath.Join(repoRoot, config.PartioDir))
+		if markErr := mgr.MarkCondensed(sessionData.SessionID); markErr != nil {
+			slog.Debug("could not mark session as condensed", "error", markErr)
+		}
 	}
 
 	slog.Debug("checkpoint created", "id", cpID, "agent_pct", attr.AgentPercent)

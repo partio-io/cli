@@ -68,6 +68,59 @@ func TestManagerEnd(t *testing.T) {
 	}
 }
 
+func TestManagerMarkCondensed(t *testing.T) {
+	t.Run("marks existing session as condensed and ended", func(t *testing.T) {
+		dir := t.TempDir()
+		mgr := NewManager(dir)
+
+		_, err := mgr.Start("claude-code", "main", "/tmp/test")
+		if err != nil {
+			t.Fatalf("start error: %v", err)
+		}
+
+		if err := mgr.MarkCondensed("sess-abc"); err != nil {
+			t.Fatalf("mark condensed error: %v", err)
+		}
+
+		cur, err := mgr.Current()
+		if err != nil {
+			t.Fatalf("current error: %v", err)
+		}
+		if cur.State != StateEnded {
+			t.Errorf("expected state=ended, got %s", cur.State)
+		}
+		if !cur.Condensed {
+			t.Error("expected condensed=true")
+		}
+		if cur.CapturedSessionID != "sess-abc" {
+			t.Errorf("expected captured_session_id=sess-abc, got %s", cur.CapturedSessionID)
+		}
+		if cur.CapturedAt.IsZero() {
+			t.Error("expected captured_at to be set")
+		}
+	})
+
+	t.Run("creates session entry when none exists", func(t *testing.T) {
+		dir := t.TempDir()
+		mgr := NewManager(dir)
+
+		if err := mgr.MarkCondensed("sess-xyz"); err != nil {
+			t.Fatalf("mark condensed error: %v", err)
+		}
+
+		cur, err := mgr.Current()
+		if err != nil {
+			t.Fatalf("current error: %v", err)
+		}
+		if cur == nil {
+			t.Fatal("expected session to be created")
+		}
+		if cur.State != StateEnded || !cur.Condensed || cur.CapturedSessionID != "sess-xyz" {
+			t.Errorf("unexpected session state: %+v", cur)
+		}
+	})
+}
+
 func TestManagerClear(t *testing.T) {
 	dir := t.TempDir()
 	mgr := NewManager(dir)
