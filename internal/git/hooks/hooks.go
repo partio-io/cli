@@ -25,6 +25,20 @@ exit 0
 `, partioMarker, name, name, name)
 }
 
+// hookScriptAbsolute returns the bash shim for a given hook name using an absolute binary path.
+func hookScriptAbsolute(name, binaryPath string) string {
+	return fmt.Sprintf(`#!/bin/bash
+%s
+%s _hook %s "$@"
+exit_code=$?
+[ $exit_code -ne 0 ] && exit $exit_code
+# Chain to original hook if backed up
+hooks_dir="$(git rev-parse --git-common-dir)/hooks"
+[ -f "$hooks_dir/%s.partio-backup" ] && exec "$hooks_dir/%s.partio-backup" "$@"
+exit 0
+`, partioMarker, binaryPath, name, name, name)
+}
+
 func isPartioHook(content string) bool {
 	return strings.Contains(content, partioMarker)
 }

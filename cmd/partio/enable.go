@@ -15,15 +15,19 @@ import (
 )
 
 func newEnableCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "enable",
 		Short: "Enable partio in the current repository",
 		Long:  `Sets up partio in the current git repository by creating the .partio/ config directory, installing git hooks, and creating the checkpoint orphan branch.`,
 		RunE:  runEnable,
 	}
+	cmd.Flags().Bool("absolute-path", false, "Install hooks using the absolute path to the partio binary (useful when partio is not on PATH in hook execution environments)")
+	return cmd
 }
 
 func runEnable(cmd *cobra.Command, args []string) error {
+	absolutePath, _ := cmd.Flags().GetBool("absolute-path")
+
 	repoRoot, err := git.RepoRoot()
 	if err != nil {
 		return fmt.Errorf("must be run inside a git repository")
@@ -56,7 +60,19 @@ func runEnable(cmd *cobra.Command, args []string) error {
 	addToGitignore(repoRoot, ".partio/settings.local.json")
 
 	// Install git hooks
-	if err := githooks.Install(repoRoot); err != nil {
+	if absolutePath {
+		exePath, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("resolving partio binary path: %w", err)
+		}
+		exePath, err = filepath.EvalSymlinks(exePath)
+		if err != nil {
+			return fmt.Errorf("resolving partio binary symlinks: %w", err)
+		}
+		if err := githooks.InstallAbsolute(repoRoot, exePath); err != nil {
+			return fmt.Errorf("installing git hooks: %w", err)
+		}
+	} else if err := githooks.Install(repoRoot); err != nil {
 		return fmt.Errorf("installing git hooks: %w", err)
 	}
 
