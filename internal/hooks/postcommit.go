@@ -49,6 +49,15 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		return fmt.Errorf("getting current commit: %w", err)
 	}
 
+	// Skip if this commit was already processed (e.g. duplicate hook invocations
+	// during rebase, merge, or cherry-pick).
+	partioDir := filepath.Join(repoRoot, config.PartioDir)
+	cache := loadCommitCache(partioDir)
+	if cache.contains(commitHash) {
+		slog.Debug("post-commit: commit already processed, skipping", "commit", commitHash)
+		return nil
+	}
+
 	// Calculate attribution
 	attr, err := attribution.Calculate(commitHash, state.AgentActive)
 	if err != nil {
@@ -158,6 +167,12 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		if markErr := mgr.MarkCondensed(sessionData.SessionID); markErr != nil {
 			slog.Debug("could not mark session as condensed", "error", markErr)
 		}
+	}
+
+	// Record the post-amend commit hash so duplicate hook invocations are no-ops.
+	cache.add(commitHash)
+	if saveErr := saveCommitCache(partioDir, cache); saveErr != nil {
+		slog.Debug("could not save commit cache", "error", saveErr)
 	}
 
 	slog.Debug("checkpoint created", "id", cpID, "agent_pct", attr.AgentPercent)
