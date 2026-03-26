@@ -29,7 +29,7 @@ func runReset(cmd *cobra.Command, args []string) error {
 	_, _ = git.ExecGit("branch", "-D", branchName)
 
 	// Recreate
-	if err := createCheckpointBranch(); err != nil {
+	if _, err := createCheckpointBranch(); err != nil {
 		return fmt.Errorf("recreating checkpoint branch: %w", err)
 	}
 

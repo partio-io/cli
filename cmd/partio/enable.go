@@ -18,7 +18,7 @@ func newEnableCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "enable",
 		Short: "Enable partio in the current repository",
-		Long:  `Sets up partio in the current git repository by creating the .partio/ config directory, installing git hooks, and creating the checkpoint orphan branch.`,
+		Long:  `Sets up partio in the current git repository by creating the .partio/ config directory, installing git hooks, and creating the checkpoint orphan branch. If a remote checkpoint branch already exists (e.g., on a fresh clone), the local branch is created tracking the remote so existing checkpoint history is preserved.`,
 		RunE:  runEnable,
 	}
 	cmd.Flags().Bool("absolute-path", false, "Install hooks using the absolute path to the partio binary (useful when partio is not on PATH in hook execution environments)")
@@ -76,14 +76,18 @@ func runEnable(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("installing git hooks: %w", err)
 	}
 
-	// Create orphan checkpoint branch
-	if err := createCheckpointBranch(); err != nil {
+	// Create orphan checkpoint branch (or restore from remote)
+	restored, err := createCheckpointBranch()
+	if err != nil {
 		slog.Warn("could not create checkpoint branch (may already exist)", "error", err)
 	}
 
 	fmt.Println("partio enabled successfully!")
 	fmt.Println("  - Created .partio/ config directory")
 	fmt.Println("  - Installed git hooks (pre-commit, post-commit, pre-push)")
+	if restored {
+		fmt.Println("  - Restored checkpoint history from remote branch")
+	}
 	fmt.Println("  - Ready to capture AI sessions on commit")
 	return nil
 }
@@ -116,13 +120,22 @@ func addToGitignore(repoRoot, entry string) {
 	_, _ = f.WriteString(entry + "\n")
 }
 
-func createCheckpointBranch() error {
+func createCheckpointBranch() (bool, error) {
 	const branchName = "partio/checkpoints/v1"
 
 	// Check if branch already exists
 	_, err := git.ExecGit("rev-parse", "--verify", branchName)
 	if err == nil {
-		return nil // already exists
+		return false, nil // already exists
+	}
+
+	// Check if a remote tracking branch exists (e.g., fresh clone of an existing repo)
+	if git.RemoteBranchExists(branchName) {
+		_, err = git.ExecGit("branch", "--track", branchName, "origin/"+branchName)
+		if err != nil {
+			return false, fmt.Errorf("creating local branch from remote: %w", err)
+		}
+		return true, nil
 	}
 
 	// Create orphan branch with an empty initial commit using plumbing
@@ -132,21 +145,21 @@ func createCheckpointBranch() error {
 		// Alternative: write an empty tree
 		treeHash, err = git.ExecGit("mktree", "--missing")
 		if err != nil {
-			return fmt.Errorf("creating empty tree: %w", err)
+			return false, fmt.Errorf("creating empty tree: %w", err)
 		}
 	}
 
 	// 2. Create commit with no parent
 	commitHash, err := git.ExecGit("commit-tree", treeHash, "-m", "partio: initialize checkpoint storage")
 	if err != nil {
-		return fmt.Errorf("creating initial commit: %w", err)
+		return false, fmt.Errorf("creating initial commit: %w", err)
 	}
 
 	// 3. Create the ref
 	_, err = git.ExecGit("update-ref", "refs/heads/"+branchName, commitHash)
 	if err != nil {
-		return fmt.Errorf("creating branch ref: %w", err)
+		return false, fmt.Errorf("creating branch ref: %w", err)
 	}
 
-	return nil
+	return false, nil
 }
