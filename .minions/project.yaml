@@ -1,0 +1,39 @@
+version: "1"
+
+org: partio-io
+
+# CLI is both the principal and the main target
+principal:
+  name: cli
+  full_name: partio-io/cli
+
+repos:
+  - name: cli
+    full_name: partio-io/cli
+    build_info: "Go CLI (build: `make lint && make test`)"
+
+  - name: app
+    full_name: partio-io/app
+    build_info: "Next.js dashboard (build: `npm run lint && npm run build`)"
+
+  - name: docs
+    full_name: partio-io/docs
+    build_info: "Mintlify docs (verify MDX frontmatter + mint.json)"
+    docs_repo: true
+
+  - name: site
+    full_name: partio-io/site
+    build_info: "Next.js marketing site (build: `npm run lint && npm run build`)"
+
+  - name: extension
+    full_name: partio-io/extension
+    build_info: "Browser extension"
+
+credentials:
+  anthropic_api_key_env: ANTHROPIC_API_KEY
+  gh_token_env: GH_TOKEN
+
+defaults:
+  max_turns: 30
+  pr_labels:
+    - minion

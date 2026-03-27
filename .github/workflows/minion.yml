@@ -1,0 +1,289 @@
+name: Run Minion
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_file:
+        description: "Task YAML file path (e.g., tasks/detect-external-hooks.yaml) or 'tasks/' for all"
+        required: true
+        type: string
+      parallel:
+        description: "Max parallel minions"
+        required: false
+        default: "2"
+        type: string
+      dry_run:
+        description: "Dry run (prompt generation only)"
+        required: false
+        default: false
+        type: boolean
+
+  # Auto-trigger on issues labeled 'minion-ready' or 'minion-approved'
+  issues:
+    types: [labeled]
+
+  # Trigger on /minion build comment
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  run-minion:
+    # Skip unless: workflow_dispatch, minion-ready/minion-approved label, or /minion build comment
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && (github.event.label.name == 'minion-ready' || github.event.label.name == 'minion-approved')) ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/minion build'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check authorization
+        if: github.event_name != 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          ORG=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+          ROLE=$(gh api "orgs/${ORG}/memberships/${{ github.actor }}" --jq '.role' 2>/dev/null || echo "none")
+          if [ "$ROLE" != "admin" ]; then
+            echo "::error::Unauthorized: ${{ github.actor }} (role: ${ROLE}) is not an org admin"
+            exit 1
+          fi
+          echo "Authorized: ${{ github.actor }} (org role: ${ROLE})"
+
+      # Mark issue as executing (issue-triggered runs only)
+      - name: Mark executing
+        if: github.event_name != 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          ISSUE_NUM="${{ github.event.issue.number }}"
+
+          # Skip if already executing (dedup)
+          LABELS=$(gh issue view "$ISSUE_NUM" --repo "${{ github.repository }}" --json labels -q '.labels[].name')
+          if echo "$LABELS" | grep -q "minion-executing"; then
+            echo "::error::Issue #${ISSUE_NUM} is already executing"
+            exit 1
+          fi
+
+          gh issue edit "$ISSUE_NUM" --repo "${{ github.repository }}" --add-label "minion-executing"
+
+      # Checkout this repo (cli = principal)
+      - name: Checkout cli
+        uses: actions/checkout@v4
+        with:
+          path: cli
+
+      # Install yq for parsing project.yaml
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      # Checkout other repos defined in project.yaml (skip cli itself)
+      - name: Checkout project repos
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          for ENTRY in $(yq -r '.repos[] | .full_name + ":" + .name' cli/.minions/project.yaml); do
+            FULL="${ENTRY%%:*}"
+            SHORT="${ENTRY##*:}"
+            if [ "$SHORT" = "cli" ]; then
+              continue
+            fi
+            echo "Cloning ${FULL} -> ${SHORT}/"
+            gh repo clone "$FULL" "$SHORT" -- --depth=1
+          done
+
+      - name: Configure git auth
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+
+      # Checkout minions tool (for building)
+      - name: Checkout minions
+        uses: actions/checkout@v4
+        with:
+          repository: partio-io/minions
+          path: minions
+          token: ${{ secrets.GH_PAT }}
+
+      # Install toolchains
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+
+      - name: Build minions
+        run: cd minions && make build
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      # Determine task file (workflow_dispatch vs issue trigger)
+      - name: Determine task
+        id: task
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "task_file=${{ inputs.task_file }}" >> "$GITHUB_OUTPUT"
+            echo "dry_run=${{ inputs.dry_run }}" >> "$GITHUB_OUTPUT"
+            echo "parallel=${{ inputs.parallel }}" >> "$GITHUB_OUTPUT"
+            echo "issue_num=" >> "$GITHUB_OUTPUT"
+
+          elif [ "${{ github.event_name }}" = "issue_comment" ]; then
+            ISSUE_NUM="${{ github.event.issue.number }}"
+            ISSUE_BODY=$(gh issue view "$ISSUE_NUM" --repo "${{ github.repository }}" --json body -q '.body')
+
+            TASK_YAML=$(echo "$ISSUE_BODY" | sed -n '/<!-- minion-task/,/minion-task -->/p' | sed '1d;$d')
+
+            if [ -z "$TASK_YAML" ]; then
+              echo "::error::No embedded minion-task YAML found in issue #${ISSUE_NUM}"
+              exit 1
+            fi
+
+            echo "$TASK_YAML" > "minions/tasks/_proposal-${ISSUE_NUM}.yaml"
+
+            echo "task_file=tasks/_proposal-${ISSUE_NUM}.yaml" >> "$GITHUB_OUTPUT"
+            echo "dry_run=false" >> "$GITHUB_OUTPUT"
+            echo "parallel=1" >> "$GITHUB_OUTPUT"
+            echo "issue_num=${ISSUE_NUM}" >> "$GITHUB_OUTPUT"
+
+            RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            gh issue comment "$ISSUE_NUM" --repo "${{ github.repository }}" \
+              --body "Minion build triggered. [View workflow run](${RUN_URL})"
+
+          else
+            ISSUE_NUM="${{ github.event.issue.number }}"
+            ISSUE_TITLE="$ISSUE_TITLE_ENV"
+            ISSUE_BODY=$(gh issue view "$ISSUE_NUM" --repo "${{ github.repository }}" --json body -q '.body')
+
+            TASK_YAML=$(echo "$ISSUE_BODY" | sed -n '/<!-- minion-task/,/minion-task -->/p' | sed '1d;$d')
+
+            if [ -n "$TASK_YAML" ]; then
+              echo "$TASK_YAML" > "minions/tasks/_proposal-${ISSUE_NUM}.yaml"
+              TASK_FILE="tasks/_proposal-${ISSUE_NUM}.yaml"
+            else
+              TASK_ID=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//' | head -c 60)
+              TASK_FILE="tasks/${TASK_ID}.yaml"
+
+              cat > "minions/${TASK_FILE}" <<YAML
+          id: ${TASK_ID}
+          title: "${ISSUE_TITLE}"
+          source: "${{ github.repository }}#${ISSUE_NUM}"
+          source_type: issue
+          description: |
+          $(echo "$ISSUE_BODY" | sed 's/^/  /')
+          target_repos:
+            - cli
+          acceptance_criteria:
+            - "All repo checks pass"
+          pr_labels:
+            - "minion"
+          YAML
+            fi
+
+            echo "task_file=${TASK_FILE}" >> "$GITHUB_OUTPUT"
+            echo "dry_run=false" >> "$GITHUB_OUTPUT"
+            echo "parallel=1" >> "$GITHUB_OUTPUT"
+            echo "issue_num=${ISSUE_NUM}" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          ISSUE_TITLE_ENV: ${{ github.event.issue.title }}
+
+      # Extract plan from issue comments (if available)
+      - name: Extract plan
+        id: plan
+        if: steps.task.outputs.issue_num != ''
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          ISSUE_NUM="${{ steps.task.outputs.issue_num }}"
+          PLAN_FILE="${{ github.workspace }}/minion-plan.md"
+
+          PLAN_BODY=$(gh api "repos/${{ github.repository }}/issues/${ISSUE_NUM}/comments" \
+            --jq '[.[] | select(.body | contains("## Minion Plan"))] | last | .body // empty')
+
+          if [ -n "$PLAN_BODY" ]; then
+            echo "$PLAN_BODY" > "$PLAN_FILE"
+            echo "plan_file=${PLAN_FILE}" >> "$GITHUB_OUTPUT"
+            echo "Plan found, will be included as execution context"
+          else
+            echo "plan_file=" >> "$GITHUB_OUTPUT"
+            echo "No plan comment found, proceeding without plan"
+          fi
+
+      # Run the minion
+      - name: Execute minion
+        id: execute
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          WORKSPACE_ROOT: ${{ github.workspace }}
+          MINION_PR_URLS_FILE: ${{ github.workspace }}/minion-pr-urls.txt
+          MINION_DEBUG_DIR: ${{ github.workspace }}/minion-debug
+        run: |
+          cd minions
+          ARGS="run ${{ steps.task.outputs.task_file }}"
+          if [ "${{ steps.task.outputs.dry_run }}" = "true" ]; then
+            ARGS="${ARGS} --dry-run"
+          fi
+          ARGS="${ARGS} --parallel ${{ steps.task.outputs.parallel }}"
+          if [ -n "${{ steps.plan.outputs.plan_file }}" ]; then
+            ARGS="${ARGS} --plan-file ${{ steps.plan.outputs.plan_file }}"
+          fi
+          ./minions $ARGS
+
+      - name: Upload debug artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: minion-debug-${{ github.run_id }}
+          path: ${{ github.workspace }}/minion-debug/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # On success: mark done and close issue
+      - name: Mark done
+        if: success() && steps.task.outputs.issue_num != ''
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          ISSUE_NUM="${{ steps.task.outputs.issue_num }}"
+          COMMENT="Minion completed successfully."
+          PR_FILE="${{ github.workspace }}/minion-pr-urls.txt"
+          if [ -f "$PR_FILE" ] && [ -s "$PR_FILE" ]; then
+            COMMENT="${COMMENT}\n\nPRs created:"
+            while IFS= read -r url; do
+              COMMENT="${COMMENT}\n- ${url}"
+            done < "$PR_FILE"
+          fi
+          gh issue edit "$ISSUE_NUM" --repo "${{ github.repository }}" \
+            --add-label "minion-done" --remove-label "minion-executing"
+          gh issue close "$ISSUE_NUM" --repo "${{ github.repository }}" \
+            --comment "$(echo -e "$COMMENT")"
+
+      # On failure: mark failed with logs link
+      - name: Mark failed
+        if: failure() && steps.task.outputs.issue_num != ''
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          ISSUE_NUM="${{ steps.task.outputs.issue_num }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh issue edit "$ISSUE_NUM" --repo "${{ github.repository }}" \
+            --add-label "minion-failed" --remove-label "minion-executing"
+          gh issue comment "$ISSUE_NUM" --repo "${{ github.repository }}" \
+            --body "Minion execution failed. [View logs](${RUN_URL})"
