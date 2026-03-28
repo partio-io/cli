@@ -1,0 +1,15 @@
+sources:
+    - name: entireio-cli
+      url: https://github.com/entireio/cli/blob/main/CHANGELOG.md
+      type: changelog
+      last_version: 0.5.1
+    - name: entireio-cli-issues
+      url: https://github.com/entireio/cli/issues
+      type: issues
+      repo: entireio/cli
+      last_version: "750"
+    - name: entireio-cli-pulls
+      url: https://github.com/entireio/cli/pulls
+      type: pulls
+      repo: entireio/cli
+      last_version: "746"

@@ -1,0 +1,136 @@
+name: Plan Minion Task
+
+on:
+  # Trigger when minion-planning label is added
+  issues:
+    types: [labeled]
+
+  # Trigger on /minion replan comment
+  issue_comment:
+    types: [created]
+
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to plan for"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  plan:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && github.event.label.name == 'minion-planning') ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/minion replan'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check authorization
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          ORG=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+          ROLE=$(gh api "orgs/${ORG}/memberships/${{ github.actor }}" --jq '.role' 2>/dev/null || echo "none")
+          if [ "$ROLE" != "admin" ]; then
+            echo "::error::Unauthorized: ${{ github.actor }} (role: ${ROLE}) is not an org admin"
+            exit 1
+          fi
+
+      - name: Determine issue number
+        id: issue
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "number=${{ inputs.issue_number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Acknowledge replan request
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          ISSUE_NUM="${{ steps.issue.outputs.number }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh issue comment "$ISSUE_NUM" --repo "${{ github.repository }}" \
+            --body "Minion re-planning triggered. [View workflow run](${RUN_URL})"
+
+      # Checkout this repo (cli = principal)
+      - name: Checkout cli
+        uses: actions/checkout@v4
+        with:
+          path: cli
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Checkout project repos
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          for ENTRY in $(yq -r '.repos[] | .full_name + ":" + .name' cli/.minions/project.yaml); do
+            FULL="${ENTRY%%:*}"
+            SHORT="${ENTRY##*:}"
+            if [ "$SHORT" = "cli" ]; then
+              continue
+            fi
+            gh repo clone "$FULL" "$SHORT" -- --depth=1
+          done
+
+      - name: Configure git auth
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+
+      - name: Checkout minions
+        uses: actions/checkout@v4
+        with:
+          repository: partio-io/minions
+          path: minions
+          token: ${{ secrets.GH_PAT }}
+
+      # Install toolchains
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build minions
+        run: cd minions && make build
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      # Run plan
+      - name: Generate plan
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          WORKSPACE_ROOT: ${{ github.workspace }}
+        run: |
+          cd minions
+          ./minions plan --issue ${{ steps.issue.outputs.number }} --repo "${{ github.repository }}"
+
+      # On failure: comment with logs link
+      - name: Report failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          ISSUE_NUM="${{ steps.issue.outputs.number }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh issue comment "$ISSUE_NUM" --repo "${{ github.repository }}" \
+            --body "Minion planning failed. [View logs](${RUN_URL})"
