@@ -26,7 +26,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install minions
-        run: go install github.com/partio-io/minions/cmd/minions@latest
+        run: |
+          go install github.com/partio-io/minions/cmd/minions@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Run doc-update program
         env:
