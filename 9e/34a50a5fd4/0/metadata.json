@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "9e34a50a5fd4",
+  "session_id": "5744bb2e-1c7c-4093-bb41-d3d54f5f1a70",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-31T05:55:53.366654Z",
+  "branch": "minion/detect-external-hooks-cli-agent",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "cmd/partio/doctor.go",
+    "cmd/partio/enable.go",
+    "internal/git/hooks/detect.go",
+    "internal/git/hooks/detect_test.go"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "528f93c9b84d",
+  "token_usage": {
+    "input_tokens": 21,
+    "cache_creation_tokens": 47454,
+    "cache_read_tokens": 713898,
+    "output_tokens": 6714,
+    "api_call_count": 20
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-03-31T05:55:53.3127Z",
+    "agent_lines": 233,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 233,
+    "agent_percentage": 100
+  }
+}
