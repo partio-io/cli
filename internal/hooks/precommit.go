@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/partio-io/cli/internal/agent/claude"
+	"github.com/partio-io/cli/internal/agent/codex"
 	"github.com/partio-io/cli/internal/config"
 	"github.com/partio-io/cli/internal/git"
 	"github.com/partio-io/cli/internal/session"
@@ -15,6 +16,7 @@ import (
 // preCommitState records the state captured during pre-commit for use by post-commit.
 type preCommitState struct {
 	AgentActive   bool   `json:"agent_active"`
+	AgentName     string `json:"agent_name,omitempty"`
 	SessionPath   string `json:"session_path,omitempty"`
 	PreCommitHash string `json:"pre_commit_hash,omitempty"`
 	Branch        string `json:"branch"`
@@ -27,32 +29,39 @@ func (r *Runner) PreCommit() error {
 }
 
 func runPreCommit(repoRoot string, cfg config.Config) error {
-	detector := claude.New()
+	claudeDetector := claude.New()
 
-	// Detect if agent is running
-	running, err := detector.IsRunning()
+	// Detect if Claude Code is running.
+	running, err := claudeDetector.IsRunning()
 	if err != nil {
-		slog.Warn("could not detect agent process", "error", err)
+		slog.Warn("could not detect claude process", "error", err)
 		running = false
 	}
 
+	var (
+		sessionPath string
+		agentName   string
+	)
+
 	if running {
+		agentName = claudeDetector.Name()
+
 		// Quick check: find the latest JSONL path without a full parse and see if
 		// we have already captured this session in a fully-condensed ended state.
 		// This avoids the expensive JSONL parse for stale sessions.
-		latestPath, pathErr := detector.FindLatestJSONLPath(repoRoot)
+		latestPath, pathErr := claudeDetector.FindLatestJSONLPath(repoRoot)
 		if pathErr == nil {
 			sid := claude.PeekSessionID(latestPath)
 			if shouldSkipSession(filepath.Join(repoRoot, config.PartioDir), sid, latestPath) {
 				slog.Debug("skipping already-condensed ended session", "session_id", sid)
 				running = false
+				agentName = ""
 			}
 		}
 	}
 
-	var sessionPath string
 	if running {
-		path, _, err := detector.FindLatestSession(repoRoot)
+		path, _, err := claudeDetector.FindLatestSession(repoRoot)
 		if err != nil {
 			slog.Debug("agent running but no session found", "error", err)
 		} else {
@@ -61,11 +70,25 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 		}
 	}
 
+	// If Claude Code is not running, check for Codex CLI.
+	if !running {
+		codexDetector := codex.New()
+		codexRunning, err := codexDetector.IsRunning()
+		if err != nil {
+			slog.Warn("could not detect codex process", "error", err)
+		} else if codexRunning {
+			running = true
+			agentName = codexDetector.Name()
+			slog.Debug("codex agent detected")
+		}
+	}
+
 	branch, _ := git.CurrentBranch()
 	commitHash, _ := git.CurrentCommit()
 
 	state := preCommitState{
-		AgentActive:   running && sessionPath != "",
+		AgentActive:   running && (sessionPath != "" || agentName == "codex"),
+		AgentName:     agentName,
 		SessionPath:   sessionPath,
 		PreCommitHash: commitHash,
 		Branch:        branch,

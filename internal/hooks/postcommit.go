@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/partio-io/cli/internal/agent"
 	"github.com/partio-io/cli/internal/agent/claude"
 	"github.com/partio-io/cli/internal/attribution"
 	"github.com/partio-io/cli/internal/checkpoint"
@@ -65,11 +66,15 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		attr = &attribution.Result{AgentPercent: 100}
 	}
 
-	// Parse agent session data
-	detector := claude.New()
-	sessionPath, sessionData, err := detector.FindLatestSession(repoRoot)
-	if err != nil {
-		slog.Warn("could not read agent session", "error", err)
+	// Parse agent session data — only applicable for Claude Code.
+	var sessionPath string
+	var sessionData *agent.SessionData
+	if state.AgentName == "" || state.AgentName == "claude-code" {
+		claudeDetector := claude.New()
+		sessionPath, sessionData, err = claudeDetector.FindLatestSession(repoRoot)
+		if err != nil {
+			slog.Warn("could not read agent session", "error", err)
+		}
 	}
 
 	// Skip if this session is already fully condensed and ended — re-processing
