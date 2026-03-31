@@ -1,0 +1,60 @@
+diff --git a/.github/workflows/doc-minion.yml b/.github/workflows/doc-minion.yml
+index e868300..295d892 100644
+--- a/.github/workflows/doc-minion.yml
++++ b/.github/workflows/doc-minion.yml
+@@ -26,7 +26,9 @@ jobs:
+       - uses: actions/checkout@v4
+ 
+       - name: Install minions
+-        run: go install github.com/partio-io/minions/cmd/minions@latest
++        run: |
++          go install github.com/partio-io/minions/cmd/minions@latest
++          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+ 
+       - name: Run doc-update program
+         env:
+diff --git a/.github/workflows/minion.yml b/.github/workflows/minion.yml
+index eb9d666..5e25332 100644
+--- a/.github/workflows/minion.yml
++++ b/.github/workflows/minion.yml
+@@ -59,7 +59,9 @@ jobs:
+           fi
+ 
+       - name: Install minions
+-        run: go install github.com/partio-io/minions/cmd/minions@latest
++        run: |
++          go install github.com/partio-io/minions/cmd/minions@latest
++          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+ 
+       - name: Run program
+         env:
+diff --git a/.github/workflows/plan.yml b/.github/workflows/plan.yml
+index 63a302a..b994675 100644
+--- a/.github/workflows/plan.yml
++++ b/.github/workflows/plan.yml
+@@ -26,7 +26,9 @@ jobs:
+       - uses: actions/checkout@v4
+ 
+       - name: Install minions
+-        run: go install github.com/partio-io/minions/cmd/minions@latest
++        run: |
++          go install github.com/partio-io/minions/cmd/minions@latest
++          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+ 
+       - name: Determine program
+         id: program
+diff --git a/.github/workflows/propose.yml b/.github/workflows/propose.yml
+index db9acf4..be0f2f5 100644
+--- a/.github/workflows/propose.yml
++++ b/.github/workflows/propose.yml
+@@ -24,7 +24,9 @@ jobs:
+       - uses: actions/checkout@v4
+ 
+       - name: Install minions
+-        run: go install github.com/partio-io/minions/cmd/minions@latest
++        run: |
++          go install github.com/partio-io/minions/cmd/minions@latest
++          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+ 
+       - name: Run propose program
+         env:
