@@ -1,0 +1,54 @@
+diff --git a/.github/workflows/minion.yml b/.github/workflows/minion.yml
+index 8607835..4db446b 100644
+--- a/.github/workflows/minion.yml
++++ b/.github/workflows/minion.yml
+@@ -47,13 +47,7 @@ jobs:
+             echo "issue_num=" >> "$GITHUB_OUTPUT"
+           else
+             ISSUE_NUM="${{ github.event.issue.number }}"
+-            ISSUE_BODY=$(gh issue view "$ISSUE_NUM" --repo "${{ github.repository }}" --json body -q '.body')
+-            PROGRAM_PATH=$(echo "$ISSUE_BODY" | grep -oP '(?<=<!-- program: ).*(?= -->)' || true)
+-            if [ -z "$PROGRAM_PATH" ]; then
+-              echo "::error::No program reference in issue #${ISSUE_NUM}"
+-              exit 1
+-            fi
+-            echo "path=${PROGRAM_PATH}" >> "$GITHUB_OUTPUT"
++            echo "path=.minions/programs/implement.md" >> "$GITHUB_OUTPUT"
+             echo "dry_run=false" >> "$GITHUB_OUTPUT"
+             echo "issue_num=${ISSUE_NUM}" >> "$GITHUB_OUTPUT"
+           fi
+@@ -72,6 +66,9 @@ jobs:
+           GH_TOKEN: ${{ secrets.GH_PAT }}
+         run: |
+           ARGS="run ${{ steps.program.outputs.path }}"
++          if [ -n "${{ steps.program.outputs.issue_num }}" ]; then
++            ARGS="${ARGS} --issue ${{ steps.program.outputs.issue_num }}"
++          fi
+           if [ "${{ steps.program.outputs.dry_run }}" = "true" ]; then
+             ARGS="${ARGS} --dry-run"
+           fi
+diff --git a/.minions/programs/implement.md b/.minions/programs/implement.md
+new file mode 100644
+index 0000000..7660830
+--- /dev/null
++++ b/.minions/programs/implement.md
+@@ -0,0 +1,19 @@
++---
++id: implement
++target_repos:
++  - cli
++acceptance_criteria:
++  - "All changes match what the issue describes"
++  - "make test passes"
++  - "make lint passes"
++pr_labels:
++  - minion
++---
++
++# Implement the issue
++
++Read the issue provided as context and implement exactly what it describes.
++
++Follow existing code patterns and conventions. Read the relevant code before making changes. Keep changes minimal — implement what the issue asks for, nothing more.
++
++After implementation, run the appropriate checks (`make test`, `make lint`) and fix any failures.
