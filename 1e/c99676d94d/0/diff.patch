@@ -1,0 +1,220 @@
+diff --git a/.github/workflows/minion.yml b/.github/workflows/minion.yml
+index 3833f4a..d07493b 100644
+--- a/.github/workflows/minion.yml
++++ b/.github/workflows/minion.yml
+@@ -3,8 +3,8 @@ name: Run Minion
+ on:
+   workflow_dispatch:
+     inputs:
+-      task_file:
+-        description: "Program .md file path (e.g., programs/detect-hooks.md)"
++      program:
++        description: "Program .md file path (e.g., .minions/programs/detect-hooks.md)"
+         required: true
+         type: string
+       dry_run:
+@@ -28,7 +28,6 @@ permissions:
+ 
+ jobs:
+   run-minion:
+-    # Skip unless: workflow_dispatch, minion-ready/minion-approved label, or /minion build comment
+     if: >
+       github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'issues' && (github.event.label.name == 'minion-ready' || github.event.label.name == 'minion-approved')) ||
+@@ -48,7 +47,6 @@ jobs:
+             echo "::error::Unauthorized: ${{ github.actor }} (role: ${ROLE}) is not an org admin"
+             exit 1
+           fi
+-          echo "Authorized: ${{ github.actor }} (org role: ${ROLE})"
+ 
+       # Mark issue as executing (issue-triggered runs only)
+       - name: Mark executing
+@@ -57,29 +55,25 @@ jobs:
+           GH_TOKEN: ${{ secrets.GH_PAT }}
+         run: |
+           ISSUE_NUM="${{ github.event.issue.number }}"
+-
+-          # Skip if already executing (dedup)
+           LABELS=$(gh issue view "$ISSUE_NUM" --repo "${{ github.repository }}" --json labels -q '.labels[].name')
+           if echo "$LABELS" | grep -q "minion-executing"; then
+             echo "::error::Issue #${ISSUE_NUM} is already executing"
+             exit 1
+           fi
+-
+           gh issue edit "$ISSUE_NUM" --repo "${{ github.repository }}" --add-label "minion-executing"
+ 
+-      # Checkout this repo (cli = principal)
++      # Checkout cli (principal repo)
+       - name: Checkout cli
+         uses: actions/checkout@v4
+         with:
+           path: cli
+ 
+-      # Install yq for parsing project.yaml
+       - name: Install yq
+         run: |
+           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+           sudo chmod +x /usr/local/bin/yq
+ 
+-      # Checkout other repos defined in project.yaml (skip cli itself)
++      # Checkout other repos
+       - name: Checkout project repos
+         env:
+           GH_TOKEN: ${{ secrets.GH_PAT }}
+@@ -87,10 +81,7 @@ jobs:
+           for ENTRY in $(yq -r '.repos[] | .full_name + ":" + .name' cli/.minions/project.yaml); do
+             FULL="${ENTRY%%:*}"
+             SHORT="${ENTRY##*:}"
+-            if [ "$SHORT" = "cli" ]; then
+-              continue
+-            fi
+-            echo "Cloning ${FULL} -> ${SHORT}/"
++            [ "$SHORT" = "cli" ] && continue
+             gh repo clone "$FULL" "$SHORT" -- --depth=1
+           done
+ 
+@@ -99,7 +90,7 @@ jobs:
+           GH_TOKEN: ${{ secrets.GH_PAT }}
+         run: git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+ 
+-      # Checkout minions tool (for building)
++      # Checkout minions tool
+       - name: Checkout minions
+         uses: actions/checkout@v4
+         with:
+@@ -107,7 +98,6 @@ jobs:
+           path: minions
+           token: ${{ secrets.GH_PAT }}
+ 
+-      # Install toolchains
+       - name: Setup Go
+         uses: actions/setup-go@v5
+         with:
+@@ -127,62 +117,27 @@ jobs:
+       - name: Install Claude Code
+         run: npm install -g @anthropic-ai/claude-code
+ 
+-      # Extract program from issue or use dispatch input
++      # Determine program path
+       - name: Determine program
+-        id: task
++        id: program
+         run: |
+           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+-            echo "program_file=${{ inputs.task_file }}" >> "$GITHUB_OUTPUT"
++            echo "path=${{ inputs.program }}" >> "$GITHUB_OUTPUT"
+             echo "dry_run=${{ inputs.dry_run }}" >> "$GITHUB_OUTPUT"
+             echo "issue_num=" >> "$GITHUB_OUTPUT"
+-
+           else
+-            # Issue-triggered (label or /minion build comment)
+-            if [ "${{ github.event_name }}" = "issue_comment" ]; then
+-              ISSUE_NUM="${{ github.event.issue.number }}"
+-            else
+-              ISSUE_NUM="${{ github.event.issue.number }}"
+-            fi
+-
++            ISSUE_NUM="${{ github.event.issue.number }}"
+             ISSUE_BODY=$(gh issue view "$ISSUE_NUM" --repo "${{ github.repository }}" --json body -q '.body')
+ 
+-            # Try new program format first, then legacy YAML
+-            PROGRAM=$(echo "$ISSUE_BODY" | sed -n '/<!-- minion-program/,/minion-program -->/p' | sed '1d;$d')
+-
+-            if [ -z "$PROGRAM" ]; then
+-              # Try legacy YAML format — the Go tool will convert it
+-              PROGRAM=$(echo "$ISSUE_BODY" | sed -n '/<!-- minion-task/,/minion-task -->/p' | sed '1d;$d')
+-              if [ -n "$PROGRAM" ]; then
+-                echo "Found legacy YAML task, will be converted to program by minions"
+-              fi
+-            fi
+-
+-            if [ -z "$PROGRAM" ]; then
+-              # Generate minimal program from issue title/body
+-              ISSUE_TITLE="$ISSUE_TITLE_ENV"
+-              TASK_ID=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//' | head -c 60)
+-              PROGRAM=$(cat <<PROG
+-          ---
+-          id: ${TASK_ID}
+-          target_repos:
+-            - cli
+-          acceptance_criteria:
+-            - "All repo checks pass"
+-          pr_labels:
+-            - minion
+-          ---
+-
+-          # ${ISSUE_TITLE}
++            # Extract program path from <!-- program: path --> marker
++            PROGRAM_PATH=$(echo "$ISSUE_BODY" | grep -oP '(?<=<!-- program: ).*(?= -->)' || true)
+ 
+-          $(echo "$ISSUE_BODY" | head -100)
+-          PROG
+-              )
++            if [ -z "$PROGRAM_PATH" ]; then
++              echo "::error::No program reference found in issue #${ISSUE_NUM}. Expected <!-- program: .minions/programs/foo.md -->"
++              exit 1
+             fi
+ 
+-            PROGRAM_FILE="${{ github.workspace }}/minion-program-${ISSUE_NUM}.md"
+-            echo "$PROGRAM" > "$PROGRAM_FILE"
+-
+-            echo "program_file=${PROGRAM_FILE}" >> "$GITHUB_OUTPUT"
++            echo "path=cli/${PROGRAM_PATH}" >> "$GITHUB_OUTPUT"
+             echo "dry_run=false" >> "$GITHUB_OUTPUT"
+             echo "issue_num=${ISSUE_NUM}" >> "$GITHUB_OUTPUT"
+ 
+@@ -194,11 +149,9 @@ jobs:
+           fi
+         env:
+           GH_TOKEN: ${{ secrets.GH_PAT }}
+-          ISSUE_TITLE_ENV: ${{ github.event.issue.title }}
+ 
+       # Run the minion
+       - name: Execute minion
+-        id: execute
+         env:
+           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+           GH_TOKEN: ${{ secrets.GH_PAT }}
+@@ -207,8 +160,8 @@ jobs:
+           MINION_DEBUG_DIR: ${{ github.workspace }}/minion-debug
+         run: |
+           cd minions
+-          ARGS="run --program ${{ steps.task.outputs.program_file }}"
+-          if [ "${{ steps.task.outputs.dry_run }}" = "true" ]; then
++          ARGS="run --program ${{ github.workspace }}/${{ steps.program.outputs.path }}"
++          if [ "${{ steps.program.outputs.dry_run }}" = "true" ]; then
+             ARGS="${ARGS} --dry-run"
+           fi
+           ./minions $ARGS
+@@ -222,13 +175,12 @@ jobs:
+           if-no-files-found: ignore
+           retention-days: 7
+ 
+-      # On success: mark done and close issue
+       - name: Mark done
+-        if: success() && steps.task.outputs.issue_num != ''
++        if: success() && steps.program.outputs.issue_num != ''
+         env:
+           GH_TOKEN: ${{ secrets.GH_PAT }}
+         run: |
+-          ISSUE_NUM="${{ steps.task.outputs.issue_num }}"
++          ISSUE_NUM="${{ steps.program.outputs.issue_num }}"
+           COMMENT="Minion completed successfully."
+           PR_FILE="${{ github.workspace }}/minion-pr-urls.txt"
+           if [ -f "$PR_FILE" ] && [ -s "$PR_FILE" ]; then
+@@ -242,13 +194,12 @@ jobs:
+           gh issue close "$ISSUE_NUM" --repo "${{ github.repository }}" \
+             --comment "$(echo -e "$COMMENT")"
+ 
+-      # On failure: mark failed with logs link
+       - name: Mark failed
+-        if: failure() && steps.task.outputs.issue_num != ''
++        if: failure() && steps.program.outputs.issue_num != ''
+         env:
+           GH_TOKEN: ${{ secrets.GH_PAT }}
+         run: |
+-          ISSUE_NUM="${{ steps.task.outputs.issue_num }}"
++          ISSUE_NUM="${{ steps.program.outputs.issue_num }}"
+           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+           gh issue edit "$ISSUE_NUM" --repo "${{ github.repository }}" \
+             --add-label "minion-failed" --remove-label "minion-executing"
