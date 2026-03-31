@@ -1,0 +1,646 @@
+diff --git a/.github/workflows/approve.yml b/.github/workflows/approve.yml
+deleted file mode 100644
+index 49541ff..0000000
+--- a/.github/workflows/approve.yml
++++ /dev/null
+@@ -1,70 +0,0 @@
+-name: Auto-Approve Proposals
+-
+-on:
+-  workflow_dispatch:
+-    inputs:
+-      delay:
+-        description: "Minimum age before approval (e.g., 24h, 0h)"
+-        required: false
+-        default: "24h"
+-        type: string
+-      dry_run:
+-        description: "Dry run (no labels added)"
+-        required: false
+-        default: false
+-        type: boolean
+-
+-permissions:
+-  issues: write
+-
+-jobs:
+-  approve:
+-    runs-on: ubuntu-latest
+-    timeout-minutes: 5
+-
+-    steps:
+-      - name: Check authorization
+-        if: github.event_name != 'schedule'
+-        env:
+-          GH_TOKEN: ${{ secrets.GH_PAT }}
+-        run: |
+-          ORG=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+-          ROLE=$(gh api "orgs/${ORG}/memberships/${{ github.actor }}" --jq '.role' 2>/dev/null || echo "none")
+-          if [ "$ROLE" != "admin" ]; then
+-            echo "::error::Unauthorized: ${{ github.actor }} (role: ${ROLE}) is not an org admin"
+-            exit 1
+-          fi
+-          echo "Authorized: ${{ github.actor }} (org role: ${ROLE})"
+-
+-      - name: Checkout cli
+-        uses: actions/checkout@v4
+-        with:
+-          path: cli
+-
+-      - name: Checkout minions
+-        uses: actions/checkout@v4
+-        with:
+-          repository: partio-io/minions
+-          path: minions
+-          token: ${{ secrets.GH_PAT }}
+-
+-      - name: Setup Go
+-        uses: actions/setup-go@v5
+-        with:
+-          go-version: "1.26"
+-
+-      - name: Build minions
+-        run: cd minions && make build
+-
+-      - name: Run approve
+-        env:
+-          GH_TOKEN: ${{ secrets.GH_PAT }}
+-          WORKSPACE_ROOT: ${{ github.workspace }}
+-        run: |
+-          cd minions
+-          DELAY="${{ inputs.delay || '24h' }}"
+-          ARGS="approve --delay ${DELAY}"
+-          if [ "${{ inputs.dry_run }}" = "true" ]; then
+-            ARGS="${ARGS} --dry-run"
+-          fi
+-          ./minions $ARGS
+diff --git a/.github/workflows/doc-minion.yml b/.github/workflows/doc-minion.yml
+index a357bbc..e868300 100644
+--- a/.github/workflows/doc-minion.yml
++++ b/.github/workflows/doc-minion.yml
+@@ -8,7 +8,7 @@ on:
+         required: true
+         type: string
+       dry_run:
+-        description: "Dry run (prompt generation only)"
++        description: "Dry run"
+         required: false
+         default: false
+         type: boolean
+@@ -23,67 +23,18 @@ jobs:
+     timeout-minutes: 15
+ 
+     steps:
+-      # Checkout this repo (cli = principal)
+-      - name: Checkout cli
+-        uses: actions/checkout@v4
+-        with:
+-          path: cli
++      - uses: actions/checkout@v4
+ 
+-      - name: Install yq
+-        run: |
+-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+-          sudo chmod +x /usr/local/bin/yq
+-
+-      - name: Checkout project repos
+-        env:
+-          GH_TOKEN: ${{ secrets.GH_PAT }}
+-        run: |
+-          for ENTRY in $(yq -r '.repos[] | .full_name + ":" + .name' cli/.minions/project.yaml); do
+-            FULL="${ENTRY%%:*}"
+-            SHORT="${ENTRY##*:}"
+-            if [ "$SHORT" = "cli" ]; then
+-              continue
+-            fi
+-            gh repo clone "$FULL" "$SHORT" -- --depth=1
+-          done
+-
+-      - name: Configure git auth
+-        env:
+-          GH_TOKEN: ${{ secrets.GH_PAT }}
+-        run: git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+-
+-      - name: Checkout minions
+-        uses: actions/checkout@v4
+-        with:
+-          repository: partio-io/minions
+-          path: minions
+-          token: ${{ secrets.GH_PAT }}
+-
+-      - name: Setup Go
+-        uses: actions/setup-go@v5
+-        with:
+-          go-version: "1.26"
+-
+-      - name: Setup Node.js
+-        uses: actions/setup-node@v4
+-        with:
+-          node-version: "22"
+-
+-      - name: Build minions
+-        run: cd minions && make build
+-
+-      - name: Install Claude Code
+-        run: npm install -g @anthropic-ai/claude-code
++      - name: Install minions
++        run: go install github.com/partio-io/minions/cmd/minions@latest
+ 
+-      - name: Run doc minion
++      - name: Run doc-update program
+         env:
+           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+           GH_TOKEN: ${{ secrets.GH_PAT }}
+-          WORKSPACE_ROOT: ${{ github.workspace }}
+         run: |
+-          cd minions
+-          ARGS="doc --pr ${{ inputs.pr_ref }}"
++          ARGS="run .minions/programs/doc-update.md"
+           if [ "${{ inputs.dry_run }}" = "true" ]; then
+             ARGS="${ARGS} --dry-run"
+           fi
+-          ./minions $ARGS
++          minions $ARGS
+diff --git a/.github/workflows/plan.yml b/.github/workflows/plan.yml
+index 57c13f2..63a302a 100644
+--- a/.github/workflows/plan.yml
++++ b/.github/workflows/plan.yml
+@@ -1,19 +1,12 @@
+ name: Plan Minion Task
+ 
+ on:
+-  # Trigger when minion-planning label is added
+   issues:
+     types: [labeled]
+-
+-  # Trigger on /minion replan comment
+-  issue_comment:
+-    types: [created]
+-
+-  # Manual trigger
+   workflow_dispatch:
+     inputs:
+-      issue_number:
+-        description: "Issue number to plan for"
++      program:
++        description: "Program .md file path"
+         required: true
+         type: string
+ 
+@@ -25,112 +18,36 @@ jobs:
+   plan:
+     if: >
+       github.event_name == 'workflow_dispatch' ||
+-      (github.event_name == 'issues' && github.event.label.name == 'minion-planning') ||
+-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/minion replan'))
++      (github.event_name == 'issues' && github.event.label.name == 'minion-planning')
+     runs-on: ubuntu-latest
+     timeout-minutes: 15
+ 
+     steps:
+-      - name: Check authorization
+-        env:
+-          GH_TOKEN: ${{ secrets.GH_PAT }}
+-        run: |
+-          ORG=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+-          ROLE=$(gh api "orgs/${ORG}/memberships/${{ github.actor }}" --jq '.role' 2>/dev/null || echo "none")
+-          if [ "$ROLE" != "admin" ]; then
+-            echo "::error::Unauthorized: ${{ github.actor }} (role: ${ROLE}) is not an org admin"
+-            exit 1
+-          fi
++      - uses: actions/checkout@v4
+ 
+-      - name: Determine issue number
+-        id: issue
+-        run: |
+-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+-            echo "number=${{ inputs.issue_number }}" >> "$GITHUB_OUTPUT"
+-          else
+-            echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+-          fi
+-
+-      - name: Acknowledge replan request
+-        if: github.event_name == 'issue_comment'
+-        env:
+-          GH_TOKEN: ${{ secrets.GH_PAT }}
+-        run: |
+-          ISSUE_NUM="${{ steps.issue.outputs.number }}"
+-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+-          gh issue comment "$ISSUE_NUM" --repo "${{ github.repository }}" \
+-            --body "Minion re-planning triggered. [View workflow run](${RUN_URL})"
+-
+-      # Checkout this repo (cli = principal)
+-      - name: Checkout cli
+-        uses: actions/checkout@v4
+-        with:
+-          path: cli
+-
+-      - name: Install yq
+-        run: |
+-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+-          sudo chmod +x /usr/local/bin/yq
++      - name: Install minions
++        run: go install github.com/partio-io/minions/cmd/minions@latest
+ 
+-      - name: Checkout project repos
++      - name: Determine program
++        id: program
+         env:
+           GH_TOKEN: ${{ secrets.GH_PAT }}
+         run: |
+-          for ENTRY in $(yq -r '.repos[] | .full_name + ":" + .name' cli/.minions/project.yaml); do
+-            FULL="${ENTRY%%:*}"
+-            SHORT="${ENTRY##*:}"
+-            if [ "$SHORT" = "cli" ]; then
+-              continue
++          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
++            echo "path=${{ inputs.program }}" >> "$GITHUB_OUTPUT"
++          else
++            ISSUE_NUM="${{ github.event.issue.number }}"
++            ISSUE_BODY=$(gh issue view "$ISSUE_NUM" --repo "${{ github.repository }}" --json body -q '.body')
++            PROGRAM_PATH=$(echo "$ISSUE_BODY" | grep -oP '(?<=<!-- program: ).*(?= -->)' || true)
++            if [ -z "$PROGRAM_PATH" ]; then
++              echo "::error::No program reference in issue #${ISSUE_NUM}"
++              exit 1
+             fi
+-            gh repo clone "$FULL" "$SHORT" -- --depth=1
+-          done
+-
+-      - name: Configure git auth
+-        env:
+-          GH_TOKEN: ${{ secrets.GH_PAT }}
+-        run: git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+-
+-      - name: Checkout minions
+-        uses: actions/checkout@v4
+-        with:
+-          repository: partio-io/minions
+-          path: minions
+-          token: ${{ secrets.GH_PAT }}
+-
+-      # Install toolchains
+-      - name: Setup Go
+-        uses: actions/setup-go@v5
+-        with:
+-          go-version: "1.26"
+-
+-      - name: Setup Node.js
+-        uses: actions/setup-node@v4
+-        with:
+-          node-version: "22"
+-
+-      - name: Build minions
+-        run: cd minions && make build
+-
+-      - name: Install Claude Code
+-        run: npm install -g @anthropic-ai/claude-code
++            echo "path=${PROGRAM_PATH}" >> "$GITHUB_OUTPUT"
++          fi
+ 
+-      # Run plan
+-      - name: Generate plan
++      - name: Run program with planner
+         env:
+           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+           GH_TOKEN: ${{ secrets.GH_PAT }}
+-          WORKSPACE_ROOT: ${{ github.workspace }}
+-        run: |
+-          cd minions
+-          ./minions plan --issue ${{ steps.issue.outputs.number }} --repo "${{ github.repository }}"
+-
+-      # On failure: comment with logs link
+-      - name: Report failure
+-        if: failure()
+-        env:
+-          GH_TOKEN: ${{ secrets.GH_PAT }}
+-        run: |
+-          ISSUE_NUM="${{ steps.issue.outputs.number }}"
+-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+-          gh issue comment "$ISSUE_NUM" --repo "${{ github.repository }}" \
+-            --body "Minion planning failed. [View logs](${RUN_URL})"
++        run: minions run ${{ steps.program.outputs.path }} --dry-run
+diff --git a/.github/workflows/propose.yml b/.github/workflows/propose.yml
+index 137fe77..db9acf4 100644
+--- a/.github/workflows/propose.yml
++++ b/.github/workflows/propose.yml
+@@ -2,14 +2,9 @@ name: Propose Features
+ 
+ on:
+   schedule:
+-    - cron: "0 8,20 * * *"  # Twice daily at 08:00 and 20:00 UTC
+-
++    - cron: "0 8,20 * * *"
+   workflow_dispatch:
+     inputs:
+-      source:
+-        description: "Process only this source (leave empty for all)"
+-        required: false
+-        type: string
+       dry_run:
+         description: "Dry run (no issues created)"
+         required: false
+@@ -26,67 +21,18 @@ jobs:
+     timeout-minutes: 15
+ 
+     steps:
+-      - name: Check authorization
+-        if: github.event_name != 'schedule'
+-        env:
+-          GH_TOKEN: ${{ secrets.GH_PAT }}
+-        run: |
+-          ORG=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+-          ROLE=$(gh api "orgs/${ORG}/memberships/${{ github.actor }}" --jq '.role' 2>/dev/null || echo "none")
+-          if [ "$ROLE" != "admin" ]; then
+-            echo "::error::Unauthorized: ${{ github.actor }} (role: ${ROLE}) is not an org admin"
+-            exit 1
+-          fi
+-          echo "Authorized: ${{ github.actor }} (org role: ${ROLE})"
+-
+-      - name: Checkout cli
+-        uses: actions/checkout@v4
+-        with:
+-          path: cli
+-          token: ${{ secrets.GH_PAT }}
+-
+-      - name: Checkout minions
+-        uses: actions/checkout@v4
+-        with:
+-          repository: partio-io/minions
+-          path: minions
+-          token: ${{ secrets.GH_PAT }}
++      - uses: actions/checkout@v4
+ 
+-      - name: Setup Go
+-        uses: actions/setup-go@v5
+-        with:
+-          go-version: "1.26"
++      - name: Install minions
++        run: go install github.com/partio-io/minions/cmd/minions@latest
+ 
+-      - name: Build minions
+-        run: cd minions && make build
+-
+-      - name: Install Claude Code
+-        run: npm install -g @anthropic-ai/claude-code
+-
+-      - name: Run propose
++      - name: Run propose program
+         env:
+           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+           GH_TOKEN: ${{ secrets.GH_PAT }}
+-          WORKSPACE_ROOT: ${{ github.workspace }}
+         run: |
+-          cd minions
+-          ARGS="propose --sources-file ${{ github.workspace }}/cli/.minions/sources.yaml"
++          ARGS="run .minions/programs/propose.md"
+           if [ "${{ inputs.dry_run }}" = "true" ]; then
+             ARGS="${ARGS} --dry-run"
+           fi
+-          if [ -n "${{ inputs.source }}" ]; then
+-            ARGS="${ARGS} --source ${{ inputs.source }}"
+-          fi
+-          ./minions $ARGS
+-
+-      # Commit updated sources.yaml (last_version changes)
+-      - name: Commit sources.yaml
+-        if: inputs.dry_run != 'true'
+-        run: |
+-          cd cli
+-          git config user.name "github-actions[bot]"
+-          git config user.email "github-actions[bot]@users.noreply.github.com"
+-          git add .minions/sources.yaml
+-          git diff --cached --quiet || git commit -m "chore: update sources.yaml last_version" && git push
+-        env:
+-          GH_TOKEN: ${{ secrets.GH_PAT }}
++          minions $ARGS
+diff --git a/.minions/programs/approve.md b/.minions/programs/approve.md
+new file mode 100644
+index 0000000..6014a78
+--- /dev/null
++++ b/.minions/programs/approve.md
+@@ -0,0 +1,29 @@
++---
++id: approve
++target_repos:
++  - cli
++---
++
++# Auto-approve eligible proposals
++
++Scan open proposal issues and approve those that have passed the review window.
++
++## Steps
++
++1. **List open proposals:**
++   ```bash
++   gh issue list --repo <this-repo> --label minion-proposal --state open --json number,title,labels,createdAt --limit 200
++   ```
++
++2. **For each proposal**, check if it should be approved:
++   - Skip if it has a `do-not-build` label
++   - Skip if it already has `minion-approved` label
++   - Skip if it was created less than 24 hours ago
++   - Skip if it has `minion-executing` or `minion-failed` label
++
++3. **Approve eligible proposals** by adding the `minion-approved` label:
++   ```bash
++   gh issue edit <number> --repo <this-repo> --add-label minion-approved
++   ```
++
++4. **Print summary** of approved and skipped proposals with reasons.
+diff --git a/.minions/programs/doc-update.md b/.minions/programs/doc-update.md
+new file mode 100644
+index 0000000..48b2f1f
+--- /dev/null
++++ b/.minions/programs/doc-update.md
+@@ -0,0 +1,45 @@
++---
++id: doc-update
++target_repos:
++  - docs
++acceptance_criteria:
++  - "Documentation accurately reflects the changes in the source PR"
++  - "MDX frontmatter is valid"
++  - "No broken links or references"
++pr_labels:
++  - minion
++  - documentation
++---
++
++# Update documentation for a merged PR
++
++When a code PR merges on the cli repo, update the documentation to reflect the changes.
++
++## Steps
++
++1. **Identify the source PR.** The PR reference is passed as context. Read the PR title, body, and diff:
++   ```bash
++   gh pr view <number> --repo <repo> --json title,body,files
++   gh pr diff <number> --repo <repo>
++   ```
++
++2. **Understand what changed.** Analyze the diff to determine what user-facing behavior changed — new commands, changed flags, new config options, etc.
++
++3. **Read existing docs.** Check `docs/` for relevant pages that need updating. Look at the CLAUDE.md in the docs repo for structure guidance.
++
++4. **Update the docs.** Edit the relevant MDX files to reflect the changes. Keep the existing style and structure.
++
++5. **Verify.** Ensure MDX frontmatter is valid and no broken references.
++
++6. **Create a PR** on the docs repo:
++   ```bash
++   git checkout -b minion/doc-update-<source-pr-number>
++   git add -A
++   git commit -m "docs: update for <repo>#<number>"
++   git push -u origin minion/doc-update-<source-pr-number>
++   gh pr create --repo <docs-repo> --title "[docs] Update for <repo>#<number>" --label minion --label documentation
++   ```
++
++## Context
++
++- `docs/CLAUDE.md`
+diff --git a/.minions/programs/ingest.md b/.minions/programs/ingest.md
+new file mode 100644
+index 0000000..ed500a2
+--- /dev/null
++++ b/.minions/programs/ingest.md
+@@ -0,0 +1,37 @@
++---
++id: ingest
++target_repos:
++  - cli
++---
++
++# Ingest features from a single source
++
++Analyze content from a URL and generate feature proposals.
++
++## Steps
++
++1. **Fetch the content.** Use `curl` to download the URL provided as context.
++
++2. **Read the ingest prompt** from `.minions/ingest-prompt.md`.
++
++3. **Analyze the content** using the ingest prompt guidelines. Extract feature ideas that are relevant to this project.
++
++4. **For each relevant feature:**
++   - Generate a kebab-case ID
++   - Check for duplicates: `gh issue list --repo <this-repo> --label minion-proposal --search "<id>" --limit 1`
++   - Write a program file to `.minions/programs/<id>.md`
++   - Create a GitHub issue linking to it with `<!-- program: .minions/programs/<id>.md -->`
++
++5. **Commit and push** the new program files:
++   ```bash
++   git add .minions/programs/
++   git commit -m "chore: add minion proposals from ingest"
++   git push
++   ```
++
++6. **Print summary.**
++
++## Context
++
++- `.minions/ingest-prompt.md`
++- `.minions/project.yaml`
+diff --git a/.minions/programs/propose.md b/.minions/programs/propose.md
+new file mode 100644
+index 0000000..801dcb4
+--- /dev/null
++++ b/.minions/programs/propose.md
+@@ -0,0 +1,43 @@
++---
++id: propose
++target_repos:
++  - cli
++---
++
++# Propose features from monitored sources
++
++Scan monitored sources for new content and create feature proposals.
++
++## Steps
++
++1. **Read sources config** from `.minions/sources.yaml` in this repo. It lists changelog URLs, GitHub issue/PR repos, and the `last_version` cursor for each.
++
++2. **Read the ingest prompt** from `.minions/ingest-prompt.md` — it describes the project and how to extract features.
++
++3. **For each source**, fetch new content since `last_version`:
++   - **changelog** sources: fetch the URL, find version headers newer than `last_version`
++   - **issues** sources: run `gh issue list --repo <repo> --json number,title,body --limit 50`, filter items with number > last_version
++   - **pulls** sources: run `gh pr list --repo <repo> --json number,title,body --limit 50`, filter items with number > last_version
++
++4. **For each source with new content**, use the ingest prompt to analyze what's relevant to this project. For each relevant feature idea:
++   - Generate a kebab-case ID
++   - Check if a proposal already exists: `gh issue list --repo <this-repo> --label minion-proposal --search "<feature-id>" --limit 1`
++   - If not, write a program file to `.minions/programs/<id>.md` with frontmatter (id, target_repos, acceptance_criteria, pr_labels) and description
++   - Create a GitHub issue: `gh issue create --repo <this-repo> --label minion-proposal --title "<title>" --body "<description + link to program file + <!-- program: .minions/programs/<id>.md --> marker>"`
++
++5. **Update `last_version`** in `.minions/sources.yaml` for each processed source (latest version string for changelogs, highest item number for issues/pulls).
++
++6. **Commit and push** all new program files and the updated sources.yaml:
++   ```bash
++   git add .minions/programs/ .minions/sources.yaml
++   git commit -m "chore: add minion proposals"
++   git push
++   ```
++
++7. **Print summary** of what was created.
++
++## Context
++
++- `.minions/sources.yaml`
++- `.minions/ingest-prompt.md`
++- `.minions/project.yaml`
+diff --git a/.minions/programs/readme-update.md b/.minions/programs/readme-update.md
+new file mode 100644
+index 0000000..4b77a41
+--- /dev/null
++++ b/.minions/programs/readme-update.md
+@@ -0,0 +1,47 @@
++---
++id: readme-update
++target_repos:
++  - cli
++acceptance_criteria:
++  - "README accurately reflects current CLI capabilities"
++  - "No broken links"
++pr_labels:
++  - minion
++---
++
++# Update README for a merged PR
++
++When a PR merges, update the repo's README to reflect any user-facing changes.
++
++## Steps
++
++1. **Read the source PR** diff and description:
++   ```bash
++   gh pr view <number> --repo <repo> --json title,body,files
++   gh pr diff <number> --repo <repo>
++   ```
++
++2. **Read the current README.md** in the repo.
++
++3. **Determine if the README needs updating.** Only update if:
++   - New commands or flags were added
++   - Existing commands changed behavior
++   - Install instructions changed
++   - Architecture changed significantly
++
++   If no README update is needed, create a file `.no-update-needed` with a brief explanation and stop.
++
++4. **Update README.md** with the relevant changes. Keep existing style.
++
++5. **Create a PR**:
++   ```bash
++   git checkout -b minion/readme-update-<source-pr-number>
++   git add README.md
++   git commit -m "docs: update README for <repo>#<number>"
++   git push -u origin minion/readme-update-<source-pr-number>
++   gh pr create --repo <repo> --title "[readme] Update for #<number>" --label minion
++   ```
++
++## Context
++
++- `README.md`
