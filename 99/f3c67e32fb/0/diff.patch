@@ -1,0 +1,229 @@
+diff --git a/.github/workflows/minion.yml b/.github/workflows/minion.yml
+index fb87e13..3833f4a 100644
+--- a/.github/workflows/minion.yml
++++ b/.github/workflows/minion.yml
+@@ -4,14 +4,9 @@ on:
+   workflow_dispatch:
+     inputs:
+       task_file:
+-        description: "Task YAML file path (e.g., tasks/detect-external-hooks.yaml) or 'tasks/' for all"
++        description: "Program .md file path (e.g., programs/detect-hooks.md)"
+         required: true
+         type: string
+-      parallel:
+-        description: "Max parallel minions"
+-        required: false
+-        default: "2"
+-        type: string
+       dry_run:
+         description: "Dry run (prompt generation only)"
+         required: false
+@@ -132,99 +127,75 @@ jobs:
+       - name: Install Claude Code
+         run: npm install -g @anthropic-ai/claude-code
+ 
+-      # Determine task file (workflow_dispatch vs issue trigger)
+-      - name: Determine task
++      # Extract program from issue or use dispatch input
++      - name: Determine program
+         id: task
+         run: |
+           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+-            echo "task_file=${{ inputs.task_file }}" >> "$GITHUB_OUTPUT"
++            echo "program_file=${{ inputs.task_file }}" >> "$GITHUB_OUTPUT"
+             echo "dry_run=${{ inputs.dry_run }}" >> "$GITHUB_OUTPUT"
+-            echo "parallel=${{ inputs.parallel }}" >> "$GITHUB_OUTPUT"
+             echo "issue_num=" >> "$GITHUB_OUTPUT"
+ 
+-          elif [ "${{ github.event_name }}" = "issue_comment" ]; then
+-            ISSUE_NUM="${{ github.event.issue.number }}"
+-            ISSUE_BODY=$(gh issue view "$ISSUE_NUM" --repo "${{ github.repository }}" --json body -q '.body')
+-
+-            TASK_YAML=$(echo "$ISSUE_BODY" | sed -n '/<!-- minion-task/,/minion-task -->/p' | sed '1d;$d')
+-
+-            if [ -z "$TASK_YAML" ]; then
+-              echo "::error::No embedded minion-task YAML found in issue #${ISSUE_NUM}"
+-              exit 1
++          else
++            # Issue-triggered (label or /minion build comment)
++            if [ "${{ github.event_name }}" = "issue_comment" ]; then
++              ISSUE_NUM="${{ github.event.issue.number }}"
++            else
++              ISSUE_NUM="${{ github.event.issue.number }}"
+             fi
+ 
+-            echo "$TASK_YAML" > "minions/tasks/_proposal-${ISSUE_NUM}.yaml"
+-
+-            echo "task_file=tasks/_proposal-${ISSUE_NUM}.yaml" >> "$GITHUB_OUTPUT"
+-            echo "dry_run=false" >> "$GITHUB_OUTPUT"
+-            echo "parallel=1" >> "$GITHUB_OUTPUT"
+-            echo "issue_num=${ISSUE_NUM}" >> "$GITHUB_OUTPUT"
+-
+-            RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+-            gh issue comment "$ISSUE_NUM" --repo "${{ github.repository }}" \
+-              --body "Minion build triggered. [View workflow run](${RUN_URL})"
+-
+-          else
+-            ISSUE_NUM="${{ github.event.issue.number }}"
+-            ISSUE_TITLE="$ISSUE_TITLE_ENV"
+             ISSUE_BODY=$(gh issue view "$ISSUE_NUM" --repo "${{ github.repository }}" --json body -q '.body')
+ 
+-            TASK_YAML=$(echo "$ISSUE_BODY" | sed -n '/<!-- minion-task/,/minion-task -->/p' | sed '1d;$d')
++            # Try new program format first, then legacy YAML
++            PROGRAM=$(echo "$ISSUE_BODY" | sed -n '/<!-- minion-program/,/minion-program -->/p' | sed '1d;$d')
+ 
+-            if [ -n "$TASK_YAML" ]; then
+-              echo "$TASK_YAML" > "minions/tasks/_proposal-${ISSUE_NUM}.yaml"
+-              TASK_FILE="tasks/_proposal-${ISSUE_NUM}.yaml"
+-            else
+-              TASK_ID=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//' | head -c 60)
+-              TASK_FILE="tasks/${TASK_ID}.yaml"
++            if [ -z "$PROGRAM" ]; then
++              # Try legacy YAML format — the Go tool will convert it
++              PROGRAM=$(echo "$ISSUE_BODY" | sed -n '/<!-- minion-task/,/minion-task -->/p' | sed '1d;$d')
++              if [ -n "$PROGRAM" ]; then
++                echo "Found legacy YAML task, will be converted to program by minions"
++              fi
++            fi
+ 
+-              cat > "minions/${TASK_FILE}" <<YAML
++            if [ -z "$PROGRAM" ]; then
++              # Generate minimal program from issue title/body
++              ISSUE_TITLE="$ISSUE_TITLE_ENV"
++              TASK_ID=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//' | head -c 60)
++              PROGRAM=$(cat <<PROG
++          ---
+           id: ${TASK_ID}
+-          title: "${ISSUE_TITLE}"
+-          source: "${{ github.repository }}#${ISSUE_NUM}"
+-          source_type: issue
+-          description: |
+-          $(echo "$ISSUE_BODY" | sed 's/^/  /')
+           target_repos:
+             - cli
+           acceptance_criteria:
+             - "All repo checks pass"
+           pr_labels:
+-            - "minion"
+-          YAML
++            - minion
++          ---
++
++          # ${ISSUE_TITLE}
++
++          $(echo "$ISSUE_BODY" | head -100)
++          PROG
++              )
+             fi
+ 
+-            echo "task_file=${TASK_FILE}" >> "$GITHUB_OUTPUT"
++            PROGRAM_FILE="${{ github.workspace }}/minion-program-${ISSUE_NUM}.md"
++            echo "$PROGRAM" > "$PROGRAM_FILE"
++
++            echo "program_file=${PROGRAM_FILE}" >> "$GITHUB_OUTPUT"
+             echo "dry_run=false" >> "$GITHUB_OUTPUT"
+-            echo "parallel=1" >> "$GITHUB_OUTPUT"
+             echo "issue_num=${ISSUE_NUM}" >> "$GITHUB_OUTPUT"
++
++            if [ "${{ github.event_name }}" = "issue_comment" ]; then
++              RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
++              gh issue comment "$ISSUE_NUM" --repo "${{ github.repository }}" \
++                --body "Minion build triggered. [View workflow run](${RUN_URL})"
++            fi
+           fi
+         env:
+           GH_TOKEN: ${{ secrets.GH_PAT }}
+           ISSUE_TITLE_ENV: ${{ github.event.issue.title }}
+ 
+-      # Extract plan from issue comments (if available)
+-      - name: Extract plan
+-        id: plan
+-        if: steps.task.outputs.issue_num != ''
+-        env:
+-          GH_TOKEN: ${{ secrets.GH_PAT }}
+-        run: |
+-          ISSUE_NUM="${{ steps.task.outputs.issue_num }}"
+-          PLAN_FILE="${{ github.workspace }}/minion-plan.md"
+-
+-          PLAN_BODY=$(gh api "repos/${{ github.repository }}/issues/${ISSUE_NUM}/comments" \
+-            --jq '[.[] | select(.body | contains("## Minion Plan"))] | last | .body // empty')
+-
+-          if [ -n "$PLAN_BODY" ]; then
+-            echo "$PLAN_BODY" > "$PLAN_FILE"
+-            echo "plan_file=${PLAN_FILE}" >> "$GITHUB_OUTPUT"
+-            echo "Plan found, will be included as execution context"
+-          else
+-            echo "plan_file=" >> "$GITHUB_OUTPUT"
+-            echo "No plan comment found, proceeding without plan"
+-          fi
+-
+       # Run the minion
+       - name: Execute minion
+         id: execute
+@@ -236,14 +207,10 @@ jobs:
+           MINION_DEBUG_DIR: ${{ github.workspace }}/minion-debug
+         run: |
+           cd minions
+-          ARGS="run ${{ steps.task.outputs.task_file }}"
++          ARGS="run --program ${{ steps.task.outputs.program_file }}"
+           if [ "${{ steps.task.outputs.dry_run }}" = "true" ]; then
+             ARGS="${ARGS} --dry-run"
+           fi
+-          ARGS="${ARGS} --parallel ${{ steps.task.outputs.parallel }}"
+-          if [ -n "${{ steps.plan.outputs.plan_file }}" ]; then
+-            ARGS="${ARGS} --plan-file ${{ steps.plan.outputs.plan_file }}"
+-          fi
+           ./minions $ARGS
+ 
+       - name: Upload debug artifacts
+diff --git a/.minions/ingest-prompt.md b/.minions/ingest-prompt.md
+new file mode 100644
+index 0000000..124fe1a
+--- /dev/null
++++ b/.minions/ingest-prompt.md
+@@ -0,0 +1,45 @@
++You are analyzing content to extract feature ideas for the Partio project.
++
++Partio captures the reasoning behind code changes by hooking into Git workflows to preserve AI agent sessions alongside commits. It consists of:
++
++- **cli** (Go): The core CLI tool — hooks into git, captures sessions, stores checkpoints
++- **app** (Next.js): Dashboard for browsing checkpoint data
++- **docs** (Mintlify): Documentation site
++- **site** (Next.js): Marketing website
++- **extension**: Browser extension
++
++## Source Content
++
++Type: {{SOURCE_TYPE}}
++URL: {{SOURCE_URL}}
++
++### Content
++{{CONTENT}}
++
++## Instructions
++
++Analyze the content above and extract feature ideas that could be adapted for Partio. These are INSPIRATION — not direct copies. Partio and the source are related but independent products.
++
++For each feature idea, output a JSON object with these fields:
++
++```json
++{
++  "id": "kebab-case-id",
++  "title": "Short descriptive title",
++  "source": "reference to original (e.g., 'entireio/cli#373 (changelog 0.4.5)')",
++  "description": "What Partio should implement, adapted for its own architecture and conventions. Be specific about the desired behavior.",
++  "why": "Brief explanation of why this matters for Partio — what problem it solves or what value it adds for users.",
++  "user_relevance": "Why this change is relevant to Partio users — how it improves their experience, workflow, or the value they get from Partio.",
++  "target_repos": ["cli"],
++  "context_hints": ["cli/internal/relevant/path/"],
++  "acceptance_criteria": ["specific testable criterion 1", "specific testable criterion 2"]
++}
++```
++
++Do NOT include `docs` in `target_repos`. Documentation updates are handled automatically by the doc minion after code PRs merge — speculative docs PRs created alongside code changes become stale during review and get orphaned if the code PR is rejected.
++
++Output a JSON array of feature objects. Only include features that are genuinely relevant to Partio's domain (Git workflows, AI agent sessions, code attribution, checkpoints). Skip features that don't apply.
++
++If no relevant features are found, output an empty array: `[]`
++
++Output ONLY the JSON array, no other text.
