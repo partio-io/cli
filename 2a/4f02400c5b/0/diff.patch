@@ -1,0 +1,56 @@
+diff --git a/.github/workflows/doc-minion.yml b/.github/workflows/doc-minion.yml
+index 295d892..b0c2179 100644
+--- a/.github/workflows/doc-minion.yml
++++ b/.github/workflows/doc-minion.yml
+@@ -25,6 +25,9 @@ jobs:
+     steps:
+       - uses: actions/checkout@v4
+ 
++      - name: Install Claude Code
++        run: npm install -g @anthropic-ai/claude-code
++
+       - name: Install minions
+         run: |
+           go install github.com/partio-io/minions/cmd/minions@latest
+diff --git a/.github/workflows/minion.yml b/.github/workflows/minion.yml
+index 5e25332..8607835 100644
+--- a/.github/workflows/minion.yml
++++ b/.github/workflows/minion.yml
+@@ -58,6 +58,9 @@ jobs:
+             echo "issue_num=${ISSUE_NUM}" >> "$GITHUB_OUTPUT"
+           fi
+ 
++      - name: Install Claude Code
++        run: npm install -g @anthropic-ai/claude-code
++
+       - name: Install minions
+         run: |
+           go install github.com/partio-io/minions/cmd/minions@latest
+diff --git a/.github/workflows/plan.yml b/.github/workflows/plan.yml
+index b994675..4bebbf7 100644
+--- a/.github/workflows/plan.yml
++++ b/.github/workflows/plan.yml
+@@ -25,6 +25,9 @@ jobs:
+     steps:
+       - uses: actions/checkout@v4
+ 
++      - name: Install Claude Code
++        run: npm install -g @anthropic-ai/claude-code
++
+       - name: Install minions
+         run: |
+           go install github.com/partio-io/minions/cmd/minions@latest
+diff --git a/.github/workflows/propose.yml b/.github/workflows/propose.yml
+index be0f2f5..def1ef1 100644
+--- a/.github/workflows/propose.yml
++++ b/.github/workflows/propose.yml
+@@ -23,6 +23,9 @@ jobs:
+     steps:
+       - uses: actions/checkout@v4
+ 
++      - name: Install Claude Code
++        run: npm install -g @anthropic-ai/claude-code
++
+       - name: Install minions
+         run: |
+           go install github.com/partio-io/minions/cmd/minions@latest
