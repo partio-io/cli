@@ -1,0 +1,624 @@
+# Minion Task: Detect external hook managers during enable
+
+You are a coding agent executing a task autonomously. Complete the task in a single session without human interaction.
+
+## Implementation Plan
+
+Follow this plan that was reviewed and approved:
+
+The plan is ready for review. Key design decisions:
+
+- **Detection lives in `internal/git/hooks/detect.go`** — follows the "one concern per file" convention and keeps it close to the hook installation code it relates to.
+- **Warning placement in `enable.go`** — between gitignore setup and hook installation, so the user sees the warning before hooks are written.
+- **Informational only** — warnings use `fmt.Println` (user-facing output) and don't block installation. In `doctor.go`, they don't increment the issues counter.
+- **Package.json parsing** is minimal — only reads the `scripts.prepare` field, silently skips if file is missing or unparsable.
+- **Two new files, three modified files** across both repos.
+
+---
+
+## Task
+
+During `partio enable`, detect if external Git hook managers (Husky, Lefthook,
+Overcommit) are already installed in the repository. If detected, warn the user
+about potential conflicts with Partio's own hook installation.
+
+Detection should check for:
+- Husky: `.husky/` directory or `prepare` script in package.json
+- Lefthook: `lefthook.yml` or `.lefthook.yml` in repo root
+- Overcommit: `.overcommit.yml` in repo root
+
+The warning should be informational (not blocking). Suggest running `partio doctor`
+for more details.
+
+## Agent Instructions
+
+Implement the detection logic in the CLI. Follow existing patterns in
+`cmd/partio/enable.go` and the hook installation code in `internal/git/hooks/`.
+
+## Target Repos
+
+You are working in a multi-repo workspace:
+
+- `cli/` — Go CLI (build: `make lint && make test`)
+
+Your working directory is the repo root.
+
+## Acceptance Criteria
+
+You MUST satisfy ALL of the following before finishing:
+
+- partio enable warns when Husky .husky/ directory is detected
+- partio enable warns when lefthook.yml is detected
+- partio enable warns when .overcommit.yml is detected
+- Warning is informational, does not block hook installation
+- make test passes in cli/
+- make lint passes in cli/
+- docs/cli/commands.mdx updated with hook conflict info if applicable
+
+## cli/CLAUDE.md
+```
+# CLAUDE.md — ai-workflow-core (Partio)
+
+## Project Overview
+
+Partio captures the *why* behind code changes by hooking into Git workflows to preserve AI agent sessions (currently Claude Code) alongside the code changes tracked by Git. It stores checkpoints on an orphan branch (`partio/checkpoints/v1`) using git plumbing commands.
+
+**Module:** `github.com/partio-io/cli`
+**Go version:** 1.25.0
+**CLI framework:** Cobra
+
+## Project Structure
+
+```
+cmd/partio/          CLI commands (enable, disable, status, rewind, doctor, hook, etc.)
+internal/
+  agent/             Agent detection interface + Claude Code implementation
+    claude/          Claude-specific: process detection, JSONL parsing, session discovery
+  attribution/       Code attribution calculation (agent vs human line counts)
+  checkpoint/        Checkpoint domain type + git plumbing-based storage
+  config/            Layered configuration (defaults → global → repo → local → env)
+  git/               Git operations (repo info, diff, branch, hooks/)
+    hooks/           Hook script generation, install/uninstall
+  hooks/             Git hook implementations (pre-commit, post-commit, pre-push)
+  session/           Session lifecycle management and state persistence
+  log/               slog-based logging setup
+```
+
+## Build & Test
+
+```bash
+make build       # Compile binary (embeds version from git tags)
+make test        # Run all tests (go test -v ./...)
+make lint        # Run golangci-lint
+make install     # Build and install to $GOPATH/bin
+make clean       # Remove compiled binary
+```
+
+## Architecture
+
+- **DDD-influenced**: Domain types (`Checkpoint`, `SessionData`, `Config`, `Session`) live alongside their logic in focused packages.
+- **Detector interface** (`agent/detector.go`): Pluggable agent detection — currently only Claude Code is implemented.
+- **Git plumbing storage**: Checkpoints are written directly to git object database (hash-object, mktree, commit-tree, update-ref) without checkout.
+- **Hook state passing**: Pre-commit saves detection state to `.partio/state/pre-commit.json`; post-commit reads and deletes it immediately to create checkpoints.
+- **Layered config**: Defaults → `~/.config/partio/settings.json` → `.partio/settings.json` → `.partio/settings.local.json` → environment variables.
+
+## Key Patterns & Conventions
+
+- **One primary concern per file** — e.g., `find_session_dir.go`, `find_latest_session.go`, `parse_jsonl.go`.
+- **Table-driven tests** with `t.TempDir()` for filesystem isolation and `t.Setenv()` for env vars.
+- **No external test frameworks** — standard library `testing` only.
+- **Minimal dependencies** — only `cobra` (CLI) and `google/uuid`.
+- **Error resilience in hooks** — hooks log warnings but don't block git operations on non-critical failures.
+- **Binary attribution** — currently 0% or 100% based on agent detection, not complexity analysis.
+
+## Data Flow
+
+```
+git commit
+  → pre-commit:  detect if Claude Code is running, save state to .partio/state/
+  → commit completes
+  → post-commit: read + delete state → calculate attribution → parse JSONL session
+                  → create checkpoint on orphan branch → amend commit with trailers
+git push
+  → pre-push:    push checkpoint branch to origin (if push_sessions enabled)
+```
+
+## Git Worktree Support
+
+Partio supports git worktrees:
+
+- **Hooks** are installed to `git rev-parse --git-common-dir` (shared across worktrees), not the per-worktree git dir.
+- **Session discovery** (`find_session_dir.go`) walks up from the repo root to parent directories, since Claude Code keys sessions to the cwd where it was launched (which may be a parent of the git repo root in worktree setups).
+- **Hook re-entry prevention**: Post-commit deletes the state file immediately (not via defer) before amending the commit, since `git commit --amend` re-triggers post-commit (`--no-verify` only skips pre-commit/commit-msg). Pre-push uses `--no-verify` on its internal push to avoid recursion.
+- **Hook scripts** use `git rev-parse --git-common-dir` for backup chaining and end with `exit 0` to prevent `[ -f ... ]` false-returns from failing the hook.
+
+## Environment Variables
+
+| Variable | Purpose |
+|---|---|
+| `PARTIO_ENABLED` | Enable/disable partio |
+| `PARTIO_STRATEGY` | Capture strategy (default: `manual-commit`) |
+| `PARTIO_LOG_LEVEL` | Log level: debug, info, warn, error |
+| `PARTIO_AGENT` | Agent name (default: `claude-code`) |
+
+## Known Limitations
+
+- `partio enable` skips hook installation if `.partio/` already exists. To reinstall hooks, run `partio disable && partio enable`.
+- The `_hook` command accepts extra args (`cobra.MinimumNArgs(1)`) because git passes additional arguments to hooks (e.g., remote name and URL for pre-push).
+- Session JSONL parsing may produce empty context/prompt fields depending on the Claude session format.
+```
+
+## Pre-Read Context
+
+### cli/cmd/partio/enable.go
+```
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
+
+	"github.com/spf13/cobra"
+
+	"github.com/partio-io/cli/internal/config"
+	"github.com/partio-io/cli/internal/git"
+	githooks "github.com/partio-io/cli/internal/git/hooks"
+)
+
+func newEnableCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "enable",
+		Short: "Enable partio in the current repository",
+		Long:  `Sets up partio in the current git repository by creating the .partio/ config directory, installing git hooks, and creating the checkpoint orphan branch.`,
+		RunE:  runEnable,
+	}
+	cmd.Flags().Bool("absolute-path", false, "Install hooks using the absolute path to the partio binary (useful when partio is not on PATH in hook execution environments)")
+	return cmd
+}
+
+func runEnable(cmd *cobra.Command, args []string) error {
+	absolutePath, _ := cmd.Flags().GetBool("absolute-path")
+
+	repoRoot, err := git.RepoRoot()
+	if err != nil {
+		return fmt.Errorf("must be run inside a git repository")
+	}
+
+	partioDir := filepath.Join(repoRoot, config.PartioDir)
+
+	// Check if already enabled
+	if _, err := os.Stat(partioDir); err == nil {
+		fmt.Println("partio is already enabled in this repository.")
+		return nil
+	}
+
+	// Create .partio/ directory
+	if err := os.MkdirAll(partioDir, 0o755); err != nil {
+		return fmt.Errorf("creating .partio directory: %w", err)
+	}
+
+	// Write default settings.json
+	defaults := config.Defaults()
+	data, err := json.MarshalIndent(defaults, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshaling default config: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(partioDir, "settings.json"), data, 0o644); err != nil {
+		return fmt.Errorf("writing settings.json: %w", err)
+	}
+
+	// Add .partio/settings.local.json to .gitignore
+	addToGitignore(repoRoot, ".partio/settings.local.json")
+
+	// Install git hooks
+	if absolutePath {
+		exePath, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("resolving partio binary path: %w", err)
+		}
+		exePath, err = filepath.EvalSymlinks(exePath)
+		if err != nil {
+			return fmt.Errorf("resolving partio binary symlinks: %w", err)
+		}
+		if err := githooks.InstallAbsolute(repoRoot, exePath); err != nil {
+			return fmt.Errorf("installing git hooks: %w", err)
+		}
+	} else if err := githooks.Install(repoRoot); err != nil {
+		return fmt.Errorf("installing git hooks: %w", err)
+	}
+
+	// Create orphan checkpoint branch
+	if err := createCheckpointBranch(); err != nil {
+		slog.Warn("could not create checkpoint branch (may already exist)", "error", err)
+	}
+
+	fmt.Println("partio enabled successfully!")
+	fmt.Println("  - Created .partio/ config directory")
+	fmt.Println("  - Installed git hooks (pre-commit, post-commit, pre-push)")
+	fmt.Println("  - Ready to capture AI sessions on commit")
+	return nil
+}
+
+func addToGitignore(repoRoot, entry string) {
+	gitignore := filepath.Join(repoRoot, ".gitignore")
+
+	// Read existing content
+	existing, _ := os.ReadFile(gitignore)
+	content := string(existing)
+
+	// Check if already present
+	for _, line := range filepath.SplitList(content) {
+		if line == entry {
+			return
+		}
+	}
+
+	// Append
+	f, err := os.OpenFile(gitignore, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		slog.Warn("could not update .gitignore", "error", err)
+		return
+	}
+	defer func() { _ = f.Close() }()
+
+	if len(existing) > 0 && existing[len(existing)-1] != '\n' {
+		_, _ = f.WriteString("\n")
+	}
+	_, _ = f.WriteString(entry + "\n")
+}
+
+func createCheckpointBranch() error {
+	const branchName = "partio/checkpoints/v1"
+
+	// Check if branch already exists
+	_, err := git.ExecGit("rev-parse", "--verify", branchName)
+	if err == nil {
+		return nil // already exists
+	}
+
+	// Create orphan branch with an empty initial commit using plumbing
+	// 1. Create empty tree
+	treeHash, err := git.ExecGit("hash-object", "-t", "tree", "/dev/null")
+	if err != nil {
+		// Alternative: write an empty tree
+		treeHash, err = git.ExecGit("mktree", "--missing")
+		if err != nil {
+			return fmt.Errorf("creating empty tree: %w", err)
+		}
+	}
+
+	// 2. Create commit with no parent
+	commitHash, err := git.ExecGit("commit-tree", treeHash, "-m", "partio: initialize checkpoint storage")
+	if err != nil {
+		return fmt.Errorf("creating initial commit: %w", err)
+	}
+
+	// 3. Create the ref
+	_, err = git.ExecGit("update-ref", "refs/heads/"+branchName, commitHash)
+	if err != nil {
+		return fmt.Errorf("creating branch ref: %w", err)
+	}
+
+	return nil
+}
+```
+
+### cli/internal/git/hooks/ (directory listing)
+```
+hooks.go
+hooks_test.go
+install.go
+uninstall.go
+```
+
+### docs/cli/commands.mdx
+```
+---
+title: Commands
+description: "Complete reference for all partio CLI commands"
+---
+
+# CLI Commands
+
+## Global flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--log-level` | string | From config | Override log level (`debug`, `info`, `warn`, `error`) |
+
+---
+
+## `partio enable`
+
+Enable partio in the current Git repository.
+
+```bash
+partio enable [--absolute-path]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--absolute-path` | bool | `false` | Install hooks using the absolute path to the partio binary |
+
+**What it does:**
+
+1. Verifies you're inside a Git repository
+2. Creates the `.partio/` config directory
+3. Writes default `settings.json`
+4. Adds `.partio/settings.local.json` to `.gitignore`
+5. Installs Git hooks (`pre-commit`, `post-commit`, `pre-push`)
+6. Creates the `partio/checkpoints/v1` orphan branch
+
+**`--absolute-path`:**
+
+By default, hooks invoke `partio` by name and rely on PATH resolution at hook execution time. Use `--absolute-path` if partio is not on PATH in your hook execution environment — for example, when using nix, asdf, mise, or system-level git hooks.
+
+```bash
+partio enable --absolute-path
+```
+
+This embeds the resolved absolute path of the partio binary into the installed hook scripts.
+
+**Output:**
+
+```
+partio enabled successfully!
+  - Created .partio/ config directory
+  - Installed git hooks (pre-commit, post-commit, pre-push)
+  - Ready to capture AI sessions on commit
+```
+
+If already enabled:
+
+```
+partio is already enabled in this repository.
+```
+
+---
+
+## `partio disable`
+
+Disable partio in the current repository.
+
+```bash
+partio disable [--remove-data]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--remove-data` | bool | `false` | Also delete the `.partio/` directory and all config |
+
+**What it does:**
+
+1. Removes partio-managed hooks from `.git/hooks/`
+2. Restores any backed-up original hooks
+3. If `--remove-data`: deletes `.partio/` directory
+
+**Output (default):**
+
+```
+partio disabled.
+  - Removed git hooks (originals restored from backup if present)
+  - Checkpoint data and config preserved (use --remove-data to delete)
+```
+
+---
+
+## `partio status`
+
+Show partio status for the current repository.
+
+```bash
+partio status
+```
+
+**Output (enabled):**
+
+```
+Repository: /path/to/your-project
+Branch:     main
+Status:     enabled
+Strategy:   manual-commit
+Agent:      claude-code
+Hooks:      installed
+Checkpoints: branch exists
+```
+
+**Output (not enabled):**
+
+```
+Repository: /path/to/your-project
+Branch:     main
+Status:     not enabled (run 'partio enable' to set up)
+```
+
+---
+
+## `partio rewind`
+
+List or restore checkpoints.
+
+```bash
+partio rewind --list
+partio rewind --to <checkpoint-id>
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--list` | bool | `false` | List all stored checkpoints |
+| `--to` | string | `""` | Restore to a specific checkpoint ID (12 hex characters) |
+
+**`--list` output:**
+
+```
+Checkpoints:
+
+  a3f8c2d14e9b  branch=main           agent=87%   created=2026-02-17T14:30:00Z
+  bb12340092ac  branch=feature/auth    agent=100%  created=2026-02-16T09:15:22Z
+```
+
+**`--to` output:**
+
+```
+Rewinding to checkpoint a3f8c2d14e9b
+  Commit: 4f9a2c...
+  Branch: main
+  Context:
+  <session context summary>
+  Created branch: partio/rewind/a3f8c2d14e9b
+```
+
+This creates a new branch named `partio/rewind/<id>` checked out at the checkpoint's commit.
+
+---
+
+## `partio resume`
+
+Resume a session from a checkpoint. Reads checkpoint data from the orphan branch and launches a new Claude Code session with the previous context.
+
+```bash
+partio resume <checkpoint-id>
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--print` | bool | `false` | Print the composed context prompt to stdout |
+| `--copy` | bool | `false` | Copy the context prompt to clipboard |
+| `--branch` | bool | `false` | Create a branch at the checkpoint's commit before launching |
+
+**Default behavior:**
+
+Writes a context file to a temporary directory and launches Claude Code with instructions to read it and continue the previous work. If Claude Code is not found in PATH, the context is printed to stdout instead.
+
+**With `--branch`:**
+
+Creates a new branch named `partio/resume/<id>` checked out at the checkpoint's commit before launching.
+
+```
+Created branch: partio/resume/a3f8c2d14e9b
+Context written to /tmp/partio-resume-a3f8c2d14e9b.md
+Launching Claude Code...
+```
+
+**With `--print`:**
+
+```bash
+partio resume a3f8c2d14e9b --print
+```
+
+Prints the composed context prompt (including the original request, plan, diff, and session metadata) to stdout without launching Claude Code.
+
+**With `--copy`:**
+
+Copies the context prompt to the system clipboard (macOS and Linux).
+
+---
+
+## `partio doctor`
+
+Check partio installation health.
+
+```bash
+partio doctor
+```
+
+**Checks performed:**
+
+1. `.partio/` directory exists
+2. `pre-commit` hook installed and managed by partio
+3. `post-commit` hook installed and managed by partio
+4. `pre-push` hook installed and managed by partio
+5. `partio/checkpoints/v1` branch exists
+6. partio binary found in PATH
+
+**Output (healthy):**
+
+```
+[OK]   .partio/ directory exists
+[OK]   pre-commit hook installed
+[OK]   post-commit hook installed
+[OK]   pre-push hook installed
+[OK]   checkpoint branch exists
+[OK]   partio binary found (you're running it!)
+
+All checks passed!
+```
+
+**Output (issues found):**
+
+```
+[WARN] .partio/ directory missing - run 'partio enable'
+[WARN] pre-commit hook missing
+[OK]   post-commit hook installed
+[WARN] post-commit hook exists but not managed by partio
+[WARN] checkpoint branch missing
+[OK]   partio binary found (you're running it!)
+
+4 issue(s) found. Run 'partio enable' to fix.
+```
+
+---
+
+## `partio reset`
+
+Reset the checkpoint branch. This deletes all stored checkpoint data and recreates the branch.
+
+```bash
+partio reset
+```
+
+**Output:**
+
+```
+Checkpoint branch reset successfully.
+```
+
+<Warning>This permanently deletes all checkpoint data. This cannot be undone.</Warning>
+
+---
+
+## `partio clean`
+
+Remove orphaned checkpoint data.
+
+```bash
+partio clean
+```
+
+Scans the checkpoint branch for data that no longer corresponds to any commit.
+
+**Output:**
+
+```
+Checkpoint data present on partio/checkpoints/v1 branch.
+To fully reset, run: partio reset
+```
+
+---
+
+## `partio version`
+
+Print the partio version.
+
+```bash
+partio version
+```
+
+**Output:**
+
+```
+partio v0.1.0
+```
+```
+
+## Instructions
+
+1. **Read first.** Before writing any code, read and understand the relevant existing code.
+2. **Follow conventions.** Match existing code style, file organization, and test patterns.
+3. **Implement incrementally.** Make small, focused changes.
+4. **Run checks.** After implementation, run the appropriate checks for each modified repo.
+5. **Fix failures.** If checks fail, read the error output carefully and fix the issue.
+6. **Keep changes minimal.** Implement exactly what the task asks for — nothing more.
