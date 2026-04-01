@@ -6,7 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/partio-io/cli/internal/agent"
 	"github.com/partio-io/cli/internal/agent/claude"
+	"github.com/partio-io/cli/internal/agent/codex"
 	"github.com/partio-io/cli/internal/config"
 	"github.com/partio-io/cli/internal/git"
 	"github.com/partio-io/cli/internal/session"
@@ -15,6 +17,7 @@ import (
 // preCommitState records the state captured during pre-commit for use by post-commit.
 type preCommitState struct {
 	AgentActive   bool   `json:"agent_active"`
+	AgentName     string `json:"agent_name,omitempty"`
 	SessionPath   string `json:"session_path,omitempty"`
 	PreCommitHash string `json:"pre_commit_hash,omitempty"`
 	Branch        string `json:"branch"`
@@ -27,37 +30,64 @@ func (r *Runner) PreCommit() error {
 }
 
 func runPreCommit(repoRoot string, cfg config.Config) error {
-	detector := claude.New()
+	detectors := []agent.Detector{claude.New(), codex.New()}
 
-	// Detect if agent is running
-	running, err := detector.IsRunning()
-	if err != nil {
-		slog.Warn("could not detect agent process", "error", err)
-		running = false
+	// Find the first running agent detector.
+	var activeDetector agent.Detector
+	for _, d := range detectors {
+		running, err := d.IsRunning()
+		if err != nil {
+			slog.Warn("could not detect agent process", "agent", d.Name(), "error", err)
+			continue
+		}
+		if running {
+			activeDetector = d
+			break
+		}
 	}
 
-	if running {
-		// Quick check: find the latest JSONL path without a full parse and see if
-		// we have already captured this session in a fully-condensed ended state.
-		// This avoids the expensive JSONL parse for stale sessions.
-		latestPath, pathErr := detector.FindLatestJSONLPath(repoRoot)
-		if pathErr == nil {
-			sid := claude.PeekSessionID(latestPath)
-			if shouldSkipSession(filepath.Join(repoRoot, config.PartioDir), sid, latestPath) {
-				slog.Debug("skipping already-condensed ended session", "session_id", sid)
-				running = false
+	agentRunning := activeDetector != nil
+
+	// For Claude: check whether the current session has already been captured.
+	if agentRunning {
+		if cd, ok := activeDetector.(*claude.Detector); ok {
+			latestPath, pathErr := cd.FindLatestJSONLPath(repoRoot)
+			if pathErr == nil {
+				sid := claude.PeekSessionID(latestPath)
+				if shouldSkipSession(filepath.Join(repoRoot, config.PartioDir), sid, latestPath) {
+					slog.Debug("skipping already-condensed ended session", "session_id", sid)
+					agentRunning = false
+					activeDetector = nil
+				}
 			}
 		}
 	}
 
+	// For Claude: find the latest session file.
 	var sessionPath string
-	if running {
-		path, _, err := detector.FindLatestSession(repoRoot)
-		if err != nil {
-			slog.Debug("agent running but no session found", "error", err)
+	if agentRunning {
+		if cd, ok := activeDetector.(*claude.Detector); ok {
+			path, _, err := cd.FindLatestSession(repoRoot)
+			if err != nil {
+				slog.Debug("agent running but no session found", "error", err)
+			} else {
+				sessionPath = path
+				slog.Debug("agent session detected", "path", path)
+			}
+		}
+	}
+
+	// AgentActive is true when any agent is running. For Claude, require a
+	// session path too (preserving existing behaviour). For other agents a
+	// session path is not required.
+	var agentActive bool
+	var agentName string
+	if agentRunning && activeDetector != nil {
+		agentName = activeDetector.Name()
+		if _, ok := activeDetector.(*claude.Detector); ok {
+			agentActive = sessionPath != ""
 		} else {
-			sessionPath = path
-			slog.Debug("agent session detected", "path", path)
+			agentActive = true
 		}
 	}
 
@@ -65,7 +95,8 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 	commitHash, _ := git.CurrentCommit()
 
 	state := preCommitState{
-		AgentActive:   running && sessionPath != "",
+		AgentActive:   agentActive,
+		AgentName:     agentName,
 		SessionPath:   sessionPath,
 		PreCommitHash: commitHash,
 		Branch:        branch,
