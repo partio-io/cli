@@ -7,6 +7,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/partio-io/cli/internal/agent"
+	"github.com/partio-io/cli/internal/agent/claude"
+	"github.com/partio-io/cli/internal/agent/codex"
 	"github.com/partio-io/cli/internal/config"
 	"github.com/partio-io/cli/internal/git"
 )
@@ -44,7 +47,16 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("Status:     enabled")
 	fmt.Printf("Strategy:   %s\n", cfg.Strategy)
-	fmt.Printf("Agent:      %s\n", cfg.Agent)
+
+	detectors := []agent.Detector{claude.New(), codex.New()}
+	detectedAgent := cfg.Agent
+	for _, d := range detectors {
+		if running, _ := d.IsRunning(); running {
+			detectedAgent = d.Name()
+			break
+		}
+	}
+	fmt.Printf("Agent:      %s\n", detectedAgent)
 
 	// Check hooks
 	hooksDir, hooksErr := git.HooksDir(repoRoot)

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/partio-io/cli/internal/agent/claude"
+	"github.com/partio-io/cli/internal/agent/codex"
 	"github.com/partio-io/cli/internal/config"
 	"github.com/partio-io/cli/internal/git"
 	"github.com/partio-io/cli/internal/session"
@@ -27,10 +28,10 @@ func (r *Runner) PreCommit() error {
 }
 
 func runPreCommit(repoRoot string, cfg config.Config) error {
-	detector := claude.New()
+	claudeDetector := claude.New()
 
-	// Detect if agent is running
-	running, err := detector.IsRunning()
+	// Detect if Claude Code is running (with full session capture support).
+	running, err := claudeDetector.IsRunning()
 	if err != nil {
 		slog.Warn("could not detect agent process", "error", err)
 		running = false
@@ -40,7 +41,7 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 		// Quick check: find the latest JSONL path without a full parse and see if
 		// we have already captured this session in a fully-condensed ended state.
 		// This avoids the expensive JSONL parse for stale sessions.
-		latestPath, pathErr := detector.FindLatestJSONLPath(repoRoot)
+		latestPath, pathErr := claudeDetector.FindLatestJSONLPath(repoRoot)
 		if pathErr == nil {
 			sid := claude.PeekSessionID(latestPath)
 			if shouldSkipSession(filepath.Join(repoRoot, config.PartioDir), sid, latestPath) {
@@ -50,9 +51,21 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 		}
 	}
 
+	// If Claude Code is not running, check for Codex CLI.
+	if !running {
+		codexDetector := codex.New()
+		codexRunning, codexErr := codexDetector.IsRunning()
+		if codexErr != nil {
+			slog.Warn("could not detect codex process", "error", codexErr)
+		} else if codexRunning {
+			running = true
+			slog.Debug("codex agent detected")
+		}
+	}
+
 	var sessionPath string
 	if running {
-		path, _, err := detector.FindLatestSession(repoRoot)
+		path, _, err := claudeDetector.FindLatestSession(repoRoot)
 		if err != nil {
 			slog.Debug("agent running but no session found", "error", err)
 		} else {
