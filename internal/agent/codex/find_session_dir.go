@@ -16,7 +16,7 @@ func (d *Detector) FindSessionDir(repoRoot string) (string, error) {
 
 	sessionDir := filepath.Join(home, ".codex")
 	if _, err := os.Stat(sessionDir); err != nil {
-		return "", fmt.Errorf("no Codex session directory found for %s", repoRoot)
+		return "", fmt.Errorf("no Codex session directory found: %w", err)
 	}
 
 	return sessionDir, nil

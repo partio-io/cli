@@ -48,6 +48,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	fmt.Println("Status:     enabled")
 	fmt.Printf("Strategy:   %s\n", cfg.Strategy)
 
+	// Detect which agent is currently running; fall back to configured agent name.
 	detectors := []agent.Detector{claude.New(), codex.New()}
 	detectedAgent := cfg.Agent
 	for _, d := range detectors {

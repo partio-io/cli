@@ -1,6 +1,7 @@
 package codex
 
 import (
+	"os"
 	"os/exec"
 	"testing"
 )
@@ -59,6 +60,7 @@ func TestIsRunning(t *testing.T) {
 
 			d := New()
 			got, err := d.IsRunning()
+
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
@@ -72,5 +74,44 @@ func TestIsRunning(t *testing.T) {
 				t.Errorf("IsRunning() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestName(t *testing.T) {
+	d := New()
+	if got := d.Name(); got != "codex" {
+		t.Errorf("Name() = %q, want %q", got, "codex")
+	}
+}
+
+func TestFindSessionDir_NoCodexDir(t *testing.T) {
+	// Point HOME at a temp directory that has no .codex subdirectory.
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	d := New()
+	_, err := d.FindSessionDir("/some/repo")
+	if err == nil {
+		t.Fatal("expected error when ~/.codex does not exist, got nil")
+	}
+}
+
+func TestFindSessionDir_CodexDirExists(t *testing.T) {
+	// Create a temp HOME with a .codex directory.
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	codexDir := tmp + "/.codex"
+	if err := os.MkdirAll(codexDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	d := New()
+	got, err := d.FindSessionDir("/some/repo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != codexDir {
+		t.Errorf("FindSessionDir() = %q, want %q", got, codexDir)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/partio-io/cli/internal/agent"
 	"github.com/partio-io/cli/internal/agent/claude"
 	"github.com/partio-io/cli/internal/attribution"
 	"github.com/partio-io/cli/internal/checkpoint"
@@ -65,11 +66,16 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		attr = &attribution.Result{AgentPercent: 100}
 	}
 
-	// Parse agent session data
-	detector := claude.New()
-	sessionPath, sessionData, err := detector.FindLatestSession(repoRoot)
-	if err != nil {
-		slog.Warn("could not read agent session", "error", err)
+	// Parse agent session data (Claude-specific; skipped for other agents).
+	var sessionPath string
+	var sessionData *agent.SessionData
+	if state.AgentName == "" || state.AgentName == "claude-code" {
+		detector := claude.New()
+		var parseErr error
+		sessionPath, sessionData, parseErr = detector.FindLatestSession(repoRoot)
+		if parseErr != nil {
+			slog.Warn("could not read agent session", "error", parseErr)
+		}
 	}
 
 	// Skip if this session is already fully condensed and ended — re-processing
@@ -100,13 +106,19 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		return fmt.Errorf("getting post-amend commit: %w", err)
 	}
 
+	// Use the detected agent name from pre-commit state, falling back to config.
+	agentName := state.AgentName
+	if agentName == "" {
+		agentName = cfg.Agent
+	}
+
 	// Create checkpoint with the post-amend hash
 	cp := &checkpoint.Checkpoint{
 		ID:          cpID,
 		CommitHash:  commitHash,
 		Branch:      state.Branch,
 		CreatedAt:   time.Now(),
-		Agent:       cfg.Agent,
+		Agent:       agentName,
 		AgentPct:    attr.AgentPercent,
 		ContentHash: commitHash,
 	}
@@ -122,7 +134,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		Context:     "",
 		FullJSONL:   "",
 		Metadata: checkpoint.SessionMetadata{
-			Agent: cfg.Agent,
+			Agent: agentName,
 		},
 		Prompt: "",
 	}
