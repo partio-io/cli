@@ -1,0 +1,19 @@
+diff --git a/.minions/programs/implement.md b/.minions/programs/implement.md
+index 147aa7b..388924f 100644
+--- a/.minions/programs/implement.md
++++ b/.minions/programs/implement.md
+@@ -31,3 +31,14 @@ A human will review your PR. Make it easy for them:
+   - Key design decisions you made
+   - How to test the changes
+   - Reference to the source issue (e.g., "Resolves #120")
++
++## Agents
++
++### implement
++
++```capabilities
++max_turns: 100
++checks: true
++retry_on_fail: true
++retry_max_turns: 20
++```
