@@ -15,4 +15,7 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("PARTIO_LOG_LEVEL"); v != "" {
 		cfg.LogLevel = v
 	}
+	if v := os.Getenv("PARTIO_AGENT"); v != "" {
+		cfg.Agent = v
+	}
 }

@@ -12,6 +12,12 @@ import (
 	"github.com/partio-io/cli/internal/session"
 )
 
+// claudeDetector is satisfied by *claude.Detector and allows
+// Claude-specific session operations in hooks.
+type claudeDetector interface {
+	FindLatestJSONLPath(repoRoot string) (string, error)
+}
+
 // preCommitState records the state captured during pre-commit for use by post-commit.
 type preCommitState struct {
 	AgentActive   bool   `json:"agent_active"`
@@ -27,7 +33,7 @@ func (r *Runner) PreCommit() error {
 }
 
 func runPreCommit(repoRoot string, cfg config.Config) error {
-	detector := claude.New()
+	detector := resolveDetector(cfg.Agent)
 
 	// Detect if agent is running
 	running, err := detector.IsRunning()
@@ -36,11 +42,11 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 		running = false
 	}
 
-	if running {
-		// Quick check: find the latest JSONL path without a full parse and see if
-		// we have already captured this session in a fully-condensed ended state.
-		// This avoids the expensive JSONL parse for stale sessions.
-		latestPath, pathErr := detector.FindLatestJSONLPath(repoRoot)
+	var sessionPath string
+
+	// Claude-specific: check for already-condensed sessions and find JSONL path.
+	if cd, ok := detector.(claudeDetector); running && ok {
+		latestPath, pathErr := cd.FindLatestJSONLPath(repoRoot)
 		if pathErr == nil {
 			sid := claude.PeekSessionID(latestPath)
 			if shouldSkipSession(filepath.Join(repoRoot, config.PartioDir), sid, latestPath) {
@@ -48,24 +54,31 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 				running = false
 			}
 		}
-	}
 
-	var sessionPath string
-	if running {
-		path, _, err := detector.FindLatestSession(repoRoot)
-		if err != nil {
-			slog.Debug("agent running but no session found", "error", err)
-		} else {
-			sessionPath = path
-			slog.Debug("agent session detected", "path", path)
+		if running {
+			if cdFull, ok := detector.(*claude.Detector); ok {
+				path, _, err := cdFull.FindLatestSession(repoRoot)
+				if err != nil {
+					slog.Debug("agent running but no session found", "error", err)
+				} else {
+					sessionPath = path
+					slog.Debug("agent session detected", "path", path)
+				}
+			}
 		}
 	}
 
 	branch, _ := git.CurrentBranch()
 	commitHash, _ := git.CurrentCommit()
 
+	// Claude requires a session path to be active; other agents are active when running.
+	agentActive := running
+	if _, ok := detector.(*claude.Detector); ok {
+		agentActive = running && sessionPath != ""
+	}
+
 	state := preCommitState{
-		AgentActive:   running && sessionPath != "",
+		AgentActive:   agentActive,
 		SessionPath:   sessionPath,
 		PreCommitHash: commitHash,
 		Branch:        branch,
