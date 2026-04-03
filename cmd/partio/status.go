@@ -50,14 +50,11 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	// Detect which agent is currently running; fall back to configured agent name.
 	detectors := []agent.Detector{claude.New(), codex.New()}
-	detectedAgent := cfg.Agent
-	for _, d := range detectors {
-		if running, _ := d.IsRunning(); running {
-			detectedAgent = d.Name()
-			break
-		}
+	if detected := agent.Detect(detectors); detected != nil {
+		fmt.Printf("Agent:      %s (running)\n", detected.Name())
+	} else {
+		fmt.Printf("Agent:      %s\n", cfg.Agent)
 	}
-	fmt.Printf("Agent:      %s\n", detectedAgent)
 
 	// Check hooks
 	hooksDir, hooksErr := git.HooksDir(repoRoot)
