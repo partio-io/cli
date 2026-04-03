@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "9e34a50a5fd4",
+  "strategy": "manual-commit",
+  "branch": "minion/detect-external-hooks-cli-agent",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "cmd/partio/doctor.go",
+    "cmd/partio/enable.go",
+    "internal/git/hooks/detect.go",
+    "internal/git/hooks/detect_test.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/9e/34a50a5fd4/0/metadata.json",
+      "transcript": "/9e/34a50a5fd4/0/full.jsonl",
+      "context": "/9e/34a50a5fd4/0/context.md",
+      "content_hash": "/9e/34a50a5fd4/0/content_hash.txt",
+      "prompt": "/9e/34a50a5fd4/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 21,
+    "cache_creation_tokens": 47454,
+    "cache_read_tokens": 713898,
+    "output_tokens": 6714,
+    "api_call_count": 20
+  }
+}
