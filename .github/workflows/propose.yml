@@ -17,14 +17,12 @@ permissions:
 
 jobs:
   propose:
-    runs-on: ubuntu-latest
+    runs-on: github-runner-partio-minion-ai-01
     timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Claude Code
-        run: npm install -g @anthropic-ai/claude-code
 
       - name: Install minions
         run: |
@@ -33,7 +31,6 @@ jobs:
 
       - name: Run propose program
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           ARGS="run .minions/programs/propose.md"

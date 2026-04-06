@@ -19,14 +19,12 @@ jobs:
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issues' && github.event.label.name == 'minion-planning')
-    runs-on: ubuntu-latest
+    runs-on: github-runner-partio-minion-ai-01
     timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Claude Code
-        run: npm install -g @anthropic-ai/claude-code
 
       - name: Install minions
         run: |
@@ -53,6 +51,5 @@ jobs:
 
       - name: Run program with planner
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: minions run ${{ steps.program.outputs.path }} --dry-run
