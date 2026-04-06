@@ -1,0 +1,39 @@
+{
+  "cli_version": "0.4.7",
+  "checkpoint_id": "7b4ba254c30e",
+  "session_id": "dddd31e6-ea65-46b6-b666-0e092ed18c1c",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-03T06:11:52.662988Z",
+  "branch": "minion/implement-implement",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "internal/agent/codex/codex.go",
+    "internal/agent/codex/process.go",
+    "internal/agent/codex/find_session_dir.go",
+    "internal/agent/codex/codex_test.go",
+    "internal/agent/codex/process_test.go",
+    "internal/agent/codex/find_session_dir_test.go",
+    "internal/hooks/resolve.go",
+    "internal/hooks/precommit.go",
+    "internal/hooks/postcommit.go",
+    "internal/config/env.go"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "c9431fe3fe15",
+  "token_usage": {
+    "input_tokens": 32,
+    "cache_creation_tokens": 68170,
+    "cache_read_tokens": 1408569,
+    "output_tokens": 20910,
+    "api_call_count": 29
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-03T06:11:52.583861Z",
+    "agent_lines": 236,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 236,
+    "agent_percentage": 100
+  }
+}
