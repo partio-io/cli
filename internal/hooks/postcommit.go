@@ -30,7 +30,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	stateFile := filepath.Join(repoRoot, config.PartioDir, "state", "pre-commit.json")
 	data, err := os.ReadFile(stateFile)
 	if err != nil {
-		slog.Debug("post-commit: no pre-commit state found, skipping checkpoint")
+		slog.Warn("post-commit: no checkpoint created", "reason", "no pre-commit state found", "state_file", stateFile)
 		return nil
 	}
 	// Remove immediately to prevent re-entry (amend triggers post-commit again)
@@ -42,7 +42,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	}
 
 	if !state.AgentActive {
-		slog.Warn("post-commit: no trailer added", "reason", "no agent was active during commit")
+		slog.Warn("post-commit: no checkpoint created", "reason", "no agent was active during pre-commit")
 		return nil
 	}
 
@@ -57,7 +57,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	partioDir := filepath.Join(repoRoot, config.PartioDir)
 	cache := loadCommitCache(partioDir)
 	if cache.contains(commitHash) {
-		slog.Warn("post-commit: no trailer added", "reason", "commit already processed", "commit", commitHash)
+		slog.Warn("post-commit: no checkpoint created", "reason", "commit already processed", "commit", commitHash)
 		return nil
 	}
 
@@ -98,7 +98,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	// it produces a redundant checkpoint with no new content.
 	if sessionData != nil && sessionData.SessionID != "" {
 		if shouldSkipSession(filepath.Join(repoRoot, config.PartioDir), sessionData.SessionID, sessionPath) {
-			slog.Warn("post-commit: no trailer added", "reason", "session already condensed", "commit", commitHash, "session_id", sessionData.SessionID)
+			slog.Warn("post-commit: no checkpoint created", "reason", "session already condensed", "commit", commitHash, "session_id", sessionData.SessionID)
 			return nil
 		}
 	}
@@ -113,7 +113,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	}
 
 	if err := git.AmendTrailers(trailers); err != nil {
-		slog.Warn("could not add trailers to commit", "error", err)
+		slog.Warn("post-commit: could not add trailers to commit", "commit", commitHash, "error", err)
 	}
 
 	// Get the post-amend commit hash (this is the hash that gets pushed)
