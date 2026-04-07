@@ -1,0 +1,52 @@
+diff --git a/.github/workflows/doc-minion.yml b/.github/workflows/doc-minion.yml
+index 5f95472..bb5238a 100644
+--- a/.github/workflows/doc-minion.yml
++++ b/.github/workflows/doc-minion.yml
+@@ -28,7 +28,7 @@ jobs:
+ 
+       - name: Install minions
+         run: |
+-          go install github.com/partio-io/minions/cmd/minions@v0.0.4
++          go install github.com/partio-io/minions/cmd/minions@v0.0.5
+           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+ 
+       - name: Run doc-update program
+diff --git a/.github/workflows/minion.yml b/.github/workflows/minion.yml
+index 3a38513..1eb52dd 100644
+--- a/.github/workflows/minion.yml
++++ b/.github/workflows/minion.yml
+@@ -55,7 +55,7 @@ jobs:
+ 
+       - name: Install minions
+         run: |
+-          go install github.com/partio-io/minions/cmd/minions@v0.0.4
++          go install github.com/partio-io/minions/cmd/minions@v0.0.5
+           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+ 
+       - name: Run program
+diff --git a/.github/workflows/plan.yml b/.github/workflows/plan.yml
+index cecda79..39059e7 100644
+--- a/.github/workflows/plan.yml
++++ b/.github/workflows/plan.yml
+@@ -28,7 +28,7 @@ jobs:
+ 
+       - name: Install minions
+         run: |
+-          go install github.com/partio-io/minions/cmd/minions@v0.0.4
++          go install github.com/partio-io/minions/cmd/minions@v0.0.5
+           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+ 
+       - name: Determine program
+diff --git a/.github/workflows/propose.yml b/.github/workflows/propose.yml
+index 61beb5a..a5b8d3c 100644
+--- a/.github/workflows/propose.yml
++++ b/.github/workflows/propose.yml
+@@ -26,7 +26,7 @@ jobs:
+ 
+       - name: Install minions
+         run: |
+-          go install github.com/partio-io/minions/cmd/minions@v0.0.4
++          go install github.com/partio-io/minions/cmd/minions@v0.0.5
+           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+ 
+       - name: Run propose program
