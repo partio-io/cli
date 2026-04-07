@@ -28,7 +28,7 @@ jobs:
 
       - name: Install minions
         run: |
-          go install github.com/partio-io/minions/cmd/minions@v0.0.4
+          go install github.com/partio-io/minions/cmd/minions@v0.0.5
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Run doc-update program
