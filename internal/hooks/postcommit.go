@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -29,7 +30,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	stateFile := filepath.Join(repoRoot, config.PartioDir, "state", "pre-commit.json")
 	data, err := os.ReadFile(stateFile)
 	if err != nil {
-		slog.Debug("no pre-commit state found, skipping checkpoint")
+		slog.Debug("post-commit: no pre-commit state found, skipping checkpoint")
 		return nil
 	}
 	// Remove immediately to prevent re-entry (amend triggers post-commit again)
@@ -41,7 +42,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	}
 
 	if !state.AgentActive {
-		slog.Debug("no agent was active, skipping checkpoint")
+		slog.Warn("post-commit: no trailer added", "reason", "no agent was active during commit")
 		return nil
 	}
 
@@ -56,7 +57,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	partioDir := filepath.Join(repoRoot, config.PartioDir)
 	cache := loadCommitCache(partioDir)
 	if cache.contains(commitHash) {
-		slog.Debug("post-commit: commit already processed, skipping", "commit", commitHash)
+		slog.Warn("post-commit: no trailer added", "reason", "commit already processed", "commit", commitHash)
 		return nil
 	}
 
@@ -78,15 +79,26 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	if cd, ok := detector.(*claude.Detector); ok {
 		sessionPath, sessionData, err = cd.FindLatestSession(repoRoot)
 		if err != nil {
-			slog.Warn("could not read agent session", "error", err)
+			slog.Warn("post-commit: could not read agent session", "commit", commitHash, "error", err)
 		}
+	}
+
+	// Log staged file paths and session content paths for diagnosing path mismatches.
+	if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
+		commitFiles, _ := git.DiffNameOnly(commitHash)
+		slog.Debug("post-commit: file overlap check",
+			"commit", commitHash,
+			"staged_files", commitFiles,
+			"session_path", sessionPath,
+			"session_found", sessionData != nil,
+		)
 	}
 
 	// Skip if this session is already fully condensed and ended — re-processing
 	// it produces a redundant checkpoint with no new content.
 	if sessionData != nil && sessionData.SessionID != "" {
 		if shouldSkipSession(filepath.Join(repoRoot, config.PartioDir), sessionData.SessionID, sessionPath) {
-			slog.Debug("post-commit: skipping already-condensed ended session", "session_id", sessionData.SessionID)
+			slog.Warn("post-commit: no trailer added", "reason", "session already condensed", "commit", commitHash, "session_id", sessionData.SessionID)
 			return nil
 		}
 	}
