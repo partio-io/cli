@@ -3,6 +3,7 @@ package hooks
 import (
 	"log/slog"
 
+	"github.com/partio-io/cli/internal/checkpoint"
 	"github.com/partio-io/cli/internal/config"
 	"github.com/partio-io/cli/internal/git"
 )
@@ -27,6 +28,11 @@ func runPrePush(repoRoot string, cfg config.Config) error {
 	if !git.BranchExists(git.CheckpointBranch) {
 		slog.Debug("no checkpoint branch, skipping push")
 		return nil
+	}
+
+	store := checkpoint.NewStore(repoRoot)
+	if _, err := store.SyncWithRemote("origin"); err != nil {
+		slog.Debug("could not sync remote checkpoint branch", "error", err)
 	}
 
 	if err := git.PushBranch("origin", git.CheckpointBranch); err != nil {
