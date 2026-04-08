@@ -1,0 +1,214 @@
+diff --git a/.partio/sessions/current.json b/.partio/sessions/current.json
+new file mode 100644
+index 0000000..586c453
+--- /dev/null
++++ b/.partio/sessions/current.json
+@@ -0,0 +1,12 @@
++{
++  "id": "",
++  "agent": "",
++  "state": "ended",
++  "started_at": "0001-01-01T00:00:00Z",
++  "ended_at": "0001-01-01T00:00:00Z",
++  "branch": "",
++  "source_dir": "",
++  "condensed": true,
++  "captured_session_id": "a6d5c8a7-82cf-49b4-a82c-68eaebcb48de",
++  "captured_at": "2026-04-08T08:29:37.483801+02:00"
++}
+\ No newline at end of file
+diff --git a/.partio/state/processed-commits.json b/.partio/state/processed-commits.json
+new file mode 100644
+index 0000000..9069fa3
+--- /dev/null
++++ b/.partio/state/processed-commits.json
+@@ -0,0 +1 @@
++{"entries":[{"sha":"36a85a0e1f92ca901f077d32f257e1d1d0cc5146","processed_at":"2026-04-08T08:29:37.483964+02:00"}]}
+\ No newline at end of file
+diff --git a/internal/agent/codex/process_test.go b/internal/agent/codex/process_test.go
+index 5b66dc6..b465de0 100644
+--- a/internal/agent/codex/process_test.go
++++ b/internal/agent/codex/process_test.go
+@@ -10,45 +10,23 @@ func TestDetector_Name(t *testing.T) {
+ }
+ 
+ func TestDetector_IsRunning(t *testing.T) {
+-	tests := []struct {
+-		name string
+-	}{
+-		{name: "returns without error"},
+-	}
+-
+-	for _, tt := range tests {
+-		t.Run(tt.name, func(t *testing.T) {
+-			d := New()
+-			// We can't control whether codex is actually running in CI,
+-			// but we can verify the function returns without unexpected errors.
+-			_, err := d.IsRunning()
+-			if err != nil {
+-				t.Errorf("IsRunning() returned unexpected error: %v", err)
+-			}
+-		})
++	d := New()
++	// We can't control whether codex is actually running,
++	// but we can verify the function returns without unexpected errors.
++	_, err := d.IsRunning()
++	if err != nil {
++		t.Errorf("IsRunning() returned unexpected error: %v", err)
+ 	}
+ }
+ 
+ func TestDetector_FindSessionDir(t *testing.T) {
+-	tests := []struct {
+-		name     string
+-		repoRoot string
+-		wantErr  bool
+-	}{
+-		{
+-			name:     "returns error when no session directory exists",
+-			repoRoot: t.TempDir(),
+-			wantErr:  true,
+-		},
+-	}
+-
+-	for _, tt := range tests {
+-		t.Run(tt.name, func(t *testing.T) {
+-			d := New()
+-			_, err := d.FindSessionDir(tt.repoRoot)
+-			if (err != nil) != tt.wantErr {
+-				t.Errorf("FindSessionDir() error = %v, wantErr %v", err, tt.wantErr)
+-			}
+-		})
+-	}
++	t.Run("returns error when no session directory exists", func(t *testing.T) {
++		// Use a fake HOME so ~/.codex/sessions/ doesn't exist
++		t.Setenv("HOME", t.TempDir())
++		d := New()
++		_, err := d.FindSessionDir(t.TempDir())
++		if err == nil {
++			t.Error("FindSessionDir() expected error, got nil")
++		}
++	})
+ }
+diff --git a/internal/agent/registry.go b/internal/agent/registry.go
+index bf79b0c..0ad652f 100644
+--- a/internal/agent/registry.go
++++ b/internal/agent/registry.go
+@@ -24,3 +24,18 @@ func NewDetector(name string) (Detector, error) {
+ 	}
+ 	return fn(), nil
+ }
++
++// DetectActive checks all registered detectors and returns those that are
++// currently running. This allows capturing sessions from any active agent
++// without requiring PARTIO_AGENT to be set.
++func DetectActive() []Detector {
++	var active []Detector
++	for _, fn := range registry {
++		d := fn()
++		running, err := d.IsRunning()
++		if err == nil && running {
++			active = append(active, d)
++		}
++	}
++	return active
++}
+diff --git a/internal/hooks/postcommit.go b/internal/hooks/postcommit.go
+index b86d402..baa8dbb 100644
+--- a/internal/hooks/postcommit.go
++++ b/internal/hooks/postcommit.go
+@@ -71,9 +71,13 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
+ 	// Parse agent session data (Claude-specific — other agents skip this)
+ 	var sessionPath string
+ 	var sessionData *agent.SessionData
+-	detector, detErr := agent.NewDetector(cfg.Agent)
++	agentName := cfg.Agent
++	if state.AgentName != "" {
++		agentName = state.AgentName
++	}
++	detector, detErr := agent.NewDetector(agentName)
+ 	if detErr != nil {
+-		slog.Warn("unknown agent, falling back to claude-code", "agent", cfg.Agent, "error", detErr)
++		slog.Warn("unknown agent, falling back to claude-code", "agent", agentName, "error", detErr)
+ 		detector = claude.New()
+ 	}
+ 	if cd, ok := detector.(*claude.Detector); ok {
+@@ -128,7 +132,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
+ 		CommitHash:  commitHash,
+ 		Branch:      state.Branch,
+ 		CreatedAt:   time.Now(),
+-		Agent:       cfg.Agent,
++		Agent:       agentName,
+ 		AgentPct:    attr.AgentPercent,
+ 		ContentHash: commitHash,
+ 	}
+diff --git a/internal/hooks/precommit.go b/internal/hooks/precommit.go
+index 2793083..cb3ec4c 100644
+--- a/internal/hooks/precommit.go
++++ b/internal/hooks/precommit.go
+@@ -17,6 +17,7 @@ import (
+ // preCommitState records the state captured during pre-commit for use by post-commit.
+ type preCommitState struct {
+ 	AgentActive   bool   `json:"agent_active"`
++	AgentName     string `json:"agent_name,omitempty"`
+ 	SessionPath   string `json:"session_path,omitempty"`
+ 	PreCommitHash string `json:"pre_commit_hash,omitempty"`
+ 	Branch        string `json:"branch"`
+@@ -29,17 +30,41 @@ func (r *Runner) PreCommit() error {
+ }
+ 
+ func runPreCommit(repoRoot string, cfg config.Config) error {
+-	detector, err := agent.NewDetector(cfg.Agent)
+-	if err != nil {
+-		slog.Warn("unknown agent, falling back to claude-code", "agent", cfg.Agent, "error", err)
++	// Auto-detect all running agents, or fall back to configured agent
++	var detector agent.Detector
++	var running bool
++
++	if cfg.Agent != "" {
++		// Explicit agent configured — use it
++		var err error
++		detector, err = agent.NewDetector(cfg.Agent)
++		if err != nil {
++			slog.Warn("unknown agent, falling back to auto-detect", "agent", cfg.Agent, "error", err)
++		} else {
++			running, _ = detector.IsRunning()
++		}
++	}
++
++	if detector == nil || !running {
++		// Auto-detect: check all registered agents
++		active := agent.DetectActive()
++		if len(active) > 0 {
++			detector = active[0]
++			running = true
++			slog.Debug("auto-detected agent", "agent", detector.Name())
++		}
++	}
++
++	if detector == nil {
+ 		detector = claude.New()
+ 	}
+ 
+-	// Detect if agent is running
+-	running, runErr := detector.IsRunning()
+-	if runErr != nil {
+-		slog.Warn("could not detect agent process", "error", runErr)
+-		running = false
++	if !running {
++		runRes, runErr := detector.IsRunning()
++		if runErr != nil {
++			slog.Warn("could not detect agent process", "error", runErr)
++		}
++		running = runRes
+ 	}
+ 
+ 	// Claude-specific optimisation: check for condensed sessions.
+@@ -80,6 +105,7 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
+ 
+ 	state := preCommitState{
+ 		AgentActive:   agentActive,
++		AgentName:     detector.Name(),
+ 		SessionPath:   sessionPath,
+ 		PreCommitHash: commitHash,
+ 		Branch:        branch,
