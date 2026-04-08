@@ -30,28 +30,24 @@ func (r *Runner) PreCommit() error {
 }
 
 func runPreCommit(repoRoot string, cfg config.Config) error {
-	// Auto-detect all running agents, or fall back to configured agent
+	// Auto-detect running agents — check all registered detectors
 	var detector agent.Detector
 	var running bool
 
-	if cfg.Agent != "" {
-		// Explicit agent configured — use it
+	active := agent.DetectActive()
+	if len(active) > 0 {
+		detector = active[0]
+		running = true
+		slog.Debug("auto-detected agent", "agent", detector.Name())
+	}
+
+	// Fall back to configured agent if none auto-detected
+	if !running && cfg.Agent != "" {
 		var err error
 		detector, err = agent.NewDetector(cfg.Agent)
 		if err != nil {
-			slog.Warn("unknown agent, falling back to auto-detect", "agent", cfg.Agent, "error", err)
-		} else {
-			running, _ = detector.IsRunning()
-		}
-	}
-
-	if detector == nil || !running {
-		// Auto-detect: check all registered agents
-		active := agent.DetectActive()
-		if len(active) > 0 {
-			detector = active[0]
-			running = true
-			slog.Debug("auto-detected agent", "agent", detector.Name())
+			slog.Warn("unknown agent", "agent", cfg.Agent, "error", err)
+			detector = claude.New()
 		}
 	}
 
@@ -59,15 +55,7 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 		detector = claude.New()
 	}
 
-	if !running {
-		runRes, runErr := detector.IsRunning()
-		if runErr != nil {
-			slog.Warn("could not detect agent process", "error", runErr)
-		}
-		running = runRes
-	}
-
-	// Claude-specific optimisation: check for condensed sessions.
+	// Check for condensed sessions (Claude-specific optimisation).
 	if running {
 		if cd, ok := detector.(*claude.Detector); ok {
 			latestPath, pathErr := cd.FindLatestJSONLPath(repoRoot)
@@ -81,15 +69,16 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 		}
 	}
 
+	// Find session data using the SessionParser interface (works for any agent).
 	var sessionPath string
 	if running {
-		if cd, ok := detector.(*claude.Detector); ok {
-			path, _, findErr := cd.FindLatestSession(repoRoot)
+		if sp, ok := detector.(agent.SessionParser); ok {
+			path, _, findErr := sp.FindLatestSession(repoRoot)
 			if findErr != nil {
-				slog.Debug("agent running but no session found", "error", findErr)
+				slog.Debug("agent running but no session found", "agent", detector.Name(), "error", findErr)
 			} else {
 				sessionPath = path
-				slog.Debug("agent session detected", "path", path)
+				slog.Debug("agent session detected", "agent", detector.Name(), "path", path)
 			}
 		}
 	}
@@ -97,9 +86,10 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 	branch, _ := git.CurrentBranch()
 	commitHash, _ := git.CurrentCommit()
 
-	// For Claude, we require a session path; for other agents, running is sufficient.
+	// If the agent supports session parsing, require a session path.
+	// Otherwise (no SessionParser), running is sufficient.
 	agentActive := running
-	if _, ok := detector.(*claude.Detector); ok {
+	if _, ok := detector.(agent.SessionParser); ok {
 		agentActive = running && sessionPath != ""
 	}
 
