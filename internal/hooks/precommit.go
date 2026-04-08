@@ -14,10 +14,11 @@ import (
 
 // preCommitState records the state captured during pre-commit for use by post-commit.
 type preCommitState struct {
-	AgentActive   bool   `json:"agent_active"`
-	SessionPath   string `json:"session_path,omitempty"`
-	PreCommitHash string `json:"pre_commit_hash,omitempty"`
-	Branch        string `json:"branch"`
+	AgentActive   bool     `json:"agent_active"`
+	SessionPath   string   `json:"session_path,omitempty"`
+	SubAgentPaths []string `json:"sub_agent_paths,omitempty"`
+	PreCommitHash string   `json:"pre_commit_hash,omitempty"`
+	Branch        string   `json:"branch"`
 }
 
 // PreCommit runs pre-commit hook logic.
@@ -51,13 +52,17 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 	}
 
 	var sessionPath string
+	var subAgentPaths []string
 	if running {
-		path, _, err := detector.FindLatestSession(repoRoot)
+		primaryPath, _, subAgents, err := detector.FindAllSessions(repoRoot)
 		if err != nil {
 			slog.Debug("agent running but no session found", "error", err)
 		} else {
-			sessionPath = path
-			slog.Debug("agent session detected", "path", path)
+			sessionPath = primaryPath
+			slog.Debug("agent session detected", "path", primaryPath, "subagents", len(subAgents))
+			for _, sa := range subAgents {
+				subAgentPaths = append(subAgentPaths, sa.Path)
+			}
 		}
 	}
 
@@ -67,6 +72,7 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 	state := preCommitState{
 		AgentActive:   running && sessionPath != "",
 		SessionPath:   sessionPath,
+		SubAgentPaths: subAgentPaths,
 		PreCommitHash: commitHash,
 		Branch:        branch,
 	}

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/partio-io/cli/internal/agent"
 	"github.com/partio-io/cli/internal/agent/claude"
 	"github.com/partio-io/cli/internal/attribution"
 	"github.com/partio-io/cli/internal/checkpoint"
@@ -65,11 +66,39 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		attr = &attribution.Result{AgentPercent: 100}
 	}
 
-	// Parse agent session data
-	detector := claude.New()
-	sessionPath, sessionData, err := detector.FindLatestSession(repoRoot)
-	if err != nil {
-		slog.Warn("could not read agent session", "error", err)
+	// Parse agent session data using paths saved at pre-commit time.
+	var sessionPath string
+	var sessionData *agent.SessionData
+	if state.SessionPath != "" {
+		sessionPath = state.SessionPath
+		if d, err := claude.ParseJSONL(sessionPath); err == nil {
+			sessionData = d
+		} else {
+			slog.Warn("could not read agent session", "error", err)
+		}
+	}
+
+	// Build subagent attribution from paths saved at pre-commit time.
+	// Files modified by subagents are already captured in the commit diff;
+	// we tag their sessions distinctly to avoid duplicate attribution.
+	var subAgentSessions []checkpoint.SubAgentAttribution
+	seen := make(map[string]bool)
+	if sessionData != nil && sessionData.SessionID != "" {
+		seen[sessionData.SessionID] = true
+	}
+	for _, subPath := range state.SubAgentPaths {
+		subData, err := claude.ParseJSONL(subPath)
+		if err != nil || subData == nil || subData.SessionID == "" {
+			continue
+		}
+		if seen[subData.SessionID] {
+			continue
+		}
+		seen[subData.SessionID] = true
+		subAgentSessions = append(subAgentSessions, checkpoint.SubAgentAttribution{
+			SessionID: subData.SessionID,
+			Agent:     subData.Agent,
+		})
 	}
 
 	// Skip if this session is already fully condensed and ended — re-processing
@@ -102,13 +131,14 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 
 	// Create checkpoint with the post-amend hash
 	cp := &checkpoint.Checkpoint{
-		ID:          cpID,
-		CommitHash:  commitHash,
-		Branch:      state.Branch,
-		CreatedAt:   time.Now(),
-		Agent:       cfg.Agent,
-		AgentPct:    attr.AgentPercent,
-		ContentHash: commitHash,
+		ID:               cpID,
+		CommitHash:       commitHash,
+		Branch:           state.Branch,
+		CreatedAt:        time.Now(),
+		Agent:            cfg.Agent,
+		AgentPct:         attr.AgentPercent,
+		ContentHash:      commitHash,
+		SubAgentSessions: subAgentSessions,
 	}
 
 	if sessionData != nil {

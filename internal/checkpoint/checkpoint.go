@@ -6,30 +6,38 @@ import (
 	"time"
 )
 
+// SubAgentAttribution identifies a subagent session that contributed to a checkpoint.
+type SubAgentAttribution struct {
+	SessionID string `json:"session_id"`
+	Agent     string `json:"agent"`
+}
+
 // Checkpoint represents a captured point-in-time snapshot.
 type Checkpoint struct {
-	ID          string    `json:"id"`
-	SessionID   string    `json:"session_id"`
-	CommitHash  string    `json:"commit_hash"`
-	Branch      string    `json:"branch"`
-	CreatedAt   time.Time `json:"created_at"`
-	Agent       string    `json:"agent"`
-	AgentPct    int       `json:"agent_percent"`
-	ContentHash string    `json:"content_hash"`
-	PlanSlug    string    `json:"plan_slug,omitempty"`
+	ID               string                `json:"id"`
+	SessionID        string                `json:"session_id"`
+	CommitHash       string                `json:"commit_hash"`
+	Branch           string                `json:"branch"`
+	CreatedAt        time.Time             `json:"created_at"`
+	Agent            string                `json:"agent"`
+	AgentPct         int                   `json:"agent_percent"`
+	ContentHash      string                `json:"content_hash"`
+	PlanSlug         string                `json:"plan_slug,omitempty"`
+	SubAgentSessions []SubAgentAttribution `json:"sub_agent_sessions,omitempty"`
 }
 
 // Metadata is the JSON schema for checkpoint metadata stored on the orphan branch.
 type Metadata struct {
-	ID           string `json:"id"`
-	SessionID    string `json:"session_id"`
-	CommitHash   string `json:"commit_hash"`
-	Branch       string `json:"branch"`
-	CreatedAt    string `json:"created_at"`
-	Agent        string `json:"agent"`
-	AgentPercent int    `json:"agent_percent"`
-	ContentHash  string `json:"content_hash"`
-	PlanSlug     string `json:"plan_slug,omitempty"`
+	ID               string                `json:"id"`
+	SessionID        string                `json:"session_id"`
+	CommitHash       string                `json:"commit_hash"`
+	Branch           string                `json:"branch"`
+	CreatedAt        string                `json:"created_at"`
+	Agent            string                `json:"agent"`
+	AgentPercent     int                   `json:"agent_percent"`
+	ContentHash      string                `json:"content_hash"`
+	PlanSlug         string                `json:"plan_slug,omitempty"`
+	SubAgentSessions []SubAgentAttribution `json:"sub_agent_sessions,omitempty"`
 }
 
 // NewID generates a 12-character hex checkpoint ID.
