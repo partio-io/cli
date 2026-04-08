@@ -59,6 +59,18 @@ func runEnable(cmd *cobra.Command, args []string) error {
 	// Add .partio/settings.local.json to .gitignore
 	addToGitignore(repoRoot, ".partio/settings.local.json")
 
+	// Check for external hook managers
+	if managers := githooks.DetectExternalHookManagers(repoRoot); len(managers) > 0 {
+		fmt.Println("")
+		fmt.Println("[WARN] External hook manager(s) detected:")
+		for _, m := range managers {
+			fmt.Printf("  - %s (%s)\n", m.Name, m.Reason)
+		}
+		fmt.Println("  Partio will install its own hooks and may conflict with these tools.")
+		fmt.Println("  Run 'partio doctor' for more details.")
+		fmt.Println("")
+	}
+
 	// Install git hooks
 	if absolutePath {
 		exePath, err := os.Executable()
