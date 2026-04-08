@@ -1,0 +1,99 @@
+diff --git a/README.md b/README.md
+index 709d0e8..fd3a6e7 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ Capture the *why* behind your code changes.
+ 
+-**partio** hooks into Git workflows to capture AI agent sessions (Claude Code), preserving the reasoning behind code changes alongside the *what* that Git already tracks.
++**partio** hooks into Git workflows to capture AI agent sessions (currently Claude Code and Codex), preserving the reasoning behind code changes alongside the *what* that Git already tracks.
+ 
+ The "partial" version of [entire.io](https://entire.io).
+ 
+@@ -33,7 +33,10 @@ git commit -m "add new feature"
+ partio rewind --list
+ 
+ # Inspect a checkpoint
+-git show partio/checkpoints/v1:<shard>/<id>/0/full.jsonl
++# For checkpoint ID abcdef123456:
++#   <shard> = ab
++#   <rest>  = cdef123456
++git show partio/checkpoints/v1:<shard>/<rest>/0/full.jsonl
+ 
+ # Rewind to a checkpoint
+ partio rewind --to <id>
+@@ -59,7 +62,7 @@ partio status
+ ## How It Works
+ 
+ 1. `partio enable` installs git hooks (`pre-commit`, `post-commit`, `pre-push`)
+-2. When you commit, hooks detect if Claude Code is running
++2. When you commit, hooks detect if the configured AI agent is running
+ 3. If active, it captures the JSONL transcript, calculates attribution, and creates a checkpoint
+ 4. Checkpoints are stored on an orphan branch (`partio/checkpoints/v1`) using git plumbing
+ 5. Commits are annotated with `Partio-Checkpoint` and `Partio-Attribution` trailers
+@@ -67,23 +70,31 @@ partio status
+ 
+ ## Git Worktrees
+ 
+-partio fully supports git worktrees. Hooks are installed to the shared git directory (`git rev-parse --git-common-dir`) so they work across all worktrees. Session discovery walks up from the repo root to find the Claude Code session directory, which may be keyed to a parent workspace directory.
++partio fully supports git worktrees. Hooks are installed to the shared git directory (`git rev-parse --git-common-dir`) so they work across all worktrees. Claude Code session discovery walks up from the repo root to find the session directory, which may be keyed to a parent workspace directory.
+ 
+ ## Checkpoint Data
+ 
+ Checkpoints are stored on the `partio/checkpoints/v1` orphan branch with this structure:
+ 
+ ```
+-<shard>/<checkpoint-id>/
++<shard>/<rest>/
+   metadata.json          # Checkpoint metadata (commit, branch, agent %, timestamps)
+   0/
+     metadata.json        # Session metadata (agent, tokens, duration)
+     context.md           # First 200 chars of the initial prompt
+     prompt.txt           # Full initial human message
+     full.jsonl           # Complete Claude Code transcript
++    diff.patch           # Commit diff for the checkpointed commit
++    plan.md              # Captured Claude plan, when available
+     content_hash.txt     # Commit hash reference
+ ```
+ 
++Checkpoint IDs are 12 hex characters. The storage path is sharded by the first two characters of the ID:
++
++```text
++abcdef123456 -> ab/cdef123456
++```
++
+ You can inspect checkpoint data directly with git:
+ 
+ ```bash
+@@ -91,16 +102,16 @@ You can inspect checkpoint data directly with git:
+ git ls-tree -r --name-only partio/checkpoints/v1
+ 
+ # View checkpoint metadata
+-git show partio/checkpoints/v1:<shard>/<id>/metadata.json
++git show partio/checkpoints/v1:<shard>/<rest>/metadata.json
+ 
+ # View the full Claude session
+-git show partio/checkpoints/v1:<shard>/<id>/0/full.jsonl
++git show partio/checkpoints/v1:<shard>/<rest>/0/full.jsonl
+ ```
+ 
+ ## Configuration
+ 
+ Config files (highest priority wins):
+-- Environment variables (`PARTIO_ENABLED`, `PARTIO_STRATEGY`, `PARTIO_LOG_LEVEL`)
++- Environment variables (`PARTIO_ENABLED`, `PARTIO_STRATEGY`, `PARTIO_LOG_LEVEL`, `PARTIO_AGENT`)
+ - `.partio/settings.local.json` (git-ignored)
+ - `.partio/settings.json`
+ - `~/.config/partio/settings.json`
+@@ -115,6 +126,10 @@ Config files (highest priority wins):
+ }
+ ```
+ 
++Supported `agent` values:
++- `claude-code` (default)
++- `codex`
++
+ ## License
+ 
+ MIT
