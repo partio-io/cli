@@ -15,8 +15,8 @@ func TestDefaults(t *testing.T) {
 	if d.Strategy != "manual-commit" {
 		t.Errorf("expected strategy=manual-commit, got %s", d.Strategy)
 	}
-	if d.Agent != "claude-code" {
-		t.Errorf("expected agent=claude-code, got %s", d.Agent)
+	if d.Agent != "" {
+		t.Errorf("expected agent='' (auto-detect), got %s", d.Agent)
 	}
 	if d.LogLevel != "info" {
 		t.Errorf("expected log_level=info, got %s", d.LogLevel)
@@ -56,8 +56,8 @@ func TestMergeFromFile(t *testing.T) {
 		t.Errorf("expected log_level=debug, got %s", cfg.LogLevel)
 	}
 	// Unset fields should retain defaults
-	if cfg.Agent != "claude-code" {
-		t.Errorf("expected agent=claude-code (default), got %s", cfg.Agent)
+	if cfg.Agent != "" {
+		t.Errorf("expected agent='' (auto-detect default), got %s", cfg.Agent)
 	}
 }
 

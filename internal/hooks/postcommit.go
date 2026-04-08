@@ -68,7 +68,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		attr = &attribution.Result{AgentPercent: 100}
 	}
 
-	// Parse agent session data (Claude-specific — other agents skip this)
+	// Parse agent session data using SessionParser interface (any agent).
 	var sessionPath string
 	var sessionData *agent.SessionData
 	agentName := cfg.Agent
@@ -80,10 +80,10 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		slog.Warn("unknown agent, falling back to claude-code", "agent", agentName, "error", detErr)
 		detector = claude.New()
 	}
-	if cd, ok := detector.(*claude.Detector); ok {
-		sessionPath, sessionData, err = cd.FindLatestSession(repoRoot)
+	if sp, ok := detector.(agent.SessionParser); ok {
+		sessionPath, sessionData, err = sp.FindLatestSession(repoRoot)
 		if err != nil {
-			slog.Warn("post-commit: could not read agent session", "commit", commitHash, "error", err)
+			slog.Warn("post-commit: could not read agent session", "agent", agentName, "commit", commitHash, "error", err)
 		}
 	}
 

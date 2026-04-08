@@ -5,7 +5,7 @@ func Defaults() Config {
 	return Config{
 		Enabled:  true,
 		Strategy: "manual-commit",
-		Agent:    "claude-code",
+		Agent:    "",
 		LogLevel: "info",
 		StrategyOptions: StrategyOptions{
 			PushSessions: true,
