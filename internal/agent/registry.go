@@ -24,3 +24,18 @@ func NewDetector(name string) (Detector, error) {
 	}
 	return fn(), nil
 }
+
+// DetectActive checks all registered detectors and returns those that are
+// currently running. This allows capturing sessions from any active agent
+// without requiring PARTIO_AGENT to be set.
+func DetectActive() []Detector {
+	var active []Detector
+	for _, fn := range registry {
+		d := fn()
+		running, err := d.IsRunning()
+		if err == nil && running {
+			active = append(active, d)
+		}
+	}
+	return active
+}
