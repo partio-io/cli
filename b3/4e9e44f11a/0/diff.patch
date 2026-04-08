@@ -1,0 +1,468 @@
+diff --git a/.partio/sessions/current.json b/.partio/sessions/current.json
+index 586c453..f5d9a06 100644
+--- a/.partio/sessions/current.json
++++ b/.partio/sessions/current.json
+@@ -8,5 +8,5 @@
+   "source_dir": "",
+   "condensed": true,
+   "captured_session_id": "a6d5c8a7-82cf-49b4-a82c-68eaebcb48de",
+-  "captured_at": "2026-04-08T08:29:37.483801+02:00"
++  "captured_at": "2026-04-08T15:13:32.860983+02:00"
+ }
+\ No newline at end of file
+diff --git a/.partio/state/processed-commits.json b/.partio/state/processed-commits.json
+index 9069fa3..c6eebbe 100644
+--- a/.partio/state/processed-commits.json
++++ b/.partio/state/processed-commits.json
+@@ -1 +1 @@
+-{"entries":[{"sha":"36a85a0e1f92ca901f077d32f257e1d1d0cc5146","processed_at":"2026-04-08T08:29:37.483964+02:00"}]}
+\ No newline at end of file
++{"entries":[{"sha":"36a85a0e1f92ca901f077d32f257e1d1d0cc5146","processed_at":"2026-04-08T08:29:37.483964+02:00"},{"sha":"cafa3bd3e6976a5310f780ac911808b43ad9afed","processed_at":"2026-04-08T15:02:27.488141+02:00"},{"sha":"886aac3131bbf7e21019a88ddf6a23a39ccf9ac1","processed_at":"2026-04-08T15:11:06.860169+02:00"},{"sha":"e3230b0047aa6ffbd0cac732c8e8f8ff466954aa","processed_at":"2026-04-08T15:12:10.216817+02:00"},{"sha":"5f829e10ea78b5684c2d4420650871e474b37f9b","processed_at":"2026-04-08T15:12:46.73285+02:00"},{"sha":"5eb914f97138b8ad462ca11b91a3d7093d689045","processed_at":"2026-04-08T15:13:32.861081+02:00"}]}
+\ No newline at end of file
+diff --git a/internal/agent/codex/find_session_dir.go b/internal/agent/codex/find_session_dir.go
+index 3a0ae40..a41fb83 100644
+--- a/internal/agent/codex/find_session_dir.go
++++ b/internal/agent/codex/find_session_dir.go
+@@ -4,10 +4,13 @@ import (
+ 	"fmt"
+ 	"os"
+ 	"path/filepath"
++	"sort"
++	"strings"
++
++	"github.com/partio-io/cli/internal/agent"
+ )
+ 
+-// FindSessionDir returns the Codex CLI session directory for the given repo.
+-// Codex stores sessions at ~/.codex/sessions/ within the project directory.
++// FindSessionDir returns the Codex CLI session directory.
+ func (d *Detector) FindSessionDir(repoRoot string) (string, error) {
+ 	home, err := os.UserHomeDir()
+ 	if err != nil {
+@@ -21,3 +24,62 @@ func (d *Detector) FindSessionDir(repoRoot string) (string, error) {
+ 
+ 	return sessionDir, nil
+ }
++
++// FindLatestSession returns the most recent Codex session file for the given repo.
++// It matches sessions by comparing the session_meta cwd against the repo root.
++func (d *Detector) FindLatestSession(repoRoot string) (string, *agent.SessionData, error) {
++	sessionDir, err := d.FindSessionDir(repoRoot)
++	if err != nil {
++		return "", nil, err
++	}
++
++	// Resolve symlinks for comparison
++	absRepoRoot, err := filepath.EvalSymlinks(repoRoot)
++	if err != nil {
++		absRepoRoot = repoRoot
++	}
++	absRepoRoot, _ = filepath.Abs(absRepoRoot)
++
++	// Collect all .jsonl files
++	var files []string
++	err = filepath.Walk(sessionDir, func(path string, info os.FileInfo, err error) error {
++		if err != nil {
++			return nil // skip errors
++		}
++		if !info.IsDir() && strings.HasSuffix(path, ".jsonl") {
++			files = append(files, path)
++		}
++		return nil
++	})
++	if err != nil {
++		return "", nil, fmt.Errorf("walking session directory: %w", err)
++	}
++
++	// Sort descending by name (filenames contain timestamps)
++	sort.Sort(sort.Reverse(sort.StringSlice(files)))
++
++	// Find the most recent session that matches this repo
++	for _, path := range files {
++		cwd := PeekCWD(path)
++		if cwd == "" {
++			continue
++		}
++
++		absCWD, err := filepath.EvalSymlinks(cwd)
++		if err != nil {
++			absCWD = cwd
++		}
++		absCWD, _ = filepath.Abs(absCWD)
++
++		// Check if the session cwd matches or is a parent of the repo root
++		if absCWD == absRepoRoot || strings.HasPrefix(absRepoRoot, absCWD+"/") {
++			data, parseErr := ParseJSONL(path)
++			if parseErr != nil {
++				continue
++			}
++			return path, data, nil
++		}
++	}
++
++	return "", nil, fmt.Errorf("no Codex session found for repo %s", repoRoot)
++}
+diff --git a/internal/agent/codex/parse_jsonl.go b/internal/agent/codex/parse_jsonl.go
+new file mode 100644
+index 0000000..02d0682
+--- /dev/null
++++ b/internal/agent/codex/parse_jsonl.go
+@@ -0,0 +1,181 @@
++package codex
++
++import (
++	"bufio"
++	"encoding/json"
++	"fmt"
++	"os"
++	"time"
++
++	"github.com/partio-io/cli/internal/agent"
++)
++
++// jsonlLine is the top-level structure of a Codex JSONL line.
++type jsonlLine struct {
++	Timestamp string          `json:"timestamp"`
++	Type      string          `json:"type"`
++	Payload   json.RawMessage `json:"payload"`
++}
++
++type sessionMeta struct {
++	ID         string `json:"id"`
++	CWD        string `json:"cwd"`
++	CLIVersion string `json:"cli_version"`
++}
++
++type eventMsg struct {
++	Type    string `json:"type"`
++	Message string `json:"message,omitempty"`
++}
++
++type responseItem struct {
++	Type      string `json:"type"`
++	Name      string `json:"name,omitempty"`
++	Arguments string `json:"arguments,omitempty"`
++	Content   []struct {
++		Text string `json:"text"`
++	} `json:"content,omitempty"`
++}
++
++// ParseJSONL parses a Codex JSONL session file into SessionData.
++func ParseJSONL(path string) (*agent.SessionData, error) {
++	f, err := os.Open(path)
++	if err != nil {
++		return nil, fmt.Errorf("opening codex session: %w", err)
++	}
++	defer f.Close()
++
++	data := &agent.SessionData{
++		Agent: "codex",
++	}
++
++	var firstTS, lastTS time.Time
++	scanner := bufio.NewScanner(f)
++	scanner.Buffer(make([]byte, 0, 1024*1024), 10*1024*1024)
++
++	for scanner.Scan() {
++		var line jsonlLine
++		if err := json.Unmarshal(scanner.Bytes(), &line); err != nil {
++			continue
++		}
++
++		// Track timestamps for duration
++		if ts, err := time.Parse(time.RFC3339Nano, line.Timestamp); err == nil {
++			if firstTS.IsZero() {
++				firstTS = ts
++			}
++			lastTS = ts
++		}
++
++		switch line.Type {
++		case "session_meta":
++			var meta sessionMeta
++			if err := json.Unmarshal(line.Payload, &meta); err == nil {
++				data.SessionID = meta.ID
++			}
++
++		case "event_msg":
++			var evt eventMsg
++			if err := json.Unmarshal(line.Payload, &evt); err != nil {
++				continue
++			}
++
++			switch evt.Type {
++			case "user_message":
++				if data.Prompt == "" {
++					data.Prompt = evt.Message
++				}
++				data.Transcript = append(data.Transcript, agent.Message{
++					Role:      "user",
++					Content:   evt.Message,
++					Timestamp: lastTS,
++				})
++
++			case "agent_message":
++				data.Transcript = append(data.Transcript, agent.Message{
++					Role:      "assistant",
++					Content:   evt.Message,
++					Timestamp: lastTS,
++				})
++
++			case "token_count":
++				// Token counts come as a separate event; extract if needed
++				var tc struct {
++					InputTokens  int `json:"input_tokens"`
++					OutputTokens int `json:"output_tokens"`
++				}
++				if err := json.Unmarshal(line.Payload, &tc); err == nil {
++					data.TotalTokens += tc.InputTokens + tc.OutputTokens
++				}
++			}
++
++		case "response_item":
++			var item responseItem
++			if err := json.Unmarshal(line.Payload, &item); err != nil {
++				continue
++			}
++
++			if item.Type == "message" {
++				var text string
++				for _, c := range item.Content {
++					text += c.Text
++				}
++				if text != "" {
++					data.Transcript = append(data.Transcript, agent.Message{
++						Role:      "assistant",
++						Content:   text,
++						Timestamp: lastTS,
++					})
++				}
++			}
++		}
++	}
++
++	if !firstTS.IsZero() && !lastTS.IsZero() {
++		data.Duration = lastTS.Sub(firstTS)
++	}
++
++	return data, scanner.Err()
++}
++
++// PeekSessionID reads just the session ID from a Codex JSONL file.
++func PeekSessionID(path string) string {
++	f, err := os.Open(path)
++	if err != nil {
++		return ""
++	}
++	defer f.Close()
++
++	scanner := bufio.NewScanner(f)
++	if scanner.Scan() {
++		var line jsonlLine
++		if err := json.Unmarshal(scanner.Bytes(), &line); err == nil && line.Type == "session_meta" {
++			var meta sessionMeta
++			if err := json.Unmarshal(line.Payload, &meta); err == nil {
++				return meta.ID
++			}
++		}
++	}
++	return ""
++}
++
++// PeekCWD reads just the cwd from a Codex JSONL file's session_meta.
++func PeekCWD(path string) string {
++	f, err := os.Open(path)
++	if err != nil {
++		return ""
++	}
++	defer f.Close()
++
++	scanner := bufio.NewScanner(f)
++	if scanner.Scan() {
++		var line jsonlLine
++		if err := json.Unmarshal(scanner.Bytes(), &line); err == nil && line.Type == "session_meta" {
++			var meta sessionMeta
++			if err := json.Unmarshal(line.Payload, &meta); err == nil {
++				return meta.CWD
++			}
++		}
++	}
++	return ""
++}
+diff --git a/internal/agent/detector.go b/internal/agent/detector.go
+index e61a3ab..57b2233 100644
+--- a/internal/agent/detector.go
++++ b/internal/agent/detector.go
+@@ -11,3 +11,11 @@ type Detector interface {
+ 	// FindSessionDir returns the path to the agent's session data for the given repo.
+ 	FindSessionDir(repoRoot string) (string, error)
+ }
++
++// SessionParser is implemented by detectors that can extract session data.
++// The hooks use this to capture session transcripts from any agent.
++type SessionParser interface {
++	// FindLatestSession returns the path to the most recent session file
++	// and the parsed session data for the given repo.
++	FindLatestSession(repoRoot string) (path string, data *SessionData, err error)
++}
+diff --git a/internal/config/config_test.go b/internal/config/config_test.go
+index e7165e3..fc33f49 100644
+--- a/internal/config/config_test.go
++++ b/internal/config/config_test.go
+@@ -15,8 +15,8 @@ func TestDefaults(t *testing.T) {
+ 	if d.Strategy != "manual-commit" {
+ 		t.Errorf("expected strategy=manual-commit, got %s", d.Strategy)
+ 	}
+-	if d.Agent != "claude-code" {
+-		t.Errorf("expected agent=claude-code, got %s", d.Agent)
++	if d.Agent != "" {
++		t.Errorf("expected agent='' (auto-detect), got %s", d.Agent)
+ 	}
+ 	if d.LogLevel != "info" {
+ 		t.Errorf("expected log_level=info, got %s", d.LogLevel)
+@@ -56,8 +56,8 @@ func TestMergeFromFile(t *testing.T) {
+ 		t.Errorf("expected log_level=debug, got %s", cfg.LogLevel)
+ 	}
+ 	// Unset fields should retain defaults
+-	if cfg.Agent != "claude-code" {
+-		t.Errorf("expected agent=claude-code (default), got %s", cfg.Agent)
++	if cfg.Agent != "" {
++		t.Errorf("expected agent='' (auto-detect default), got %s", cfg.Agent)
+ 	}
+ }
+ 
+diff --git a/internal/config/defaults.go b/internal/config/defaults.go
+index f06dde6..ffd3762 100644
+--- a/internal/config/defaults.go
++++ b/internal/config/defaults.go
+@@ -5,7 +5,7 @@ func Defaults() Config {
+ 	return Config{
+ 		Enabled:  true,
+ 		Strategy: "manual-commit",
+-		Agent:    "claude-code",
++		Agent:    "",
+ 		LogLevel: "info",
+ 		StrategyOptions: StrategyOptions{
+ 			PushSessions: true,
+diff --git a/internal/hooks/postcommit.go b/internal/hooks/postcommit.go
+index baa8dbb..ad6af22 100644
+--- a/internal/hooks/postcommit.go
++++ b/internal/hooks/postcommit.go
+@@ -68,7 +68,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
+ 		attr = &attribution.Result{AgentPercent: 100}
+ 	}
+ 
+-	// Parse agent session data (Claude-specific — other agents skip this)
++	// Parse agent session data using SessionParser interface (any agent).
+ 	var sessionPath string
+ 	var sessionData *agent.SessionData
+ 	agentName := cfg.Agent
+@@ -80,10 +80,10 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
+ 		slog.Warn("unknown agent, falling back to claude-code", "agent", agentName, "error", detErr)
+ 		detector = claude.New()
+ 	}
+-	if cd, ok := detector.(*claude.Detector); ok {
+-		sessionPath, sessionData, err = cd.FindLatestSession(repoRoot)
++	if sp, ok := detector.(agent.SessionParser); ok {
++		sessionPath, sessionData, err = sp.FindLatestSession(repoRoot)
+ 		if err != nil {
+-			slog.Warn("post-commit: could not read agent session", "commit", commitHash, "error", err)
++			slog.Warn("post-commit: could not read agent session", "agent", agentName, "commit", commitHash, "error", err)
+ 		}
+ 	}
+ 
+diff --git a/internal/hooks/precommit.go b/internal/hooks/precommit.go
+index cb3ec4c..28dd9ca 100644
+--- a/internal/hooks/precommit.go
++++ b/internal/hooks/precommit.go
+@@ -30,28 +30,24 @@ func (r *Runner) PreCommit() error {
+ }
+ 
+ func runPreCommit(repoRoot string, cfg config.Config) error {
+-	// Auto-detect all running agents, or fall back to configured agent
++	// Auto-detect running agents — check all registered detectors
+ 	var detector agent.Detector
+ 	var running bool
+ 
+-	if cfg.Agent != "" {
+-		// Explicit agent configured — use it
++	active := agent.DetectActive()
++	if len(active) > 0 {
++		detector = active[0]
++		running = true
++		slog.Debug("auto-detected agent", "agent", detector.Name())
++	}
++
++	// Fall back to configured agent if none auto-detected
++	if !running && cfg.Agent != "" {
+ 		var err error
+ 		detector, err = agent.NewDetector(cfg.Agent)
+ 		if err != nil {
+-			slog.Warn("unknown agent, falling back to auto-detect", "agent", cfg.Agent, "error", err)
+-		} else {
+-			running, _ = detector.IsRunning()
+-		}
+-	}
+-
+-	if detector == nil || !running {
+-		// Auto-detect: check all registered agents
+-		active := agent.DetectActive()
+-		if len(active) > 0 {
+-			detector = active[0]
+-			running = true
+-			slog.Debug("auto-detected agent", "agent", detector.Name())
++			slog.Warn("unknown agent", "agent", cfg.Agent, "error", err)
++			detector = claude.New()
+ 		}
+ 	}
+ 
+@@ -59,15 +55,7 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
+ 		detector = claude.New()
+ 	}
+ 
+-	if !running {
+-		runRes, runErr := detector.IsRunning()
+-		if runErr != nil {
+-			slog.Warn("could not detect agent process", "error", runErr)
+-		}
+-		running = runRes
+-	}
+-
+-	// Claude-specific optimisation: check for condensed sessions.
++	// Check for condensed sessions (Claude-specific optimisation).
+ 	if running {
+ 		if cd, ok := detector.(*claude.Detector); ok {
+ 			latestPath, pathErr := cd.FindLatestJSONLPath(repoRoot)
+@@ -81,15 +69,16 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
+ 		}
+ 	}
+ 
++	// Find session data using the SessionParser interface (works for any agent).
+ 	var sessionPath string
+ 	if running {
+-		if cd, ok := detector.(*claude.Detector); ok {
+-			path, _, findErr := cd.FindLatestSession(repoRoot)
++		if sp, ok := detector.(agent.SessionParser); ok {
++			path, _, findErr := sp.FindLatestSession(repoRoot)
+ 			if findErr != nil {
+-				slog.Debug("agent running but no session found", "error", findErr)
++				slog.Debug("agent running but no session found", "agent", detector.Name(), "error", findErr)
+ 			} else {
+ 				sessionPath = path
+-				slog.Debug("agent session detected", "path", path)
++				slog.Debug("agent session detected", "agent", detector.Name(), "path", path)
+ 			}
+ 		}
+ 	}
+@@ -97,9 +86,10 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
+ 	branch, _ := git.CurrentBranch()
+ 	commitHash, _ := git.CurrentCommit()
+ 
+-	// For Claude, we require a session path; for other agents, running is sufficient.
++	// If the agent supports session parsing, require a session path.
++	// Otherwise (no SessionParser), running is sufficient.
+ 	agentActive := running
+-	if _, ok := detector.(*claude.Detector); ok {
++	if _, ok := detector.(agent.SessionParser); ok {
+ 		agentActive = running && sessionPath != ""
+ 	}
