@@ -17,6 +17,7 @@ import (
 // preCommitState records the state captured during pre-commit for use by post-commit.
 type preCommitState struct {
 	AgentActive   bool   `json:"agent_active"`
+	AgentName     string `json:"agent_name,omitempty"`
 	SessionPath   string `json:"session_path,omitempty"`
 	PreCommitHash string `json:"pre_commit_hash,omitempty"`
 	Branch        string `json:"branch"`
@@ -29,17 +30,41 @@ func (r *Runner) PreCommit() error {
 }
 
 func runPreCommit(repoRoot string, cfg config.Config) error {
-	detector, err := agent.NewDetector(cfg.Agent)
-	if err != nil {
-		slog.Warn("unknown agent, falling back to claude-code", "agent", cfg.Agent, "error", err)
+	// Auto-detect all running agents, or fall back to configured agent
+	var detector agent.Detector
+	var running bool
+
+	if cfg.Agent != "" {
+		// Explicit agent configured — use it
+		var err error
+		detector, err = agent.NewDetector(cfg.Agent)
+		if err != nil {
+			slog.Warn("unknown agent, falling back to auto-detect", "agent", cfg.Agent, "error", err)
+		} else {
+			running, _ = detector.IsRunning()
+		}
+	}
+
+	if detector == nil || !running {
+		// Auto-detect: check all registered agents
+		active := agent.DetectActive()
+		if len(active) > 0 {
+			detector = active[0]
+			running = true
+			slog.Debug("auto-detected agent", "agent", detector.Name())
+		}
+	}
+
+	if detector == nil {
 		detector = claude.New()
 	}
 
-	// Detect if agent is running
-	running, runErr := detector.IsRunning()
-	if runErr != nil {
-		slog.Warn("could not detect agent process", "error", runErr)
-		running = false
+	if !running {
+		runRes, runErr := detector.IsRunning()
+		if runErr != nil {
+			slog.Warn("could not detect agent process", "error", runErr)
+		}
+		running = runRes
 	}
 
 	// Claude-specific optimisation: check for condensed sessions.
@@ -80,6 +105,7 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 
 	state := preCommitState{
 		AgentActive:   agentActive,
+		AgentName:     detector.Name(),
 		SessionPath:   sessionPath,
 		PreCommitHash: commitHash,
 		Branch:        branch,

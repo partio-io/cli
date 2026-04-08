@@ -71,9 +71,13 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	// Parse agent session data (Claude-specific — other agents skip this)
 	var sessionPath string
 	var sessionData *agent.SessionData
-	detector, detErr := agent.NewDetector(cfg.Agent)
+	agentName := cfg.Agent
+	if state.AgentName != "" {
+		agentName = state.AgentName
+	}
+	detector, detErr := agent.NewDetector(agentName)
 	if detErr != nil {
-		slog.Warn("unknown agent, falling back to claude-code", "agent", cfg.Agent, "error", detErr)
+		slog.Warn("unknown agent, falling back to claude-code", "agent", agentName, "error", detErr)
 		detector = claude.New()
 	}
 	if cd, ok := detector.(*claude.Detector); ok {
@@ -128,7 +132,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		CommitHash:  commitHash,
 		Branch:      state.Branch,
 		CreatedAt:   time.Now(),
-		Agent:       cfg.Agent,
+		Agent:       agentName,
 		AgentPct:    attr.AgentPercent,
 		ContentHash: commitHash,
 	}

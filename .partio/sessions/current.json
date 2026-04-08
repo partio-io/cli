@@ -1,0 +1,12 @@
+{
+  "id": "",
+  "agent": "",
+  "state": "ended",
+  "started_at": "0001-01-01T00:00:00Z",
+  "ended_at": "0001-01-01T00:00:00Z",
+  "branch": "",
+  "source_dir": "",
+  "condensed": true,
+  "captured_session_id": "a6d5c8a7-82cf-49b4-a82c-68eaebcb48de",
+  "captured_at": "2026-04-08T08:29:37.483801+02:00"
+}
