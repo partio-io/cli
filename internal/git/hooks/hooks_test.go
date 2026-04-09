@@ -15,6 +15,10 @@ func initGitRepo(t *testing.T) string {
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v\n%s", err, out)
 	}
+	cmd = exec.Command("git", "-C", dir, "config", "commit.gpgsign", "false")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git config commit.gpgsign: %v\n%s", err, out)
+	}
 	return dir
 }
 
@@ -116,7 +120,7 @@ func TestInstallWorktree(t *testing.T) {
 	mainDir := initGitRepo(t)
 
 	// Need at least one commit to create a worktree
-	cmd := exec.Command("git", "-C", mainDir, "commit", "--allow-empty", "-m", "init")
+	cmd := exec.Command("git", "-C", mainDir, "commit", "--allow-empty", "--no-gpg-sign", "-m", "init")
 	cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@test.com",
 		"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@test.com")
 	if out, err := cmd.CombinedOutput(); err != nil {
