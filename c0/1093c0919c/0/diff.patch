@@ -1,0 +1,36 @@
+diff --git a/.gitignore b/.gitignore
+index b291a47..04b6757 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,2 +1,4 @@
+ .partio/settings.local.json
++.partio/sessions/
++.partio/state/
+ /partio
+diff --git a/.partio/sessions/current.json b/.partio/sessions/current.json
+deleted file mode 100644
+index f5d9a06..0000000
+--- a/.partio/sessions/current.json
++++ /dev/null
+@@ -1,12 +0,0 @@
+-{
+-  "id": "",
+-  "agent": "",
+-  "state": "ended",
+-  "started_at": "0001-01-01T00:00:00Z",
+-  "ended_at": "0001-01-01T00:00:00Z",
+-  "branch": "",
+-  "source_dir": "",
+-  "condensed": true,
+-  "captured_session_id": "a6d5c8a7-82cf-49b4-a82c-68eaebcb48de",
+-  "captured_at": "2026-04-08T15:13:32.860983+02:00"
+-}
+\ No newline at end of file
+diff --git a/.partio/state/processed-commits.json b/.partio/state/processed-commits.json
+deleted file mode 100644
+index c6eebbe..0000000
+--- a/.partio/state/processed-commits.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{"entries":[{"sha":"36a85a0e1f92ca901f077d32f257e1d1d0cc5146","processed_at":"2026-04-08T08:29:37.483964+02:00"},{"sha":"cafa3bd3e6976a5310f780ac911808b43ad9afed","processed_at":"2026-04-08T15:02:27.488141+02:00"},{"sha":"886aac3131bbf7e21019a88ddf6a23a39ccf9ac1","processed_at":"2026-04-08T15:11:06.860169+02:00"},{"sha":"e3230b0047aa6ffbd0cac732c8e8f8ff466954aa","processed_at":"2026-04-08T15:12:10.216817+02:00"},{"sha":"5f829e10ea78b5684c2d4420650871e474b37f9b","processed_at":"2026-04-08T15:12:46.73285+02:00"},{"sha":"5eb914f97138b8ad462ca11b91a3d7093d689045","processed_at":"2026-04-08T15:13:32.861081+02:00"}]}
+\ No newline at end of file
