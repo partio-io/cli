@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -8,7 +9,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/partio-io/cli/internal/agent"
 	"github.com/partio-io/cli/internal/agent/claude"
+	_ "github.com/partio-io/cli/internal/agent/codex"
 	"github.com/partio-io/cli/internal/attribution"
 	"github.com/partio-io/cli/internal/checkpoint"
 	"github.com/partio-io/cli/internal/config"
@@ -27,7 +30,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	stateFile := filepath.Join(repoRoot, config.PartioDir, "state", "pre-commit.json")
 	data, err := os.ReadFile(stateFile)
 	if err != nil {
-		slog.Debug("no pre-commit state found, skipping checkpoint")
+		slog.Warn("post-commit: no checkpoint created", "reason", "no pre-commit state found", "state_file", stateFile)
 		return nil
 	}
 	// Remove immediately to prevent re-entry (amend triggers post-commit again)
@@ -39,7 +42,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	}
 
 	if !state.AgentActive {
-		slog.Debug("no agent was active, skipping checkpoint")
+		slog.Warn("post-commit: no checkpoint created", "reason", "no agent was active during pre-commit")
 		return nil
 	}
 
@@ -54,7 +57,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	partioDir := filepath.Join(repoRoot, config.PartioDir)
 	cache := loadCommitCache(partioDir)
 	if cache.contains(commitHash) {
-		slog.Debug("post-commit: commit already processed, skipping", "commit", commitHash)
+		slog.Warn("post-commit: no checkpoint created", "reason", "commit already processed", "commit", commitHash)
 		return nil
 	}
 
@@ -65,18 +68,41 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		attr = &attribution.Result{AgentPercent: 100}
 	}
 
-	// Parse agent session data
-	detector := claude.New()
-	sessionPath, sessionData, err := detector.FindLatestSession(repoRoot)
-	if err != nil {
-		slog.Warn("could not read agent session", "error", err)
+	// Parse agent session data using SessionParser interface (any agent).
+	var sessionPath string
+	var sessionData *agent.SessionData
+	agentName := cfg.Agent
+	if state.AgentName != "" {
+		agentName = state.AgentName
+	}
+	detector, detErr := agent.NewDetector(agentName)
+	if detErr != nil {
+		slog.Warn("unknown agent, falling back to claude-code", "agent", agentName, "error", detErr)
+		detector = claude.New()
+	}
+	if sp, ok := detector.(agent.SessionParser); ok {
+		sessionPath, sessionData, err = sp.FindLatestSession(repoRoot)
+		if err != nil {
+			slog.Warn("post-commit: could not read agent session", "agent", agentName, "commit", commitHash, "error", err)
+		}
+	}
+
+	// Log staged file paths and session content paths for diagnosing path mismatches.
+	if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
+		commitFiles, _ := git.DiffNameOnly(commitHash)
+		slog.Debug("post-commit: file overlap check",
+			"commit", commitHash,
+			"staged_files", commitFiles,
+			"session_path", sessionPath,
+			"session_found", sessionData != nil,
+		)
 	}
 
 	// Skip if this session is already fully condensed and ended — re-processing
 	// it produces a redundant checkpoint with no new content.
 	if sessionData != nil && sessionData.SessionID != "" {
 		if shouldSkipSession(filepath.Join(repoRoot, config.PartioDir), sessionData.SessionID, sessionPath) {
-			slog.Debug("post-commit: skipping already-condensed ended session", "session_id", sessionData.SessionID)
+			slog.Warn("post-commit: no checkpoint created", "reason", "session already condensed", "commit", commitHash, "session_id", sessionData.SessionID)
 			return nil
 		}
 	}
@@ -91,7 +117,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	}
 
 	if err := git.AmendTrailers(trailers); err != nil {
-		slog.Warn("could not add trailers to commit", "error", err)
+		slog.Warn("post-commit: could not add trailers to commit", "commit", commitHash, "error", err)
 	}
 
 	// Get the post-amend commit hash (this is the hash that gets pushed)
@@ -106,7 +132,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		CommitHash:  commitHash,
 		Branch:      state.Branch,
 		CreatedAt:   time.Now(),
-		Agent:       cfg.Agent,
+		Agent:       agentName,
 		AgentPct:    attr.AgentPercent,
 		ContentHash: commitHash,
 	}

@@ -90,8 +90,9 @@ func TestShouldSkipSession(t *testing.T) {
 			tt.setup(t, partioDir, jsonlPath)
 
 			if tt.modifyJSONL {
-				// Ensure modification time is strictly after CapturedAt by waiting a moment
-				time.Sleep(5 * time.Millisecond)
+				// Ensure modification time is strictly after CapturedAt by waiting a moment.
+				// Filesystem timestamp granularity can be coarse (e.g. 1s on some systems).
+				time.Sleep(50 * time.Millisecond)
 				if err := os.WriteFile(jsonlPath, []byte(`{"sessionId":"sess-123"}`+"\n"+"new line\n"), 0o644); err != nil {
 					t.Fatalf("modifying JSONL: %v", err)
 				}
