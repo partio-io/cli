@@ -1,0 +1,9 @@
+diff --git a/.gitignore b/.gitignore
+index 04b6757..b291a47 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,4 +1,2 @@
+ .partio/settings.local.json
+-.partio/sessions/
+-.partio/state/
+ /partio
