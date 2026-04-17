@@ -12,4 +12,4 @@ sources:
       url: https://github.com/entireio/cli/pulls
       type: pulls
       repo: entireio/cli
-      last_version: "974"
+      last_version: "977"
