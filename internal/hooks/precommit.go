@@ -30,24 +30,28 @@ func (r *Runner) PreCommit() error {
 }
 
 func runPreCommit(repoRoot string, cfg config.Config) error {
-	// Auto-detect running agents — check all registered detectors
+	// Resolve detector: explicit config takes priority if that agent is running,
+	// otherwise auto-detect any running agent.
 	var detector agent.Detector
 	var running bool
 
-	active := agent.DetectActive()
-	if len(active) > 0 {
-		detector = active[0]
-		running = true
-		slog.Debug("auto-detected agent", "agent", detector.Name())
+	if cfg.Agent != "" {
+		d, err := agent.NewDetector(cfg.Agent)
+		if err != nil {
+			slog.Warn("unknown configured agent", "agent", cfg.Agent, "error", err)
+		} else if r, _ := d.IsRunning(); r {
+			detector = d
+			running = true
+			slog.Debug("using configured agent", "agent", detector.Name())
+		}
 	}
 
-	// Fall back to configured agent if none auto-detected
-	if !running && cfg.Agent != "" {
-		var err error
-		detector, err = agent.NewDetector(cfg.Agent)
-		if err != nil {
-			slog.Warn("unknown agent", "agent", cfg.Agent, "error", err)
-			detector = claude.New()
+	if !running {
+		active := agent.DetectActive()
+		if len(active) > 0 {
+			detector = active[0]
+			running = true
+			slog.Debug("auto-detected agent", "agent", detector.Name())
 		}
 	}
 
