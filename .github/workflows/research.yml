@@ -1,0 +1,66 @@
+name: Run Research Minion
+
+on:
+  issues:
+    types: [labeled]
+
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  run-research:
+    if: >
+      (github.event_name == 'issues' &&
+       github.event.label.name == 'minion-research' &&
+       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.issue.author_association)) ||
+      (github.event_name == 'issue_comment' &&
+       contains(github.event.comment.body, '/minion research') &&
+       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))
+    runs-on: github-runner-partio-minion-ai-01
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone argos
+        uses: actions/checkout@v4
+        with:
+          repository: jcleira/argos
+          ref: master
+          token: ${{ secrets.GH_PAT }}
+          path: argos
+
+      - name: Print argos SHA
+        run: |
+          ARGOS_SHA=$(git -C argos rev-parse HEAD)
+          ARGOS_SHA_SHORT=$(git -C argos rev-parse --short HEAD)
+          echo "argos master cloned at ${ARGOS_SHA} (${ARGOS_SHA_SHORT})"
+
+      - name: Install minions
+        run: |
+          go install github.com/partio-io/minions/cmd/minions@v0.0.5
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Run program
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          MINION_ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          minions run .minions/programs/research.md --issue ${{ github.event.issue.number }}
+
+      - name: Mark failed
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          ISSUE_NUM="${{ github.event.issue.number }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh issue edit "$ISSUE_NUM" --repo "${{ github.repository }}" \
+            --add-label "minion-failed"
+          gh issue comment "$ISSUE_NUM" --repo "${{ github.repository }}" \
+            --body "Research minion execution failed. [View logs](${RUN_URL})"
