@@ -7,9 +7,9 @@ sources:
       url: https://github.com/entireio/cli/issues
       type: issues
       repo: entireio/cli
-      last_version: "1098"
+      last_version: "1125"
     - name: entireio-cli-pulls
       url: https://github.com/entireio/cli/pulls
       type: pulls
       repo: entireio/cli
-      last_version: "1110"
+      last_version: "1131"
