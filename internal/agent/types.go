@@ -12,6 +12,7 @@ type SessionData struct {
 	TotalTokens int           `json:"total_tokens"`
 	Duration    time.Duration `json:"duration"`
 	PlanSlug    string        `json:"plan_slug,omitempty"`
+	PromptCount int           `json:"prompt_count,omitempty"`
 }
 
 // Message represents a single message in an agent transcript.
