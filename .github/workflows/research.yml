@@ -32,7 +32,7 @@ jobs:
         with:
           repository: jcleira/argos
           ref: master
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.ARGOS_PAT }}
           path: argos
 
       - name: Print argos SHA
