@@ -10,6 +10,7 @@ import (
 
 	"github.com/partio-io/cli/internal/config"
 	"github.com/partio-io/cli/internal/git"
+	githooks "github.com/partio-io/cli/internal/git/hooks"
 )
 
 func newDoctorCmd() *cobra.Command {
@@ -72,6 +73,18 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	// Check partio binary in PATH
 	fmt.Println("[OK]   partio binary found (you're running it!)")
+
+	// Check for external hook managers (informational, does not count as issue)
+	if managers := githooks.DetectExternalHookManagers(repoRoot); len(managers) > 0 {
+		fmt.Println("")
+		fmt.Println("[INFO] External hook manager(s) detected:")
+		for _, m := range managers {
+			fmt.Printf("  - %s (%s)\n", m.Name, m.Reason)
+		}
+		fmt.Println("  These tools may conflict with partio's hook installation.")
+		fmt.Println("  Partio backs up existing hooks and chains to them, but you may")
+		fmt.Println("  need to configure your hook manager to coexist with partio.")
+	}
 
 	if issues == 0 {
 		fmt.Println("\nAll checks passed!")
