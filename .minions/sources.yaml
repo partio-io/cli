@@ -2,7 +2,7 @@ sources:
     - name: entireio-cli
       url: https://github.com/entireio/cli/blob/main/CHANGELOG.md
       type: changelog
-      last_version: 0.6.1
+      last_version: 0.6.2
     - name: entireio-cli-issues
       url: https://github.com/entireio/cli/issues
       type: issues
