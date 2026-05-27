@@ -9,39 +9,46 @@ target_repos:
 Unattended research pipeline for complex `partio-io/cli` issues. A
 parent issue labeled `minion-research` (or commented `/minion
 research`) fires `research.yml`, which clones `jcleira/argos` into the
-workspace and runs this program. Slice 2 of the rollout described in
+workspace and runs this program. Slice 3 of the rollout described in
 `partio-minions/docs/2026-05-05-research-minion/`.
 
-This slice wires the first half of the pipeline:
+This slice wires the research → PRD half of the pipeline:
 
 - `researcher` drives a `/code-research`-style interview against the
   parent issue and writes the questions to a shared transcript.
 - `persona` answers each question the way jcleira would, grounded in
   the argos TELOS and memory substrate, never leaking personal data.
-- `publisher` posts the resulting Q&A transcript as a comment on the
-  parent issue so the work is visible.
+- `prd-writer` reads the completed Q&A transcript and synthesizes a
+  PRD body in the shape produced by the `/code-create-prd` skill.
+- `publisher` posts the PRD body as a comment on the parent issue,
+  prefixed with a run-scoped idempotency marker, and labels the parent
+  `minion-research-completed` so the research phase is visible. The
+  parent issue is intentionally left open and never receives
+  `minion-done`.
 
-The `prd-writer` and `slicer` agents, idempotency markers, and the
-`minion-research-completed` label arrive in later slices. This run
-produces no PR; its only side effect is the publisher's issue comment.
+The `slicer` agent and child-issue creation arrive in slice 4. The
+*skip-if-marker-exists* idempotency check (re-runs reading existing
+comments before writing) arrives in slice 5. This run produces no PR;
+its only side effects are the PRD comment and the parent label.
 
 Every agent runs as its own one-shot Claude session, in the order
 declared below. Each agent gets a fresh, isolated worktree that is
 discarded when it finishes, so worktree-relative files do NOT survive
-between agents. State is therefore exchanged through a stable path
-outside any worktree. Every agent computes the exact same path:
+between agents. State is therefore exchanged through stable paths
+outside any worktree. Every agent computes the exact same paths:
 
 ```
 TRANSCRIPT="/tmp/minion-research-transcript-${MINION_ISSUE_NUMBER:-0}.md"
+PRD_DRAFT="/tmp/minion-research-prd-draft-${MINION_ISSUE_NUMBER:-0}.md"
 ```
 
 The parent issue number is in `$MINION_ISSUE_NUMBER`. The parent
 issue body is also provided to every agent under an "Issue" section of
 its prompt. The repository for all `gh` calls is `partio-io/cli`.
 
-Because state lives in `$TRANSCRIPT` and nothing is written into the
-worktree, every agent legitimately produces "no changes" and the run
-ends without a PR. That is intended.
+Because state lives in `$TRANSCRIPT` / `$PRD_DRAFT` and nothing is
+written into the worktree, every agent legitimately produces "no
+changes" and the run ends without a PR. That is intended.
 
 ## Context
 
@@ -156,6 +163,65 @@ Output answers as decisions, not as recitations of substrate. Do not
 create or modify any file in the working directory other than
 appending to `$TRANSCRIPT`. Do not run `git` and do not open a PR.
 
+### prd-writer
+
+```capabilities
+tools:
+  - Read
+  - Write
+  - Bash
+max_turns: 20
+```
+
+You synthesize the completed research transcript into a PRD body. You
+do NOT interview, ask questions, or modify the transcript — the
+researcher and persona have already produced it. Your job is pure
+synthesis: read the Q&A, decide what the PRD says, write the PRD.
+
+PRD shape (mirrors the `/code-create-prd` skill — section headings may
+be tuned but the general structure must hold):
+
+1. `## Problem Statement` — the problem from the user's perspective.
+2. `## Solution` — the solution from the user's perspective.
+3. `## User Stories` — a long, numbered list in the form
+   "As an <actor>, I want a <feature>, so that <benefit>".
+4. `## Implementation Decisions` — modules built or modified, module
+   interfaces, architectural decisions, schema/API contracts, specific
+   interactions. Do NOT include file paths or code snippets that may
+   rot.
+5. `## Testing Decisions` — what makes a good test for this work,
+   which modules will be tested, prior art for the tests.
+6. `## Out of Scope` — what this PRD explicitly does not cover.
+7. `## Further Notes` — anything else worth recording.
+
+Transcript-to-PRD protocol:
+
+1. Compute the shared paths:
+
+   ```
+   TRANSCRIPT="/tmp/minion-research-transcript-${MINION_ISSUE_NUMBER:-0}.md"
+   PRD_DRAFT="/tmp/minion-research-prd-draft-${MINION_ISSUE_NUMBER:-0}.md"
+   ```
+
+2. Read `$TRANSCRIPT`. It contains numbered `## Q<n>` blocks each
+   followed by an `## Answer` block, ending with a `RESEARCH_COMPLETE`
+   line. Treat the persona's `## Answer` blocks as the authoritative
+   decisions; the researcher's `Recommended:` line is context, not a
+   binding choice.
+
+3. Synthesize the PRD. Cover every decision recorded in the
+   transcript. Use the same domain vocabulary the parent issue and
+   transcript use. The PRD is a synthesis, not a transcription —
+   reorganize the Q&A into the section structure above. Each user
+   story should map back to a concrete decision in the transcript.
+
+4. Write the full PRD body to `$PRD_DRAFT`, starting with a single
+   `# <Title>` line where `<Title>` reflects the parent issue's topic.
+
+Do not create or modify any file in the working directory. Write only
+`$PRD_DRAFT`. Do not run `git` and do not open a PR. Do not post any
+comment yourself — the publisher handles that.
+
 ### publisher
 
 ```capabilities
@@ -165,22 +231,55 @@ tools:
 max_turns: 10
 ```
 
-You publish the completed transcript so the research is visible on the
-parent issue.
+You publish the PRD that `prd-writer` produced and mark the parent
+issue as research-completed.
 
-1. Compute the shared path:
-
-   ```
-   TRANSCRIPT="/tmp/minion-research-transcript-${MINION_ISSUE_NUMBER:-0}.md"
-   ```
-
-2. Post its full contents as a single comment on the parent issue:
+1. Compute the shared paths:
 
    ```
-   gh issue comment "$MINION_ISSUE_NUMBER" --repo partio-io/cli --body-file "$TRANSCRIPT"
+   PRD_DRAFT="/tmp/minion-research-prd-draft-${MINION_ISSUE_NUMBER:-0}.md"
    ```
 
-This transitional transcript comment carries no idempotency marker —
-that arrives with the PRD comment in a later slice. Post exactly one
-comment. Do not modify the worktree, do not run `git`, and do not open
-a PR.
+2. Derive a stable seven-character run identifier from the workflow
+   run, falling back if not running in CI:
+
+   ```
+   RUN_ID_SOURCE="${GITHUB_RUN_ID:-$(date +%s)-$MINION_ISSUE_NUMBER}"
+   RUN_SHA7=$(printf '%s' "$RUN_ID_SOURCE" | sha1sum | cut -c1-7)
+   ```
+
+3. Assemble the comment body file: the first line is exactly the
+   idempotency marker, followed by a blank line, followed by the full
+   contents of `$PRD_DRAFT`:
+
+   ```
+   COMMENT_BODY="/tmp/minion-research-comment-${MINION_ISSUE_NUMBER:-0}.md"
+   {
+     printf '<!-- minion:research run-id=%s -->\n\n' "$RUN_SHA7"
+     cat "$PRD_DRAFT"
+   } > "$COMMENT_BODY"
+   ```
+
+4. Post the comment body as a single comment on the parent issue:
+
+   ```
+   gh issue comment "$MINION_ISSUE_NUMBER" --repo partio-io/cli --body-file "$COMMENT_BODY"
+   ```
+
+5. Add the `minion-research-completed` label to the parent issue:
+
+   ```
+   gh issue edit "$MINION_ISSUE_NUMBER" --repo partio-io/cli --add-label minion-research-completed
+   ```
+
+Hard constraints:
+
+- Do NOT add the `minion-done` label to the parent issue. This slice
+  posts research output only; the parent is not considered "done".
+- Do NOT call `gh issue close` on the parent issue. The parent stays
+  open until jcleira closes it manually.
+- Do NOT post the raw transcript as a comment. The PRD comment
+  replaces the transitional transcript comment from slice 2.
+- Post exactly one issue comment (the PRD comment) and run exactly
+  one `gh issue edit` (the label add). Do not modify the worktree, do
+  not run `git`, and do not open a PR.
