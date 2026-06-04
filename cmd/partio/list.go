@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -12,15 +13,28 @@ import (
 )
 
 func newListCmd() *cobra.Command {
-	return &cobra.Command{
+	var jsonOutput bool
+
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List captured checkpoints",
 		Long:  `List all captured checkpoints sorted by creation time (newest first).`,
-		RunE:  runList,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runList(jsonOutput)
+		},
 	}
+
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "output as JSON")
+
+	return cmd
 }
 
-func runList(cmd *cobra.Command, args []string) error {
+// checkpointListOutput is the JSON envelope for checkpoint listings.
+type checkpointListOutput struct {
+	Checkpoints []checkpoint.Metadata `json:"checkpoints"`
+}
+
+func runList(jsonOutput bool) error {
 	_, err := git.RepoRoot()
 	if err != nil {
 		return fmt.Errorf("must be run inside a git repository")
@@ -29,10 +43,20 @@ func runList(cmd *cobra.Command, args []string) error {
 	checkpoints, err := checkpoint.List()
 	if err != nil {
 		if err == checkpoint.ErrNoBranch {
+			if jsonOutput {
+				return json.NewEncoder(os.Stdout).Encode(checkpointListOutput{Checkpoints: []checkpoint.Metadata{}})
+			}
 			fmt.Println("No checkpoints found. Run 'partio enable' and make some commits to capture checkpoints.")
 			return nil
 		}
 		return err
+	}
+
+	if jsonOutput {
+		if checkpoints == nil {
+			checkpoints = []checkpoint.Metadata{}
+		}
+		return json.NewEncoder(os.Stdout).Encode(checkpointListOutput{Checkpoints: checkpoints})
 	}
 
 	if len(checkpoints) == 0 {
