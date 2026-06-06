@@ -2,36 +2,26 @@
 id: multi-commit-session-trailers
 target_repos:
   - cli
-acceptance_criteria:
-  - "All commits made during an active agent session receive the Partio-Checkpoint trailer"
-  - "Second and subsequent commits in the same session are linked to the session checkpoint"
-  - "Session continuity is detected by checking if the same agent process is still active"
-  - "The post-commit hook correctly chains multiple commits to the same session"
-  - "Tests verify trailer presence across multiple sequential commits in one session"
 pr_labels:
   - minion
+  - bug
+acceptance_criteria:
+  - When an agent session spans multiple manual commits, each commit receives a Partio-Checkpoint trailer
+  - The post-commit hook correctly creates separate checkpoints for each commit within the same session
+  - Session state is preserved across commits within the same active session (not deleted after the first commit)
+  - Unit tests verify that two sequential commits during the same active session both receive trailers and checkpoints
 ---
 
-# Ensure all commits in an active session receive checkpoint trailers
+# Ensure all commits in a multi-commit session receive checkpoint trailers
 
-## Summary
-
-Fix the checkpoint trailer logic so that every commit made during an active agent session gets a `Partio-Checkpoint` trailer, not just the first one. Currently, if an agent session spans multiple commits, only the first commit reliably receives the trailer — subsequent commits may silently skip it.
-
-## Motivation
-
-When an agent session involves multiple commits (e.g., implementing a feature across several incremental commits), losing the checkpoint trailer on later commits breaks the session-to-commit linkage. Users browsing git history can't trace all commits back to the originating session, and tools that rely on trailers for attribution miss commits.
-
-## Behavior
-
-1. Pre-commit hook detects the active agent session and saves state (already works)
-2. Post-commit hook reads state, creates/updates checkpoint, and adds trailer (already works for first commit)
-3. For subsequent commits in the same session: the hook should detect session continuity and link to the existing or updated checkpoint
-4. Session identity is determined by the running agent process, not by the state file lifecycle
+Fix the hook state lifecycle so that every commit made during an active agent session gets a `Partio-Checkpoint` trailer, not just the first one.
 
 ## Context
 
-- Inspired by `entireio/cli` issue #784 (only first commit per session gets trailer)
-- `internal/hooks/post_commit.go` for trailer injection logic
-- `internal/hooks/pre_commit.go` for session state detection
-- `internal/session/` for session lifecycle
+Entireio/cli issue #784 reports that only the first commit per session gets the `Entire-Checkpoint` trailer; subsequent commits are silently skipped. Partio likely has the same issue: the post-commit hook reads and immediately deletes the pre-commit state file (`.partio/state/pre-commit.json`), so the second commit in the same session finds no state and skips checkpoint creation.
+
+## What to implement
+
+1. Modify the post-commit hook to re-detect the active agent session directly (via the detector interface) rather than relying solely on the pre-commit state file, OR preserve the state file across commits while the session remains active.
+2. Ensure each commit within a session gets its own checkpoint on the orphan branch, with the correct commit SHA in metadata.
+3. Keep the existing re-entry prevention (delete state before amend) intact — the fix must not break the `git commit --amend` re-trigger guard.

@@ -2,34 +2,28 @@
 id: user-defined-redaction-rules
 target_repos:
   - cli
-acceptance_criteria:
-  - Users can define custom regex patterns in .partio/settings.json under a redaction.custom_patterns key
-  - Custom patterns are applied to transcript content before checkpoint storage
-  - A .partio/redactors/ directory supports shareable rule pack files (YAML or JSON)
-  - Personal overrides via .partio/redactors/local/ are gitignored by default
-  - Invalid regex patterns produce a clear warning without blocking the commit
-  - Built-in patterns (API keys, tokens) remain active alongside custom rules
 pr_labels:
   - minion
+acceptance_criteria:
+  - Users can define custom redaction rules in .partio/settings.json under a "redaction_rules" key
+  - Each rule specifies a regex pattern and an optional replacement label (e.g., "[REDACTED:API_KEY]")
+  - Redaction is applied to session transcript content before checkpoint creation
+  - Built-in default rules cover common secret patterns (API keys, tokens, passwords in env vars)
+  - Redaction rules are documented in partio doctor output when enabled
+  - Unit tests verify that custom patterns are applied and that default patterns catch common secrets
 ---
 
-# User-defined redaction rules for checkpoint transcripts
+# User-defined redaction rules for session transcripts
 
-## Problem
+Allow users to define custom regex-based redaction rules that strip sensitive content from agent session transcripts before they are stored in checkpoints.
 
-Teams have internal credential formats, proprietary token prefixes, and domain-specific secrets that Partio's built-in redaction cannot anticipate. Without user-configurable redaction, sensitive content specific to a team's infrastructure may be stored in checkpoint transcripts and pushed to shared remotes.
+## Context
 
-## Desired Behavior
+Entireio/cli v0.6.2 added user-defined redaction rules and rule packs, and v0.7.4/PR #1214 added an OpenAI Privacy Filter layer. Partio stores full Claude Code JSONL transcripts in checkpoints on the orphan branch. These transcripts may contain secrets, API keys, or other sensitive data that users don't want persisted in git history — especially when `push_sessions` is enabled.
 
-Allow teams to define custom redaction patterns that are applied to transcript content before it is written to the checkpoint branch:
+## What to implement
 
-1. **Inline patterns** in settings: `redaction.custom_patterns` array of `{name, regex, replacement}` objects in `.partio/settings.json`.
-2. **Rule packs** in `.partio/redactors/`: YAML/JSON files with named pattern sets that can be committed and shared across the team.
-3. **Local overrides** in `.partio/redactors/local/` for personal patterns (directory added to `.gitignore` by `partio enable`).
-4. Patterns are validated at load time — invalid regex logs a warning but does not block the hook.
-
-## Context Hints
-
-- `internal/checkpoint/` — where transcript content is written to git objects
-- `internal/config/` — layered configuration loading
-- `internal/session/` — session data that includes transcript content
+1. Add a `redaction_rules` configuration field to `internal/config/` that accepts an array of `{pattern, label}` objects.
+2. Include sensible built-in defaults (e.g., patterns for `*_API_KEY`, `*_SECRET`, `*_TOKEN`, bearer tokens, base64-encoded credentials).
+3. Apply redaction to JSONL transcript content in `internal/agent/claude/parse_jsonl.go` before the content is passed to checkpoint creation.
+4. Report active redaction rules in `partio doctor` output so users can verify their configuration.
