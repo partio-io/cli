@@ -21,3 +21,14 @@ func execGit(args ...string) (string, error) {
 func ExecGit(args ...string) (string, error) {
 	return execGit(args...)
 }
+
+// ExecGitStdin runs a git command with the given stdin and returns trimmed stdout.
+func ExecGitStdin(stdin string, args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	cmd.Stdin = strings.NewReader(stdin)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
