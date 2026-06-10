@@ -21,21 +21,24 @@ This slice completes the research → PRD → slice → publish pipeline:
 - `prd-writer` reads the completed Q&A transcript and synthesizes a
   PRD body in the shape produced by the `/code-create-prd` skill.
 - `slicer` reads the PRD body and decomposes it into vertical-slice
-  blocks, one per child issue, in the spirit of the
+  blocks, one block per slice, in the spirit of the
   `/code-create-issues` skill.
 - `publisher` posts the PRD body as a comment on the parent issue
-  (prefixed with a run-scoped idempotency marker), labels the parent
-  `minion-research-completed`, opens one child issue per slice (each
-  labeled `minion-approved` so `minion.yml` auto-fires `implement.md`,
-  plus `minion-research-output` for provenance), and posts a status
-  comment linking the child issues. The parent issue is intentionally
-  left open and never receives `minion-done`.
+  (prefixed with a run-scoped idempotency marker), posts the slice
+  plan as a second comment on the same parent issue, and labels the
+  parent `minion-research-completed`. It does NOT open child issues and
+  does NOT apply `minion-approved` — a research run produces review
+  artifacts only. The parent issue is intentionally left open and never
+  receives `minion-done`. Implementation is triggered manually after
+  review: when jcleira labels the parent `minion-approved` (or comments
+  `/minion build`), `minion.yml` fires `implement.md` once on the parent
+  and produces a single feature PR.
 
 The *skip-if-marker-exists* idempotency check (re-runs reading existing
-comments and issues before writing) arrives in slice 5; this slice
-writes the markers but does not yet check for them. This run produces
-no PR; its only side effects are the PRD comment, the parent label, the
-child issues, and the status comment.
+comments before writing) arrives in slice 5; this slice writes the
+markers but does not yet check for them. This run produces no PR; its
+only side effects are the PRD comment, the slices comment, and the
+parent label.
 
 Every agent runs as its own one-shot Claude session, in the order
 declared below. Each agent gets a fresh, isolated worktree that is
@@ -291,7 +294,8 @@ Slice protocol:
 
 Write only `$SLICES`. Do not create or modify any file in the working
 directory, do not run `git`, do not call `gh`, and do not open a PR.
-The publisher turns these blocks into child issues.
+The publisher posts these blocks as a slice-plan comment on the parent
+issue.
 
 ### publisher
 
@@ -303,9 +307,10 @@ tools:
 max_turns: 30
 ```
 
-You publish the research output: post the PRD as a comment, open one
-child issue per slice, and post a status comment linking the children.
-You also mark the parent issue as research-completed.
+You publish the research output: post the PRD as a comment, post the
+slice plan as a second comment, and mark the parent issue as
+research-completed. You do NOT open child issues and you do NOT trigger
+implementation — a research run produces review artifacts only.
 
 1. Compute the shared paths:
 
@@ -353,73 +358,50 @@ You also mark the parent issue as research-completed.
 
    `$SLICES` holds N blocks, each delimited by a `=== SLICE <n> ===`
    line and carrying Title, Description, Acceptance criteria, Modules
-   touched, and Out of scope fields. Read the whole file and let
-   `TOTAL` be the number of slice blocks.
+   touched, and Out of scope fields. Read the whole file.
 
-7. For each slice block, in order (`<n>` from 1 to `TOTAL`), open one
-   child issue on `partio-io/cli`. First write the child body to a file
-   with the `Write` tool:
-
-   ```
-   CHILD_BODY="/tmp/minion-research-child-${MINION_ISSUE_NUMBER:-0}-<n>.md"
-   ```
-
-   The body file must contain, in order:
-
-   - Line 1, exactly: `<!-- minion:slice parent=#<N> slice=<n>/<total> -->`
-     where `<N>` is `$MINION_ISSUE_NUMBER`, `<n>` is the slice ordinal,
-     and `<total>` is `TOTAL` (for example `slice=2/5`).
-   - A blank line, then the slice Description.
-   - The slice Acceptance criteria checklist.
-   - The slice Modules touched list.
-   - A final line, exactly: `Parent: #<N>` (again `$MINION_ISSUE_NUMBER`).
-
-   Then create the issue, titled with the slice Title, carrying both
-   labels:
+7. Post the slice plan as a single second comment on the parent issue —
+   NOT as separate issues. First assemble the comment body with the
+   `Write` tool:
 
    ```
-   gh issue create --repo partio-io/cli --title "<slice Title>" --label minion-approved --label minion-research-output --body-file "$CHILD_BODY"
+   SLICES_COMMENT="/tmp/minion-research-slices-comment-${MINION_ISSUE_NUMBER:-0}.md"
    ```
 
-   `gh issue create` prints the new issue URL on stdout. Record the
-   trailing number of that URL as the child issue number, and keep the
-   numbers in slice order for the status comment.
+   The body must contain, in order:
 
-8. Post one final status comment on the parent issue. Write its body
-   with the `Write` tool:
-
-   ```
-   STATUS_BODY="/tmp/minion-research-status-${MINION_ISSUE_NUMBER:-0}.md"
-   ```
-
-   The status body must contain, in order:
-
-   - Line 1, exactly: `<!-- minion:research-status parent=#<N> -->`
+   - Line 1, exactly: `<!-- minion:research-slices parent=#<N> -->`
      where `<N>` is `$MINION_ISSUE_NUMBER`.
-   - A blank line, then one line per child issue in slice order, each
-     formatted as `- #<child-number>` so it renders as a clickable
-     reference in the parent thread.
+   - A blank line, then a `## Proposed slices` heading.
+   - One readable section per slice, in slice order, rendered from the
+     slicer's blocks: a `### Slice <n> — <Title>` heading, then the
+     slice Description, its Acceptance criteria checklist, its Modules
+     touched list, and its Out of scope list. Convert the slicer's
+     plain `=== SLICE <n> ===` field format into this readable Markdown
+     — do not paste the raw `===` delimiters.
 
-   Then post it:
+   Then post it as a comment on the parent issue:
 
    ```
-   gh issue comment "$MINION_ISSUE_NUMBER" --repo partio-io/cli --body-file "$STATUS_BODY"
+   gh issue comment "$MINION_ISSUE_NUMBER" --repo partio-io/cli --body-file "$SLICES_COMMENT"
    ```
 
 Hard constraints:
 
-- Do NOT add the `minion-done` label to the parent issue. This slice
-  posts research output only; the parent is not considered "done".
-- Do NOT call `gh issue close` on the parent issue. The parent stays
-  open until jcleira closes it manually.
+- Do NOT open child issues. The slice plan is posted as a comment on
+  the parent issue, not as separate issues — a research run must not
+  create any GitHub issue.
+- Do NOT apply `minion-approved` (or `minion-ready`) to the parent or
+  anything else, and do NOT trigger `implement.md`. Implementation is
+  started manually by jcleira after he reviews the PRD and slice plan.
+- Do NOT add the `minion-done` label to the parent issue, and do NOT
+  call `gh issue close` on it. The parent stays open until jcleira
+  closes it manually.
 - Do NOT post the raw transcript as a comment. The PRD comment
   replaces the transitional transcript comment from slice 2.
-- Child issues carry exactly the `minion-approved` and
-  `minion-research-output` labels — never `minion-done`, and never
-  close a child.
-- Do NOT check for or skip existing comments or issues. Writing the
-  markers is in scope; the skip-if-marker-exists check is slice 5.
+- Do NOT check for or skip existing comments. Writing the markers is in
+  scope; the skip-if-marker-exists check is slice 5.
 - Post exactly two comments on the parent (the PRD comment, then the
-  status comment), open exactly one child issue per slice, and run
-  exactly one `gh issue edit` (the label add). Do not modify the
-  worktree, do not run `git`, and do not open a PR.
+  slice-plan comment), and run exactly one `gh issue edit` (the
+  `minion-research-completed` label add). Do not modify the worktree,
+  do not run `git`, and do not open a PR.
