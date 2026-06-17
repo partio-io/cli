@@ -27,19 +27,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Clone argos
-        uses: actions/checkout@v4
-        with:
-          repository: jcleira/argos
-          ref: master
-          token: ${{ secrets.ARGOS_PAT }}
-          path: argos
-
-      - name: Print argos SHA
-        run: |
-          ARGOS_SHA=$(git -C argos rev-parse HEAD)
-          ARGOS_SHA_SHORT=$(git -C argos rev-parse --short HEAD)
-          echo "argos master cloned at ${ARGOS_SHA} (${ARGOS_SHA_SHORT})"
+      # NOTE: this workflow deliberately does NOT clone jcleira/argos.
+      # The persona substrate must be a sanitized, in-repo telos+memory
+      # (see docs/2026-05-05-research-minion/issues/08-persona-local-substrate.md).
+      # Never clone the private argos repo from this public repository.
 
       - name: Install minions
         run: |
