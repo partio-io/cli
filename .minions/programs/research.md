@@ -8,16 +8,16 @@ target_repos:
 
 Unattended research pipeline for complex `partio-io/cli` issues. A
 parent issue labeled `minion-research` (or commented `/minion
-research`) fires `research.yml`, which clones `jcleira/argos` into the
-workspace and runs this program. Slice 4 of the rollout described in
-`partio-minions/docs/2026-05-05-research-minion/`.
+research`) fires `research.yml`, which runs this program. Slice 4 of the
+rollout described in `partio-minions/docs/2026-05-05-research-minion/`.
 
 This slice completes the research → PRD → slice → publish pipeline:
 
 - `researcher` drives a `/code-research`-style interview against the
   parent issue and writes the questions to a shared transcript.
 - `persona` answers each question the way jcleira would, grounded in
-  the argos TELOS and memory substrate, never leaking personal data.
+  the sanitized, in-repo persona substrate (`.minions/persona/`), never
+  leaking personal data.
 - `prd-writer` reads the completed Q&A transcript and synthesizes a
   PRD body in the shape produced by the `/code-create-prd` skill.
 - `slicer` reads the PRD body and decomposes it into vertical-slice
@@ -62,11 +62,10 @@ changes" and the run ends without a PR. That is intended.
 
 ## Context
 
-- `argos/telos/MISSION.md`
-- `argos/telos/GOALS.md`
-- `argos/telos/PROJECTS.md`
-- `argos/telos/BELIEFS.md`
-- `argos/memory/*.md`
+- `cli/.minions/persona/telos/MISSION.md`
+- `cli/.minions/persona/telos/GOALS.md`
+- `cli/.minions/persona/telos/PROJECTS.md`
+- `cli/.minions/persona/telos/BELIEFS.md`
 
 ## Agents
 
@@ -141,16 +140,18 @@ paraphrase, or reference personal data (health, training, daily diary
 content, finances, location, calendar) in any output. Output answers
 in your own words, framed as decisions on the question at hand.
 
-Substrate: the four argos TELOS files (`MISSION.md`, `GOALS.md`,
-`PROJECTS.md`, `BELIEFS.md`) are already injected into your prompt
-under the pre-read context section. In addition, read every file
-matching `argos/memory/*.md` from the cloned argos repository so you
-have the full memory substrate (~48 files). Resolve the argos clone
-location in this order: if `$GITHUB_WORKSPACE` is set and
-`$GITHUB_WORKSPACE/argos` exists, use that; otherwise search upward
-from the current directory for a sibling `argos/` directory; otherwise
-fall back to the pre-read TELOS alone. You decide at runtime which
-substrate is relevant to each question — there is no curation.
+Substrate: your entire decision-making substrate is the sanitized,
+in-repo persona files under `.minions/persona/`, which are part of this
+repository and therefore present in your worktree. The four TELOS files
+(`telos/MISSION.md`, `telos/GOALS.md`, `telos/PROJECTS.md`,
+`telos/BELIEFS.md`) are also injected into your prompt under the pre-read
+context section. In addition, read every file under
+`.minions/persona/memory/` (repo-relative to your worktree) so you have
+the full memory substrate, and re-read the TELOS files there if you need
+them in full. There is no other substrate: do NOT look for, clone, or
+read any external or personal repository. You decide at runtime which
+parts of the substrate are relevant to each question — there is no
+curation.
 
 Transcript protocol:
 
