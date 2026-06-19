@@ -2,19 +2,16 @@
 
 This directory is the **only** decision-making substrate for the
 `persona` agent in `.minions/programs/research.md`. The persona answers
-research questions "the way the maintainer (jcleira) would," and it
-grounds those answers in the files under `telos/` and `memory/` here —
-nothing else.
+research questions the way the maintainer would, and it grounds those
+answers in the files under `telos/` and `memory/` here — nothing else.
 
-## Why it lives here (and not in a private repo)
+## Why it lives here
 
-The persona used to be grounded by cloning a **private** personal repo
-(`jcleira/argos`) into this **public** repo at CI time, then posting
-PRD/slice comments on public issues. That was a private→public exposure
-path. It has been removed (see
-`docs/2026-05-05-research-minion/issues/08-persona-local-substrate.md`
-in the minions docs, and partio-io/cli#454). The pipeline must **never**
-clone or read argos, or any other private repo.
+The persona must be grounded **only** by sanitized, in-repo files — never
+by cloning or reading a private or personal repository at run time. A
+public CI pipeline that pulled private context and then posted to public
+issues would be a private→public exposure path; keeping the substrate
+in-repo and sanitized removes that path entirely.
 
 ## Privacy contract — READ BEFORE EDITING
 
@@ -30,19 +27,20 @@ Therefore these files contain **no personal data**:
 - No content copied verbatim from any private source.
 
 Only generic, publishable decision-making essence — engineering
-trade-offs, product priorities for the public products, the quality bar,
-defer-domains, and working preferences — belongs here.
+trade-offs, partio product priorities, the quality bar, defer-domains,
+and working preferences — belongs here.
 
 ## Refreshing this substrate (manual, local-only)
 
 When the persona's guidance drifts from how the maintainer actually
 decides, refresh it **manually and locally**:
 
-1. A human reads the private source (argos) on their own machine.
-2. They hand-edit the files here, distilling only publishable essence.
+1. A human curates these files from their own private notes, on their own
+   machine.
+2. They distill only publishable essence into the files here.
 3. They review the diff against the privacy contract above for leaks.
 4. They commit via a normal PR for review.
 
-**Never** automate a clone or sync of argos (or any private repo) into
-this or any public repo. Automation is the exposure path this design
-exists to remove.
+**Never** automate a clone or sync of any private or personal repository
+into this (or any) public repo. Automation is the exposure path this
+design exists to remove.

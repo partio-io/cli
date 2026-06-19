@@ -27,10 +27,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # NOTE: this workflow deliberately does NOT clone jcleira/argos.
-      # The persona substrate must be a sanitized, in-repo telos+memory
-      # (see docs/2026-05-05-research-minion/issues/08-persona-local-substrate.md).
-      # Never clone the private argos repo from this public repository.
+      # The persona substrate is the sanitized, in-repo telos+memory under
+      # .minions/persona/. Never clone any private or personal repository
+      # into this public repo to ground it.
 
       - name: Install minions
         run: |
