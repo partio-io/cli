@@ -27,20 +27,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Clone argos
-        uses: actions/checkout@v4
-        with:
-          repository: jcleira/argos
-          ref: master
-          token: ${{ secrets.ARGOS_PAT }}
-          path: argos
-
-      - name: Print argos SHA
-        run: |
-          ARGOS_SHA=$(git -C argos rev-parse HEAD)
-          ARGOS_SHA_SHORT=$(git -C argos rev-parse --short HEAD)
-          echo "argos master cloned at ${ARGOS_SHA} (${ARGOS_SHA_SHORT})"
-
       - name: Install minions
         run: |
           go install github.com/partio-io/minions/cmd/minions@v0.0.6

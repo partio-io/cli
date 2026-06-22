@@ -8,16 +8,15 @@ target_repos:
 
 Unattended research pipeline for complex `partio-io/cli` issues. A
 parent issue labeled `minion-research` (or commented `/minion
-research`) fires `research.yml`, which clones `jcleira/argos` into the
-workspace and runs this program. Slice 4 of the rollout described in
-`partio-minions/docs/2026-05-05-research-minion/`.
+research`) fires `research.yml`, which runs this program.
 
-This slice completes the research → PRD → slice → publish pipeline:
+This program runs the research → PRD → slice → publish pipeline:
 
 - `researcher` drives a `/code-research`-style interview against the
   parent issue and writes the questions to a shared transcript.
 - `persona` answers each question the way jcleira would, grounded in
-  the argos TELOS and memory substrate, never leaking personal data.
+  the sanitized, in-repo persona substrate (`.minions/persona/`), never
+  leaking personal data.
 - `prd-writer` reads the completed Q&A transcript and synthesizes a
   PRD body in the shape produced by the `/code-create-prd` skill.
 - `slicer` reads the PRD body and decomposes it into vertical-slice
@@ -34,11 +33,10 @@ This slice completes the research → PRD → slice → publish pipeline:
   `/minion build`), `minion.yml` fires `implement.md` once on the parent
   and produces a single feature PR.
 
-The *skip-if-marker-exists* idempotency check (re-runs reading existing
-comments before writing) arrives in slice 5; this slice writes the
-markers but does not yet check for them. This run produces no PR; its
-only side effects are the PRD comment, the slices comment, and the
-parent label.
+This run writes a run-scoped idempotency marker on each comment but does
+not yet check for it; re-runs do not skip existing artifacts. This run
+produces no PR; its only side effects are the PRD comment, the slices
+comment, and the parent label.
 
 Every agent runs as its own one-shot Claude session, in the order
 declared below. Each agent gets a fresh, isolated worktree that is
@@ -62,11 +60,10 @@ changes" and the run ends without a PR. That is intended.
 
 ## Context
 
-- `argos/telos/MISSION.md`
-- `argos/telos/GOALS.md`
-- `argos/telos/PROJECTS.md`
-- `argos/telos/BELIEFS.md`
-- `argos/memory/*.md`
+- `cli/.minions/persona/telos/MISSION.md`
+- `cli/.minions/persona/telos/GOALS.md`
+- `cli/.minions/persona/telos/PROJECTS.md`
+- `cli/.minions/persona/telos/BELIEFS.md`
 
 ## Agents
 
@@ -137,20 +134,20 @@ You answer each research question as jcleira would.
 
 Privacy directive (load-bearing — must not be edited away): Use TELOS
 and memory to *decide* — what answer would jcleira give? Never quote,
-paraphrase, or reference personal data (health, training, daily diary
-content, finances, location, calendar) in any output. Output answers
+paraphrase, or reference personal data in any output. Output answers
 in your own words, framed as decisions on the question at hand.
 
-Substrate: the four argos TELOS files (`MISSION.md`, `GOALS.md`,
-`PROJECTS.md`, `BELIEFS.md`) are already injected into your prompt
-under the pre-read context section. In addition, read every file
-matching `argos/memory/*.md` from the cloned argos repository so you
-have the full memory substrate (~48 files). Resolve the argos clone
-location in this order: if `$GITHUB_WORKSPACE` is set and
-`$GITHUB_WORKSPACE/argos` exists, use that; otherwise search upward
-from the current directory for a sibling `argos/` directory; otherwise
-fall back to the pre-read TELOS alone. You decide at runtime which
-substrate is relevant to each question — there is no curation.
+Substrate: your entire decision-making substrate is the sanitized,
+in-repo persona files under `.minions/persona/`, which are part of this
+repository and therefore present in your worktree. The four TELOS files
+(`telos/MISSION.md`, `telos/GOALS.md`, `telos/PROJECTS.md`,
+`telos/BELIEFS.md`) are also injected into your prompt under the pre-read
+context section. In addition, read every file under
+`.minions/persona/memory/` (repo-relative to your worktree) so you have
+the full memory substrate, and re-read the TELOS files there if you need
+them in full. Use only this in-repo substrate. You decide at runtime which
+parts of the substrate are relevant to each question — there is no
+curation.
 
 Transcript protocol:
 
@@ -397,10 +394,10 @@ Hard constraints:
 - Do NOT add the `minion-done` label to the parent issue, and do NOT
   call `gh issue close` on it. The parent stays open until jcleira
   closes it manually.
-- Do NOT post the raw transcript as a comment. The PRD comment
-  replaces the transitional transcript comment from slice 2.
-- Do NOT check for or skip existing comments. Writing the markers is in
-  scope; the skip-if-marker-exists check is slice 5.
+- Do NOT post the raw transcript as a comment; post the PRD comment
+  instead.
+- Do NOT check for or skip existing comments; writing the markers is in
+  scope, but skipping existing artifacts on re-run is not.
 - Post exactly two comments on the parent (the PRD comment, then the
   slice-plan comment), and run exactly one `gh issue edit` (the
   `minion-research-completed` label add). Do not modify the worktree,
