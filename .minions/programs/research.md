@@ -8,10 +8,9 @@ target_repos:
 
 Unattended research pipeline for complex `partio-io/cli` issues. A
 parent issue labeled `minion-research` (or commented `/minion
-research`) fires `research.yml`, which runs this program. Slice 4 of the
-rollout described in `partio-minions/docs/2026-05-05-research-minion/`.
+research`) fires `research.yml`, which runs this program.
 
-This slice completes the research → PRD → slice → publish pipeline:
+This program runs the research → PRD → slice → publish pipeline:
 
 - `researcher` drives a `/code-research`-style interview against the
   parent issue and writes the questions to a shared transcript.
@@ -34,11 +33,10 @@ This slice completes the research → PRD → slice → publish pipeline:
   `/minion build`), `minion.yml` fires `implement.md` once on the parent
   and produces a single feature PR.
 
-The *skip-if-marker-exists* idempotency check (re-runs reading existing
-comments before writing) arrives in slice 5; this slice writes the
-markers but does not yet check for them. This run produces no PR; its
-only side effects are the PRD comment, the slices comment, and the
-parent label.
+This run writes a run-scoped idempotency marker on each comment but does
+not yet check for it; re-runs do not skip existing artifacts. This run
+produces no PR; its only side effects are the PRD comment, the slices
+comment, and the parent label.
 
 Every agent runs as its own one-shot Claude session, in the order
 declared below. Each agent gets a fresh, isolated worktree that is
@@ -396,10 +394,10 @@ Hard constraints:
 - Do NOT add the `minion-done` label to the parent issue, and do NOT
   call `gh issue close` on it. The parent stays open until jcleira
   closes it manually.
-- Do NOT post the raw transcript as a comment. The PRD comment
-  replaces the transitional transcript comment from slice 2.
-- Do NOT check for or skip existing comments. Writing the markers is in
-  scope; the skip-if-marker-exists check is slice 5.
+- Do NOT post the raw transcript as a comment; post the PRD comment
+  instead.
+- Do NOT check for or skip existing comments; writing the markers is in
+  scope, but skipping existing artifacts on re-run is not.
 - Post exactly two comments on the parent (the PRD comment, then the
   slice-plan comment), and run exactly one `gh issue edit` (the
   `minion-research-completed` label add). Do not modify the worktree,
