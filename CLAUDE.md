@@ -84,6 +84,6 @@ Partio supports git worktrees:
 
 ## Known Limitations
 
-- `partio enable` skips hook installation if `.partio/` already exists. To reinstall hooks, run `partio disable && partio enable`.
+- `partio enable` is idempotent — it can be re-run to repair hooks and ensure settings are consistent.
 - The `_hook` command accepts extra args (`cobra.MinimumNArgs(1)`) because git passes additional arguments to hooks (e.g., remote name and URL for pre-push).
 - Session JSONL parsing may produce empty context/prompt fields depending on the Claude session format.

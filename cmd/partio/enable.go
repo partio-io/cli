@@ -36,24 +36,14 @@ func runEnable(cmd *cobra.Command, args []string) error {
 
 	partioDir := filepath.Join(repoRoot, config.PartioDir)
 
-	// Check if already enabled
-	if _, err := os.Stat(partioDir); err == nil {
-		fmt.Println("partio is already enabled in this repository.")
-		return nil
-	}
-
-	// Create .partio/ directory
+	// Create .partio/ directory (no-op if it already exists)
 	if err := os.MkdirAll(partioDir, 0o755); err != nil {
 		return fmt.Errorf("creating .partio directory: %w", err)
 	}
 
-	// Write default settings.json
-	defaults := config.Defaults()
-	data, err := json.MarshalIndent(defaults, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshaling default config: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join(partioDir, "settings.json"), data, 0o644); err != nil {
+	// Ensure settings.json exists with enabled: true
+	settingsPath := filepath.Join(partioDir, "settings.json")
+	if err := ensureSettingsEnabled(settingsPath); err != nil {
 		return fmt.Errorf("writing settings.json: %w", err)
 	}
 
@@ -62,7 +52,7 @@ func runEnable(cmd *cobra.Command, args []string) error {
 	addToGitignore(repoRoot, ".partio/sessions/")
 	addToGitignore(repoRoot, ".partio/state/")
 
-	// Install git hooks
+	// Install git hooks (reinstalls if missing or stale)
 	if absolutePath {
 		exePath, err := os.Executable()
 		if err != nil {
@@ -85,10 +75,53 @@ func runEnable(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("partio enabled successfully!")
-	fmt.Println("  - Created .partio/ config directory")
+	fmt.Println("  - Ensured .partio/ config directory exists")
 	fmt.Println("  - Installed git hooks (pre-commit, post-commit, pre-push)")
 	fmt.Println("  - Ready to capture AI sessions on commit")
 	return nil
+}
+
+// ensureSettingsEnabled creates settings.json with defaults if it doesn't exist,
+// or ensures enabled is set to true in existing settings.
+func ensureSettingsEnabled(settingsPath string) error {
+	existing, err := os.ReadFile(settingsPath)
+	if err != nil {
+		// File doesn't exist — write defaults
+		defaults := config.Defaults()
+		data, marshalErr := json.MarshalIndent(defaults, "", "  ")
+		if marshalErr != nil {
+			return fmt.Errorf("marshaling default config: %w", marshalErr)
+		}
+		return os.WriteFile(settingsPath, data, 0o644)
+	}
+
+	// File exists — parse and ensure enabled: true
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(existing, &raw); err != nil {
+		// Corrupted JSON — overwrite with defaults
+		defaults := config.Defaults()
+		data, marshalErr := json.MarshalIndent(defaults, "", "  ")
+		if marshalErr != nil {
+			return fmt.Errorf("marshaling default config: %w", marshalErr)
+		}
+		return os.WriteFile(settingsPath, data, 0o644)
+	}
+
+	// Check if enabled is already true
+	if v, ok := raw["enabled"]; ok {
+		var enabled bool
+		if json.Unmarshal(v, &enabled) == nil && enabled {
+			return nil // already enabled, preserve existing config
+		}
+	}
+
+	// Set enabled to true, preserving other settings
+	raw["enabled"] = json.RawMessage("true")
+	data, err := json.MarshalIndent(raw, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshaling config: %w", err)
+	}
+	return os.WriteFile(settingsPath, data, 0o644)
 }
 
 func addToGitignore(repoRoot, entry string) {
