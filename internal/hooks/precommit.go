@@ -97,6 +97,11 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 		agentActive = running && sessionPath != ""
 	}
 
+	// Check commit linking preference before saving state.
+	if agentActive && !shouldLinkCommit(repoRoot, cfg) {
+		agentActive = false
+	}
+
 	state := preCommitState{
 		AgentActive:   agentActive,
 		AgentName:     detector.Name(),

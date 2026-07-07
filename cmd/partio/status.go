@@ -44,6 +44,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("Status:     enabled")
 	fmt.Printf("Strategy:   %s\n", cfg.Strategy)
+	fmt.Printf("Linking:    %s\n", cfg.CommitLinking)
 	fmt.Printf("Agent:      %s\n", cfg.Agent)
 
 	// Check hooks
