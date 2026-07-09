@@ -74,11 +74,24 @@ func runEnable(cmd *cobra.Command, args []string) error {
 		slog.Warn("could not create checkpoint branch (may already exist)", "error", err)
 	}
 
+	// Warn about external hook managers that may conflict with partio's hooks
+	warnHookManagers(repoRoot)
+
 	fmt.Println("partio enabled successfully!")
 	fmt.Println("  - Ensured .partio/ config directory exists")
 	fmt.Println("  - Installed git hooks (pre-commit, post-commit, pre-push)")
 	fmt.Println("  - Ready to capture AI sessions on commit")
 	return nil
+}
+
+// warnHookManagers detects external git hook managers and prints integration warnings.
+func warnHookManagers(repoRoot string) {
+	managers := githooks.DetectHookManagers(repoRoot)
+	for _, m := range managers {
+		fmt.Printf("\nWarning: %s detected.\n", m.Name)
+		fmt.Println("  Partio's hooks must be called from within your hook manager's configuration.")
+		fmt.Printf("  %s\n", m.Instructions)
+	}
 }
 
 // ensureSettingsEnabled creates settings.json with defaults if it doesn't exist,
