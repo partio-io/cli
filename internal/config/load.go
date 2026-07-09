@@ -57,6 +57,9 @@ func mergeFromFile(dst *Config, path string) {
 	if v, ok := raw["log_level"]; ok {
 		_ = json.Unmarshal(v, &dst.LogLevel)
 	}
+	if v, ok := raw["commit_linking"]; ok {
+		_ = json.Unmarshal(v, &dst.CommitLinking)
+	}
 	if v, ok := raw["strategy_options"]; ok {
 		_ = json.Unmarshal(v, &dst.StrategyOptions)
 	}

@@ -18,4 +18,7 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("PARTIO_AGENT"); v != "" {
 		cfg.Agent = v
 	}
+	if v := os.Getenv("PARTIO_COMMIT_LINKING"); v != "" {
+		cfg.CommitLinking = v
+	}
 }

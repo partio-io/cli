@@ -6,8 +6,16 @@ type Config struct {
 	Strategy        string          `json:"strategy"`
 	Agent           string          `json:"agent"`
 	LogLevel        string          `json:"log_level"`
+	CommitLinking   string          `json:"commit_linking"`
 	StrategyOptions StrategyOptions `json:"strategy_options"`
 }
+
+// CommitLinking values.
+const (
+	CommitLinkingAsk    = "ask"
+	CommitLinkingAlways = "always"
+	CommitLinkingNever  = "never"
+)
 
 // StrategyOptions holds strategy-specific options.
 type StrategyOptions struct {

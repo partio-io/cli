@@ -21,6 +21,9 @@ func TestDefaults(t *testing.T) {
 	if d.LogLevel != "info" {
 		t.Errorf("expected log_level=info, got %s", d.LogLevel)
 	}
+	if d.CommitLinking != CommitLinkingAsk {
+		t.Errorf("expected commit_linking=ask, got %s", d.CommitLinking)
+	}
 	if d.StrategyOptions.PushSessions != true {
 		t.Errorf("expected push_sessions=true, got %v", d.StrategyOptions.PushSessions)
 	}
@@ -41,7 +44,7 @@ func TestMergeFromFile(t *testing.T) {
 	dir := t.TempDir()
 	settingsPath := filepath.Join(dir, "settings.json")
 
-	err := os.WriteFile(settingsPath, []byte(`{"strategy": "auto-commit", "log_level": "debug"}`), 0o644)
+	err := os.WriteFile(settingsPath, []byte(`{"strategy": "auto-commit", "log_level": "debug", "commit_linking": "always"}`), 0o644)
 	if err != nil {
 		t.Fatalf("writing test settings: %v", err)
 	}
@@ -55,6 +58,9 @@ func TestMergeFromFile(t *testing.T) {
 	if cfg.LogLevel != "debug" {
 		t.Errorf("expected log_level=debug, got %s", cfg.LogLevel)
 	}
+	if cfg.CommitLinking != CommitLinkingAlways {
+		t.Errorf("expected commit_linking=always, got %s", cfg.CommitLinking)
+	}
 	// Unset fields should retain defaults
 	if cfg.Agent != "" {
 		t.Errorf("expected agent='' (auto-detect default), got %s", cfg.Agent)
@@ -65,6 +71,7 @@ func TestEnvOverrides(t *testing.T) {
 	t.Setenv("PARTIO_STRATEGY", "env-strategy")
 	t.Setenv("PARTIO_LOG_LEVEL", "error")
 	t.Setenv("PARTIO_ENABLED", "false")
+	t.Setenv("PARTIO_COMMIT_LINKING", "never")
 
 	cfg := Defaults()
 	applyEnv(&cfg)
@@ -77,6 +84,9 @@ func TestEnvOverrides(t *testing.T) {
 	}
 	if cfg.Enabled != false {
 		t.Errorf("expected enabled=false, got %v", cfg.Enabled)
+	}
+	if cfg.CommitLinking != CommitLinkingNever {
+		t.Errorf("expected commit_linking=never, got %s", cfg.CommitLinking)
 	}
 }
 
