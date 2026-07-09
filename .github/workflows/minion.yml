@@ -77,10 +77,33 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           ISSUE_NUM="${{ steps.program.outputs.issue_num }}"
-          gh issue edit "$ISSUE_NUM" --repo "${{ github.repository }}" \
+          REPO="${{ github.repository }}"
+
+          # Find the PR this run opened. The branch name is deterministic per
+          # issue, so we can locate the PR without the agent reporting it.
+          PR=$(gh pr list --repo "$REPO" \
+            --head "minion/implement-implement-${ISSUE_NUM}" \
+            --state open --json number --jq '.[0].number // empty')
+
+          # A "successful" run that produced no PR is a silent failure, not a
+          # completion. Fail red instead of closing the issue with no work done.
+          if [ -z "$PR" ]; then
+            echo "::error::Program succeeded but no PR exists for #${ISSUE_NUM}; refusing to mark done."
+            exit 1
+          fi
+
+          # Keep the PR and issue linked. implement.md asks the agent to add a
+          # "Closes #N" reference but it does not do so reliably, so enforce it.
+          if ! gh pr view "$PR" --repo "$REPO" --json body --jq '.body' \
+              | grep -qE "#${ISSUE_NUM}([^0-9]|$)"; then
+            BODY=$(gh pr view "$PR" --repo "$REPO" --json body --jq '.body')
+            gh pr edit "$PR" --repo "$REPO" --body "${BODY}"$'\n\n'"Closes #${ISSUE_NUM}"
+          fi
+
+          gh issue edit "$ISSUE_NUM" --repo "$REPO" \
             --add-label "minion-done" --remove-label "minion-executing"
-          gh issue close "$ISSUE_NUM" --repo "${{ github.repository }}" \
-            --comment "Minion completed successfully."
+          gh issue close "$ISSUE_NUM" --repo "$REPO" \
+            --comment "Minion completed — see PR #${PR}."
 
       - name: Mark failed
         if: failure() && steps.program.outputs.issue_num != ''
