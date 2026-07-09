@@ -11,5 +11,10 @@ func Defaults() Config {
 		StrategyOptions: StrategyOptions{
 			PushSessions: true,
 		},
+		Redact: RedactOptions{
+			Enabled:          true,
+			EntropyThreshold: 4.5,
+			EntropyMinLength: 20,
+		},
 	}
 }

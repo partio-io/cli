@@ -130,6 +130,34 @@ Supported `agent` values:
 - `claude-code` (default)
 - `codex`
 
+## Security & Privacy
+
+Before any session data is written to the checkpoint branch, partio runs a two-layer secret redaction pass over all user-visible text fields (prompt, context, diff, JSONL transcript, and plan):
+
+1. **Pattern-based detection** — gitleaks-compatible regular expressions detect common secret formats including AWS access keys, GitHub personal access tokens, Slack tokens, Stripe keys, Google API keys, npm/PyPI tokens, and generic `api_key=…` / `Bearer …` assignments. Matched secrets are replaced with `[REDACTED]`.
+
+2. **Entropy-based detection** — any whitespace-delimited token that is at least 20 characters long, composed entirely of base64/hex characters, and has a Shannon entropy ≥ 4.5 bits/char is also replaced with `[REDACTED]`. This catches high-entropy strings that don't match any known pattern while keeping short version strings, commit hashes, and natural-language words intact.
+
+Redaction is enabled by default and can be tuned in `.partio/settings.json`:
+
+```json
+{
+  "redact": {
+    "enabled": true,
+    "entropy_threshold": 4.5,
+    "entropy_min_length": 20
+  }
+}
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `enabled` | `true` | Toggle redaction entirely |
+| `entropy_threshold` | `4.5` | Shannon entropy (bits/char) above which a token is redacted |
+| `entropy_min_length` | `20` | Minimum token length considered for entropy scanning |
+
+> **Note:** Redaction is a best-effort safety net. Do not rely on it as a substitute for proper secret management (e.g. environment variables, secret managers). The git diff captured in checkpoints may contain other sensitive data depending on your code.
+
 ## License
 
 MIT
