@@ -1,6 +1,7 @@
 name: Documentation Minion
 
 on:
+  # Manual / backfill: document a specific PR on demand.
   workflow_dispatch:
     inputs:
       pr_ref:
@@ -12,6 +13,14 @@ on:
         required: false
         default: false
         type: boolean
+  # Automatic: a merged PR that touched user-facing source.
+  pull_request:
+    types: [closed]
+    branches: [main]
+    paths:
+      - "cmd/**"
+      - "internal/**"
+      - "README.md"
 
 permissions:
   contents: write
@@ -19,24 +28,40 @@ permissions:
 
 jobs:
   update-docs:
+    # Run on manual dispatch, or on a PR that actually merged (closed != merged).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.merged == true
     runs-on: github-runner-partio-minion-ai-01
     timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
 
-
       - name: Install minions
         run: |
-          go install github.com/partio-io/minions/cmd/minions@v0.0.6
+          go install github.com/partio-io/minions/cmd/minions@v0.0.7
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Resolve source PR reference
+        id: src
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "pr_ref=${{ inputs.pr_ref }}" >> "$GITHUB_OUTPUT"
+            echo "dry_run=${{ inputs.dry_run }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "pr_ref=${{ github.repository }}#${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+            echo "dry_run=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Run doc-update program
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
+          PR_REF: ${{ steps.src.outputs.pr_ref }}
+          DRY_RUN: ${{ steps.src.outputs.dry_run }}
         run: |
-          ARGS="run .minions/programs/doc-update.md"
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            ARGS="${ARGS} --dry-run"
+          if [ "$DRY_RUN" = "true" ]; then
+            minions run .minions/programs/doc-update.md --pr "$PR_REF" --dry-run
+          else
+            minions run .minions/programs/doc-update.md --pr "$PR_REF"
           fi
-          minions $ARGS
