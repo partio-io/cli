@@ -16,6 +16,7 @@ import (
 	"github.com/partio-io/cli/internal/checkpoint"
 	"github.com/partio-io/cli/internal/config"
 	"github.com/partio-io/cli/internal/git"
+	"github.com/partio-io/cli/internal/redact"
 	"github.com/partio-io/cli/internal/session"
 )
 
@@ -179,6 +180,14 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 			sessionFiles.FullJSONL = string(rawJSONL)
 		}
 	}
+
+	// Redact secrets from session content before persisting to the metadata branch.
+	redactOpts := redact.Options{
+		Enabled:          cfg.Redact.Enabled,
+		EntropyThreshold: cfg.Redact.EntropyThreshold,
+		EntropyMinLength: cfg.Redact.EntropyMinLength,
+	}
+	redact.SessionFiles(sessionFiles, redactOpts)
 
 	// Write checkpoint to orphan branch
 	store := checkpoint.NewStore(repoRoot)
