@@ -1,14 +1,17 @@
 package config
 
+import "time"
+
 // Config holds all partio configuration.
 type Config struct {
-	Enabled         bool            `json:"enabled"`
-	Strategy        string          `json:"strategy"`
-	Agent           string          `json:"agent"`
-	LogLevel        string          `json:"log_level"`
-	CommitLinking   string          `json:"commit_linking"`
-	StrategyOptions StrategyOptions `json:"strategy_options"`
-	Redact          RedactOptions   `json:"redact"`
+	Enabled                bool            `json:"enabled"`
+	Strategy               string          `json:"strategy"`
+	Agent                  string          `json:"agent"`
+	LogLevel               string          `json:"log_level"`
+	CommitLinking          string          `json:"commit_linking"`
+	StrategyOptions        StrategyOptions `json:"strategy_options"`
+	Redact                 RedactOptions   `json:"redact"`
+	StaleSessionThreshold  time.Duration   `json:"stale_session_threshold"`
 }
 
 // CommitLinking values.
