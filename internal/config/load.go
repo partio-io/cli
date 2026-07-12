@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"time"
 )
 
 // Load reads config from all layers and merges them (lowest to highest priority):
@@ -65,11 +64,6 @@ func mergeFromFile(dst *Config, path string) {
 		_ = json.Unmarshal(v, &dst.StrategyOptions)
 	}
 	if v, ok := raw["stale_session_threshold"]; ok {
-		var s string
-		if err := json.Unmarshal(v, &s); err == nil {
-			if d, err := time.ParseDuration(s); err == nil {
-				dst.StaleSessionThreshold = d
-			}
-		}
+		_ = json.Unmarshal(v, &dst.StaleSessionThreshold)
 	}
 }

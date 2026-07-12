@@ -19,3 +19,10 @@ type SessionParser interface {
 	// and the parsed session data for the given repo.
 	FindLatestSession(repoRoot string) (path string, data *SessionData, err error)
 }
+
+// PIDProvider is implemented by detectors that can report the OS process ID of
+// the running agent. The value is recorded on the session and used to verify
+// process liveness during stale-session cleanup.
+type PIDProvider interface {
+	AgentPID() (int, bool)
+}

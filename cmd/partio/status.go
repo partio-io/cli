@@ -46,7 +46,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	// Clean up stale sessions before reporting status.
 	mgr := session.NewManager(partioDir)
-	if result, err := mgr.CleanupStale(cfg.StaleSessionThreshold); err != nil {
+	if result, err := mgr.CleanupStale(cfg.StaleSessionThreshold.Duration()); err != nil {
 		slog.Debug("stale session cleanup failed", "error", err)
 	} else if result.Cleaned {
 		slog.Info("stale session cleaned up", "id", result.Session.ID)

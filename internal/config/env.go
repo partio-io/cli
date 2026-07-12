@@ -24,7 +24,7 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("PARTIO_STALE_SESSION_THRESHOLD"); v != "" {
 		if d, err := time.ParseDuration(v); err == nil {
-			cfg.StaleSessionThreshold = d
+			cfg.StaleSessionThreshold = Duration(d)
 		}
 	}
 }

@@ -1,17 +1,46 @@
 package config
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
+
+// Duration is a time.Duration that marshals to and from a human-readable string
+// (e.g. "10m") in JSON, rather than an integer number of nanoseconds.
+type Duration time.Duration
+
+// MarshalJSON encodes the duration as a string such as "10m0s".
+func (d Duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(time.Duration(d).String())
+}
+
+// UnmarshalJSON parses a duration string such as "10m".
+func (d *Duration) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	v, err := time.ParseDuration(s)
+	if err != nil {
+		return err
+	}
+	*d = Duration(v)
+	return nil
+}
+
+// Duration returns the value as a time.Duration.
+func (d Duration) Duration() time.Duration { return time.Duration(d) }
 
 // Config holds all partio configuration.
 type Config struct {
-	Enabled                bool            `json:"enabled"`
-	Strategy               string          `json:"strategy"`
-	Agent                  string          `json:"agent"`
-	LogLevel               string          `json:"log_level"`
-	CommitLinking          string          `json:"commit_linking"`
-	StrategyOptions        StrategyOptions `json:"strategy_options"`
-	Redact                 RedactOptions   `json:"redact"`
-	StaleSessionThreshold  time.Duration   `json:"stale_session_threshold"`
+	Enabled               bool            `json:"enabled"`
+	Strategy              string          `json:"strategy"`
+	Agent                 string          `json:"agent"`
+	LogLevel              string          `json:"log_level"`
+	CommitLinking         string          `json:"commit_linking"`
+	StrategyOptions       StrategyOptions `json:"strategy_options"`
+	Redact                RedactOptions   `json:"redact"`
+	StaleSessionThreshold Duration        `json:"stale_session_threshold"`
 }
 
 // CommitLinking values.

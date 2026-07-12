@@ -37,7 +37,7 @@ func runCleanup(cmd *cobra.Command, args []string) error {
 	partioDir := filepath.Join(repoRoot, config.PartioDir)
 	mgr := session.NewManager(partioDir)
 
-	result, err := mgr.CleanupStale(cfg.StaleSessionThreshold)
+	result, err := mgr.CleanupStale(cfg.StaleSessionThreshold.Duration())
 	if err != nil {
 		return fmt.Errorf("cleanup failed: %w", err)
 	}
