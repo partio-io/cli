@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strings"
+	"time"
 )
 
 func applyEnv(cfg *Config) {
@@ -20,5 +21,10 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("PARTIO_COMMIT_LINKING"); v != "" {
 		cfg.CommitLinking = v
+	}
+	if v := os.Getenv("PARTIO_STALE_SESSION_THRESHOLD"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.StaleSessionThreshold = Duration(d)
+		}
 	}
 }

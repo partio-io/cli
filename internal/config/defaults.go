@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 // Defaults returns a Config with default values.
 func Defaults() Config {
 	return Config{
@@ -16,5 +18,6 @@ func Defaults() Config {
 			EntropyThreshold: 4.5,
 			EntropyMinLength: 20,
 		},
+		StaleSessionThreshold: Duration(10 * time.Minute),
 	}
 }

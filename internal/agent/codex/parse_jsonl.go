@@ -43,7 +43,7 @@ func ParseJSONL(path string) (*agent.SessionData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opening codex session: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	data := &agent.SessionData{
 		Agent: "codex",
@@ -144,7 +144,7 @@ func PeekSessionID(path string) string {
 	if err != nil {
 		return ""
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	scanner := bufio.NewScanner(f)
 	if scanner.Scan() {
@@ -165,7 +165,7 @@ func PeekCWD(path string) string {
 	if err != nil {
 		return ""
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	scanner := bufio.NewScanner(f)
 	if scanner.Scan() {

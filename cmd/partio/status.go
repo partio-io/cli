@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/partio-io/cli/internal/config"
 	"github.com/partio-io/cli/internal/git"
+	"github.com/partio-io/cli/internal/session"
 )
 
 func newStatusCmd() *cobra.Command {
@@ -40,6 +42,14 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	if !enabled {
 		fmt.Println("Status:     not enabled (run 'partio enable' to set up)")
 		return nil
+	}
+
+	// Clean up stale sessions before reporting status.
+	mgr := session.NewManager(partioDir)
+	if result, err := mgr.CleanupStale(cfg.StaleSessionThreshold.Duration()); err != nil {
+		slog.Debug("stale session cleanup failed", "error", err)
+	} else if result.Cleaned {
+		slog.Info("stale session cleaned up", "id", result.Session.ID)
 	}
 
 	fmt.Println("Status:     enabled")

@@ -63,4 +63,7 @@ func mergeFromFile(dst *Config, path string) {
 	if v, ok := raw["strategy_options"]; ok {
 		_ = json.Unmarshal(v, &dst.StrategyOptions)
 	}
+	if v, ok := raw["stale_session_threshold"]; ok {
+		_ = json.Unmarshal(v, &dst.StaleSessionThreshold)
+	}
 }

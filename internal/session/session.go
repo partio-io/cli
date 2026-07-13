@@ -16,6 +16,10 @@ type Session struct {
 	Branch    string    `json:"branch"`
 	SourceDir string    `json:"source_dir"`
 
+	// AgentPID is the OS process ID of the agent. When non-zero it is used during
+	// stale-session cleanup to verify whether the process is still alive.
+	AgentPID int `json:"agent_pid,omitempty"`
+
 	// Condensed is true when the session has been fully captured in a checkpoint
 	// and has ended. Post-commit sets this after creating a checkpoint so future
 	// commits with the same session can be skipped.

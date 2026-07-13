@@ -102,6 +102,21 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 		agentActive = false
 	}
 
+	// Record an ACTIVE session with the agent's PID so a crashed or abandoned
+	// agent leaves a session that stale-cleanup can later detect and end.
+	if agentActive {
+		pid := 0
+		if pp, ok := detector.(agent.PIDProvider); ok {
+			if p, found := pp.AgentPID(); found {
+				pid = p
+			}
+		}
+		mgr := session.NewManager(filepath.Join(repoRoot, config.PartioDir))
+		if recErr := mgr.RecordActive(detector.Name(), branch, repoRoot, pid); recErr != nil {
+			slog.Debug("could not record active session", "error", recErr)
+		}
+	}
+
 	state := preCommitState{
 		AgentActive:   agentActive,
 		AgentName:     detector.Name(),
