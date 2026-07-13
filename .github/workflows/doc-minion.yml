@@ -60,6 +60,11 @@ jobs:
           PR_REF: ${{ steps.src.outputs.pr_ref }}
           DRY_RUN: ${{ steps.src.outputs.dry_run }}
         run: |
+          # Authenticate git pushes to any github.com repo — including the docs
+          # repo minions clones as a secondary repo, which actions/checkout does
+          # not credential. The token is read from GH_TOKEN at call time and is
+          # never written into gitconfig.
+          git config --global credential.helper '!f() { echo "username=x-access-token"; echo "password=$GH_TOKEN"; }; f'
           if [ "$DRY_RUN" = "true" ]; then
             minions run .minions/programs/doc-update.md --pr "$PR_REF" --dry-run
           else
