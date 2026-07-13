@@ -52,7 +52,8 @@ func runResume(id string, printFlag, copyFlag, branchFlag bool) error {
 
 	if branchFlag {
 		branchName := fmt.Sprintf("partio/resume/%s", id)
-		_, err := git.ExecGit("checkout", "-b", branchName, data.Metadata.CommitHash)
+		commitHash := checkpoint.ResolveCommitHash(id, data.Metadata.CommitHash)
+		_, err := git.ExecGit("checkout", "-b", branchName, commitHash)
 		if err != nil {
 			return fmt.Errorf("creating resume branch: %w", err)
 		}

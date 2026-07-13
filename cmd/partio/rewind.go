@@ -119,16 +119,20 @@ func runRewindTo(id string) error {
 	// Read session context
 	context, _ := git.ExecGit("show", branch+":"+shard+"/"+rest+"/0/context.md")
 
+	// Resolve the commit hash: if the original was squash-merged it may no
+	// longer exist, so fall back to the commit that carries the trailer.
+	commitHash := checkpoint.ResolveCommitHash(id, meta.CommitHash)
+
 	fmt.Printf("Rewinding to checkpoint %s\n", id)
-	fmt.Printf("  Commit: %s\n", meta.CommitHash)
+	fmt.Printf("  Commit: %s\n", commitHash)
 	fmt.Printf("  Branch: %s\n", meta.Branch)
 	if context != "" {
 		fmt.Printf("  Context:\n%s\n", context)
 	}
 
-	// Create a new branch at the checkpoint's commit
+	// Create a new branch at the resolved commit.
 	branchName := fmt.Sprintf("partio/rewind/%s", id)
-	_, err = git.ExecGit("checkout", "-b", branchName, meta.CommitHash)
+	_, err = git.ExecGit("checkout", "-b", branchName, commitHash)
 	if err != nil {
 		return fmt.Errorf("creating rewind branch: %w", err)
 	}
