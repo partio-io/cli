@@ -13,8 +13,9 @@ import (
 
 func newRewindCmd() *cobra.Command {
 	var (
-		list bool
-		toID string
+		list      bool
+		toID      string
+		commitSHA string
 	)
 
 	cmd := &cobra.Command{
@@ -28,12 +29,16 @@ func newRewindCmd() *cobra.Command {
 			if toID != "" {
 				return runRewindTo(toID)
 			}
+			if commitSHA != "" {
+				return runRewindByCommit(commitSHA)
+			}
 			return cmd.Help()
 		},
 	}
 
 	cmd.Flags().BoolVar(&list, "list", false, "list all checkpoints")
 	cmd.Flags().StringVar(&toID, "to", "", "restore to a specific checkpoint ID")
+	cmd.Flags().StringVar(&commitSHA, "commit", "", "find and restore the checkpoint for the given commit SHA (supports squash-merged commits)")
 
 	return cmd
 }
@@ -83,8 +88,17 @@ func runRewindList() error {
 				continue
 			}
 
-			fmt.Printf("  %s  branch=%s  agent=%d%%  created=%s\n",
-				cpID, meta.Branch, meta.AgentPercent, meta.CreatedAt)
+			reachabilityNote := ""
+			if !git.CommitReachable(meta.CommitHash) {
+				if git.CommitExists(meta.CommitHash) {
+					reachabilityNote = "  [squash-merged]"
+				} else {
+					reachabilityNote = "  [commit pruned]"
+				}
+			}
+
+			fmt.Printf("  %s  branch=%s  agent=%d%%  created=%s%s\n",
+				cpID, meta.Branch, meta.AgentPercent, meta.CreatedAt, reachabilityNote)
 		}
 	}
 
@@ -139,4 +153,57 @@ func runRewindTo(id string) error {
 
 	fmt.Printf("  Created branch: %s\n", branchName)
 	return nil
+}
+
+// runRewindByCommit finds checkpoints associated with the given commit SHA and presents
+// them to the user. Supports squash-merged commits by also checking the equivalent
+// squash commit in the current branch history when the given SHA is unreachable.
+func runRewindByCommit(sha string) error {
+	_, err := git.RepoRoot()
+	if err != nil {
+		return fmt.Errorf("must be run inside a git repository")
+	}
+
+	// Search checkpoints for the given SHA directly
+	ids, err := checkpoint.FindByCommit(sha)
+	if err != nil {
+		return fmt.Errorf("searching checkpoints: %w", err)
+	}
+
+	// If not found and the commit exists but is unreachable, check for a squash-merge equivalent
+	if len(ids) == 0 && git.CommitExists(sha) && !git.CommitReachable(sha) {
+		squash, findErr := git.FindSquashCommit(sha)
+		if findErr == nil && squash != "" {
+			fmt.Printf("Commit %s is not reachable (squash-merged). Searching checkpoints for equivalent squash commit %s...\n",
+				shortSHA(sha), shortSHA(squash))
+			ids, err = checkpoint.FindByCommit(squash)
+			if err != nil {
+				return fmt.Errorf("searching checkpoints for squash commit: %w", err)
+			}
+		}
+	}
+
+	if len(ids) == 0 {
+		return fmt.Errorf("no checkpoint found for commit %s", shortSHA(sha))
+	}
+
+	if len(ids) == 1 {
+		fmt.Printf("Found checkpoint %s for commit %s.\n", ids[0], shortSHA(sha))
+		return runRewindTo(ids[0])
+	}
+
+	fmt.Printf("Found %d checkpoints for commit %s:\n", len(ids), shortSHA(sha))
+	for _, id := range ids {
+		fmt.Printf("  %s\n", id)
+	}
+	fmt.Println("Use 'partio rewind --to <id>' to restore a specific checkpoint.")
+	return nil
+}
+
+// shortSHA returns the first 8 characters of a SHA for display purposes.
+func shortSHA(sha string) string {
+	if len(sha) > 8 {
+		return sha[:8]
+	}
+	return sha
 }

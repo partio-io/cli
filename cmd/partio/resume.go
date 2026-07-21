@@ -17,8 +17,8 @@ import (
 
 func newResumeCmd() *cobra.Command {
 	var (
-		printFlag bool
-		copyFlag  bool
+		printFlag  bool
+		copyFlag   bool
 		branchFlag bool
 	)
 
