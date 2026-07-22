@@ -6,8 +6,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -17,17 +19,27 @@ import (
 
 func newResumeCmd() *cobra.Command {
 	var (
-		printFlag bool
-		copyFlag  bool
-		branchFlag bool
+		printFlag      bool
+		copyFlag       bool
+		branchFlag     bool
+		branchNameFlag string
 	)
 
 	cmd := &cobra.Command{
-		Use:   "resume <checkpoint-id>",
+		Use:   "resume [<checkpoint-id>]",
 		Short: "Resume a session from a checkpoint",
-		Long:  `Read checkpoint data from the orphan branch and launch a new Claude Code session with the previous context.`,
-		Args:  cobra.ExactArgs(1),
+		Long: `Read checkpoint data from the orphan branch and launch a new Claude Code session with the previous context.
+
+When a feature branch has been squash-merged, use --branch <name> to locate the
+most recent checkpoint by branch name rather than by checkpoint ID.`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if branchNameFlag != "" {
+				return runResumeByBranch(branchNameFlag, printFlag, copyFlag, branchFlag)
+			}
+			if len(args) == 0 {
+				return cmd.Help()
+			}
 			return runResume(args[0], printFlag, copyFlag, branchFlag)
 		},
 	}
@@ -35,8 +47,33 @@ func newResumeCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&printFlag, "print", false, "print the composed context prompt to stdout")
 	cmd.Flags().BoolVar(&copyFlag, "copy", false, "copy the context prompt to clipboard")
 	cmd.Flags().BoolVar(&branchFlag, "branch", false, "create a branch at the checkpoint's commit before launching")
+	cmd.Flags().StringVar(&branchNameFlag, "branch-name", "", "resume the most recent checkpoint for this branch name (recommended for squash-merged branches)")
 
 	return cmd
+}
+
+func runResumeByBranch(branchName string, printFlag, copyFlag, branchFlag bool) error {
+	repoRoot, err := git.RepoRoot()
+	if err != nil {
+		return fmt.Errorf("must be run inside a git repository")
+	}
+
+	metas, err := checkpoint.FindByBranch(repoRoot, branchName)
+	if err != nil {
+		return fmt.Errorf("finding checkpoints for branch %q: %w", branchName, err)
+	}
+	if len(metas) == 0 {
+		return fmt.Errorf("no checkpoints found for branch %q", branchName)
+	}
+
+	// Sort by CreatedAt descending to pick the most recent checkpoint.
+	sort.Slice(metas, func(i, j int) bool {
+		ti, _ := time.Parse(time.RFC3339, metas[i].CreatedAt)
+		tj, _ := time.Parse(time.RFC3339, metas[j].CreatedAt)
+		return ti.After(tj)
+	})
+
+	return runResume(metas[0].ID, printFlag, copyFlag, branchFlag)
 }
 
 func runResume(id string, printFlag, copyFlag, branchFlag bool) error {
