@@ -5,10 +5,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/partio-io/cli/internal/agent"
 )
+
+var systemReminderRe = regexp.MustCompile(`(?s)<system-reminder>.*?</system-reminder>`)
+
+// stripSystemReminders removes all <system-reminder>...</system-reminder> blocks from text.
+// Returns the stripped text and whether any reminders were found.
+func stripSystemReminders(text string) (string, bool) {
+	stripped := systemReminderRe.ReplaceAllString(text, "")
+	had := stripped != text
+	return strings.TrimSpace(stripped), had
+}
 
 // ParseJSONL reads a Claude Code JSONL transcript and extracts session data.
 func ParseJSONL(path string) (*agent.SessionData, error) {
@@ -24,6 +36,7 @@ func ParseJSONL(path string) (*agent.SessionData, error) {
 		sessionID   string
 		slug        string
 		totalTokens int
+		promptCount int
 		firstTS     time.Time
 		lastTS      time.Time
 	)
@@ -71,6 +84,17 @@ func ParseJSONL(path string) (*agent.SessionData, error) {
 			role = entry.Type
 		}
 
+		// Filter system-reminder injections from user/human messages
+		if role == "human" || role == "user" {
+			filtered, _ := stripSystemReminders(text)
+			if filtered == "" {
+				// Message was entirely system-reminder content; skip it
+				continue
+			}
+			text = filtered
+			promptCount++
+		}
+
 		msg := agent.Message{
 			Role:      role,
 			Content:   text,
@@ -99,6 +123,7 @@ func ParseJSONL(path string) (*agent.SessionData, error) {
 		TotalTokens: totalTokens,
 		Duration:    duration,
 		PlanSlug:    slug,
+		PromptCount: promptCount,
 	}, nil
 }
 
