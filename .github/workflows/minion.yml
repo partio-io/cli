@@ -31,7 +31,7 @@ jobs:
       (github.event_name == 'issues' && (github.event.label.name == 'minion-ready' || github.event.label.name == 'minion-approved')) ||
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/minion build'))
     runs-on: github-runner-partio-minion-ai-01
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +55,7 @@ jobs:
 
       - name: Install minions
         run: |
-          go install github.com/partio-io/minions/cmd/minions@v0.0.10
+          go install github.com/partio-io/minions/cmd/minions@v0.0.11
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Run program
