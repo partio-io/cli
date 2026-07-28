@@ -99,10 +99,15 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		)
 	}
 
+	// Determine whether the agent is still running at the time post-commit fires.
+	// This governs both the skip check and whether MarkCondensed transitions the
+	// session to StateEnded.
+	agentStillRunning, _ := detector.IsRunning()
+
 	// Skip if this session is already fully condensed and ended — re-processing
 	// it produces a redundant checkpoint with no new content.
 	if sessionData != nil && sessionData.SessionID != "" {
-		if shouldSkipSession(filepath.Join(repoRoot, config.PartioDir), sessionData.SessionID, sessionPath) {
+		if shouldSkipSession(filepath.Join(repoRoot, config.PartioDir), sessionData.SessionID, sessionPath, agentStillRunning) {
 			slog.Warn("post-commit: no checkpoint created", "reason", "session already condensed", "commit", commitHash, "session_id", sessionData.SessionID)
 			return nil
 		}
@@ -196,10 +201,12 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	}
 
 	// Mark the session as condensed so subsequent commits with the same session
-	// are skipped. This is best-effort; failure is non-fatal.
+	// are skipped. Pass agentStillRunning so MarkCondensed can avoid setting
+	// StateEnded while the agent is still active — that would cause the next
+	// commit in the same session to be incorrectly skipped.
 	if sessionData != nil && sessionData.SessionID != "" {
 		mgr := session.NewManager(filepath.Join(repoRoot, config.PartioDir))
-		if markErr := mgr.MarkCondensed(sessionData.SessionID); markErr != nil {
+		if markErr := mgr.MarkCondensed(sessionData.SessionID, agentStillRunning); markErr != nil {
 			slog.Debug("could not mark session as condensed", "error", markErr)
 		}
 	}

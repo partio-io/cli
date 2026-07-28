@@ -60,12 +60,15 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 	}
 
 	// Check for condensed sessions (Claude-specific optimisation).
+	// Pass agentRunning=true because we already confirmed the agent is active;
+	// shouldSkipSession will return false immediately and we will not suppress
+	// the checkpoint for a second commit made during the same live session.
 	if running {
 		if cd, ok := detector.(*claude.Detector); ok {
 			latestPath, pathErr := cd.FindLatestJSONLPath(repoRoot)
 			if pathErr == nil {
 				sid := claude.PeekSessionID(latestPath)
-				if shouldSkipSession(filepath.Join(repoRoot, config.PartioDir), sid, latestPath) {
+				if shouldSkipSession(filepath.Join(repoRoot, config.PartioDir), sid, latestPath, true) {
 					slog.Debug("skipping already-condensed ended session", "session_id", sid)
 					running = false
 				}
@@ -143,7 +146,12 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 // sessionID has already been fully captured (condensed + ended) and the JSONL
 // at sessionPath has not been modified since the capture time. Both ENDED and
 // Condensed must be set; IDLE or ACTIVE sessions are never skipped.
-func shouldSkipSession(partioDir, sessionID, sessionPath string) bool {
+// When agentRunning is true the function always returns false — an active agent
+// may make additional commits that each deserve their own checkpoint.
+func shouldSkipSession(partioDir, sessionID, sessionPath string, agentRunning bool) bool {
+	if agentRunning {
+		return false
+	}
 	if sessionID == "" || sessionPath == "" {
 		return false
 	}

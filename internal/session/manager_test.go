@@ -69,7 +69,7 @@ func TestManagerEnd(t *testing.T) {
 }
 
 func TestManagerMarkCondensed(t *testing.T) {
-	t.Run("marks existing session as condensed and ended", func(t *testing.T) {
+	t.Run("marks existing session as condensed and ended when agent not running", func(t *testing.T) {
 		dir := t.TempDir()
 		mgr := NewManager(dir)
 
@@ -78,7 +78,7 @@ func TestManagerMarkCondensed(t *testing.T) {
 			t.Fatalf("start error: %v", err)
 		}
 
-		if err := mgr.MarkCondensed("sess-abc"); err != nil {
+		if err := mgr.MarkCondensed("sess-abc", false); err != nil {
 			t.Fatalf("mark condensed error: %v", err)
 		}
 
@@ -100,11 +100,39 @@ func TestManagerMarkCondensed(t *testing.T) {
 		}
 	})
 
+	t.Run("does not set StateEnded when agent is still running", func(t *testing.T) {
+		dir := t.TempDir()
+		mgr := NewManager(dir)
+
+		_, err := mgr.Start("claude-code", "main", "/tmp/test")
+		if err != nil {
+			t.Fatalf("start error: %v", err)
+		}
+
+		if err := mgr.MarkCondensed("sess-abc", true); err != nil {
+			t.Fatalf("mark condensed error: %v", err)
+		}
+
+		cur, err := mgr.Current()
+		if err != nil {
+			t.Fatalf("current error: %v", err)
+		}
+		if cur.State == StateEnded {
+			t.Errorf("expected state to not be ended while agent is running, got %s", cur.State)
+		}
+		if !cur.Condensed {
+			t.Error("expected condensed=true")
+		}
+		if cur.CapturedSessionID != "sess-abc" {
+			t.Errorf("expected captured_session_id=sess-abc, got %s", cur.CapturedSessionID)
+		}
+	})
+
 	t.Run("creates session entry when none exists", func(t *testing.T) {
 		dir := t.TempDir()
 		mgr := NewManager(dir)
 
-		if err := mgr.MarkCondensed("sess-xyz"); err != nil {
+		if err := mgr.MarkCondensed("sess-xyz", false); err != nil {
 			t.Fatalf("mark condensed error: %v", err)
 		}
 

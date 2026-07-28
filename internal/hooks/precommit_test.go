@@ -14,6 +14,7 @@ func TestShouldSkipSession(t *testing.T) {
 		name         string
 		setup        func(t *testing.T, partioDir, jsonlPath string)
 		sessionID    string
+		agentRunning bool
 		modifyJSONL  bool // touch JSONL after marking condensed to simulate new content
 		wantSkip     bool
 	}{
@@ -21,7 +22,7 @@ func TestShouldSkipSession(t *testing.T) {
 			name: "skip when ended and condensed with matching session ID",
 			setup: func(t *testing.T, partioDir, jsonlPath string) {
 				mgr := session.NewManager(partioDir)
-				if err := mgr.MarkCondensed("sess-123"); err != nil {
+				if err := mgr.MarkCondensed("sess-123", false); err != nil {
 					t.Fatalf("MarkCondensed: %v", err)
 				}
 			},
@@ -29,10 +30,22 @@ func TestShouldSkipSession(t *testing.T) {
 			wantSkip:  true,
 		},
 		{
+			name: "do not skip when agent is still running even if session is condensed",
+			setup: func(t *testing.T, partioDir, jsonlPath string) {
+				mgr := session.NewManager(partioDir)
+				if err := mgr.MarkCondensed("sess-123", false); err != nil {
+					t.Fatalf("MarkCondensed: %v", err)
+				}
+			},
+			sessionID:    "sess-123",
+			agentRunning: true,
+			wantSkip:     false,
+		},
+		{
 			name: "do not skip when session ID does not match",
 			setup: func(t *testing.T, partioDir, jsonlPath string) {
 				mgr := session.NewManager(partioDir)
-				if err := mgr.MarkCondensed("sess-other"); err != nil {
+				if err := mgr.MarkCondensed("sess-other", false); err != nil {
 					t.Fatalf("MarkCondensed: %v", err)
 				}
 			},
@@ -61,7 +74,7 @@ func TestShouldSkipSession(t *testing.T) {
 			name: "do not skip when JSONL was modified after capture",
 			setup: func(t *testing.T, partioDir, jsonlPath string) {
 				mgr := session.NewManager(partioDir)
-				if err := mgr.MarkCondensed("sess-123"); err != nil {
+				if err := mgr.MarkCondensed("sess-123", false); err != nil {
 					t.Fatalf("MarkCondensed: %v", err)
 				}
 			},
@@ -98,7 +111,7 @@ func TestShouldSkipSession(t *testing.T) {
 				}
 			}
 
-			got := shouldSkipSession(partioDir, tt.sessionID, jsonlPath)
+			got := shouldSkipSession(partioDir, tt.sessionID, jsonlPath, tt.agentRunning)
 			if got != tt.wantSkip {
 				t.Errorf("shouldSkipSession() = %v, want %v", got, tt.wantSkip)
 			}

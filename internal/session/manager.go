@@ -32,10 +32,12 @@ func (m *Manager) currentPath() string {
 	return filepath.Join(m.stateDir, "current.json")
 }
 
-// MarkCondensed marks the current session as ended and fully condensed with the
-// given Claude session ID. Future hook runs that see the same session ID and an
-// unmodified JSONL file will skip checkpoint creation.
-func (m *Manager) MarkCondensed(capturedSessionID string) error {
+// MarkCondensed marks the current session as fully condensed with the given
+// agent session ID. When agentRunning is false, the session state is also
+// transitioned to StateEnded so future hook runs can skip it. When
+// agentRunning is true, StateEnded is not set — the agent may still make
+// additional commits in this session that should receive checkpoints.
+func (m *Manager) MarkCondensed(capturedSessionID string, agentRunning bool) error {
 	s, err := m.Current()
 	if err != nil {
 		return err
@@ -47,7 +49,9 @@ func (m *Manager) MarkCondensed(capturedSessionID string) error {
 		}
 		s = &Session{}
 	}
-	s.State = StateEnded
+	if !agentRunning {
+		s.State = StateEnded
+	}
 	s.Condensed = true
 	s.CapturedSessionID = capturedSessionID
 	s.CapturedAt = time.Now()

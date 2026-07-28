@@ -53,7 +53,7 @@ func TestRecordActive_ReplacesEndedSession(t *testing.T) {
 
 	// A previously ended/condensed session must not be refreshed — new agent
 	// activity should start a fresh ACTIVE session.
-	if err := mgr.MarkCondensed("sess-1"); err != nil {
+	if err := mgr.MarkCondensed("sess-1", false); err != nil {
 		t.Fatalf("MarkCondensed: %v", err)
 	}
 
