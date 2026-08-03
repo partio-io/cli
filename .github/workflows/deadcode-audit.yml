@@ -1,0 +1,96 @@
+name: Deadcode Audit
+
+on:
+  pull_request:
+    types: [opened, labeled, synchronize]
+  workflow_dispatch:
+    inputs:
+      pr_ref:
+        description: "PR reference to audit (e.g., 123 or org/repo#123)"
+        required: true
+        type: string
+      dry_run:
+        description: "Dry run (prompt generation only)"
+        required: false
+        default: false
+        type: boolean
+
+# One live audit per PR; a newer head supersedes the run in flight.
+concurrency:
+  group: deadcode-audit-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (contains(github.event.pull_request.labels.*.name, 'minion') &&
+       !contains(github.event.pull_request.labels.*.name, 'no-audit'))
+    runs-on: github-runner-partio-minion-ai-01
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve PR reference
+        id: src
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            REF="${{ inputs.pr_ref }}"
+            echo "pr_ref=${REF}" >> "$GITHUB_OUTPUT"
+            echo "pr_num=${REF##*#}" >> "$GITHUB_OUTPUT"
+            echo "dry_run=${{ inputs.dry_run }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "pr_ref=${{ github.repository }}#${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+            echo "pr_num=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+            echo "dry_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Loop guard
+        id: guard
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          HEAD_SHA=$(gh api "repos/${{ github.repository }}/pulls/${{ steps.src.outputs.pr_num }}" --jq .head.sha)
+          SUBJECT=$(gh api "repos/${{ github.repository }}/commits/${HEAD_SHA}" --jq .commit.message | head -n1)
+          case "$SUBJECT" in
+            "audit:"*)
+              echo "Head commit is an audit fix ('${SUBJECT}'); skipping to avoid an audit loop."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "skip=false" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Install minions
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          go install github.com/partio-io/minions/cmd/minions@v0.0.13
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Run deadcode audit
+        if: steps.guard.outputs.skip != 'true'
+        # On real runs the verdict gate owns the outcome, so a crashed
+        # audit session must not end the job before the gate fails it
+        # closed. Dry runs have no gate and fail here normally.
+        continue-on-error: ${{ steps.src.outputs.dry_run != 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          # The audit session runs in an isolated minions worktree, so
+          # the verdict must be written to an absolute path in this
+          # workspace for the gate step to find it.
+          MINION_AUDIT_DIR: ${{ github.workspace }}/.minion-audit
+        run: |
+          rm -rf .minion-audit
+          ARGS="run .minions/programs/deadcode-audit.md --pr ${{ steps.src.outputs.pr_ref }}"
+          if [ "${{ steps.src.outputs.dry_run }}" = "true" ]; then
+            ARGS="${ARGS} --dry-run"
+          fi
+          minions $ARGS
+
+      - name: Verdict gate
+        if: steps.guard.outputs.skip != 'true' && steps.src.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: go run ./cmd/minion-audit-gate --pr ${{ steps.src.outputs.pr_num }} --audit dead-code
