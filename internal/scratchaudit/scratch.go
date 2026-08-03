@@ -26,3 +26,5 @@ func TotalItems(items []string) int {
 func QuickSize(items []string) int {
 	return CountItems(items, true)
 }
+
+// Staging touch: second commit to exercise the audit re-run path.
