@@ -5,7 +5,7 @@ Source: [prd.md](./prd.md)
 | Done | # | Title | Blocked by |
 |------|---|-------|------------|
 | [x]  | 1 | [Lint gate for swallowed errors](./issues/01-lint-gate.md) | None |
-| [ ]  | 2 | [Dead-code audit, read-only](./issues/02-deadcode-audit-readonly.md) | None |
+| [x]  | 2 | [Dead-code audit, read-only](./issues/02-deadcode-audit-readonly.md) | None |
 | [ ]  | 3 | [Dead-code fix round](./issues/03-deadcode-fix-round.md) | [#2](./issues/02-deadcode-audit-readonly.md) |
 | [ ]  | 4 | [E2e-need audit](./issues/04-e2e-need-audit.md) | [#2](./issues/02-deadcode-audit-readonly.md) |
 | [ ]  | 5 | [Session-liveness proposal](./issues/05-session-liveness-proposal.md) | None |

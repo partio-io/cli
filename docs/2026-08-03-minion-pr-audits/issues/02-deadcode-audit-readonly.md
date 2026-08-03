@@ -30,14 +30,14 @@ Missing or malformed verdict fails the run (fail-closed).
 
 ## Acceptance criteria
 
-- [ ] Workflow triggers on pull-request opened/labeled/synchronize,
+- [x] Workflow triggers on pull-request opened/labeled/synchronize,
       proceeds only when the PR carries the `minion` label, and skips
       when the `no-audit` label is present.
-- [ ] A guard step exits early when the PR head commit subject starts
+- [x] A guard step exits early when the PR head commit subject starts
       with the `audit:` prefix (loop guard — consumed for real in
       issue 03), and concurrent runs on the same PR cancel superseded
       ones.
-- [ ] The audit session reviews the PR diff (fetching surrounding
+- [x] The audit session reviews the PR diff (fetching surrounding
       context as it judges necessary), and writes the verdict file as
       its final act.
 - [x] Gate step behavior, proven with fixture verdicts: `pass` →
@@ -46,11 +46,11 @@ Missing or malformed verdict fails the run (fail-closed).
       finding phrased with location and reasoning; re-runs update that
       comment in place rather than adding another.
 - [x] On pass, no comment at all.
-- [ ] `workflow_dispatch` dry-run renders the prompt (minions
+- [x] `workflow_dispatch` dry-run renders the prompt (minions
       dry-run path) and touches neither the PR nor the repo.
-- [ ] Workflow installs minions at the same version pin as the
+- [x] Workflow installs minions at the same version pin as the
       sibling workflows and runs on the same self-hosted runner.
-- [ ] Staged proof, then cleanup: a scratch PR with planted
+- [x] Staged proof, then cleanup: a scratch PR with planted
       semantically-dead code goes red with the comment; a clean
       scratch PR stays green and silent; an unlabeled PR triggers no
       audit; a `no-audit`-labeled one skips.
