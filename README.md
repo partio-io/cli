@@ -2,7 +2,7 @@
 
 Capture the *why* behind your code changes.
 
-**partio** hooks into Git workflows to capture AI agent sessions (currently Claude Code and Codex), preserving the reasoning behind code changes alongside the *what* that Git already tracks.
+**partio** hooks into Git workflows to capture AI agent sessions (currently Claude Code and Codex), preserving the reasoning behind code changes alongside the *what* that Git already tracks. Checkpoints live on an orphan branch (`partio/checkpoints/v1`), so they never touch your working history.
 
 The "partial" version of [entire.io](https://entire.io).
 
