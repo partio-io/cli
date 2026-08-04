@@ -23,22 +23,22 @@ head commit and exit early instead of auditing itself.
 
 ## Acceptance criteria
 
-- [ ] Fixable staged PR: planted dead code is repaired by a commit
+- [x] Fixable staged PR: planted dead code is repaired by a commit
       with the `audit:` prefix on the PR branch, the re-audit passes,
       the check ends green, and the PR carries at most the in-place
       audit comment (updated to reflect resolution or absent).
-- [ ] The workflow run triggered by the audit's own push exits early
+- [x] The workflow run triggered by the audit's own push exits early
       via the guard — observed on the staged PR, no self-audit.
-- [ ] Unfixable staged PR (a finding whose fix is deliberately out of
+- [x] Unfixable staged PR (a finding whose fix is deliberately out of
       a session's reach, e.g. requiring a design decision): exactly
       one fix attempt, then red with the surviving findings in the
       single comment.
-- [ ] Re-running the workflow on an unchanged PR converges: same
+- [x] Re-running the workflow on an unchanged PR converges: same
       verdict, no duplicate comments, no second fix commit.
-- [ ] Fix commits pass the repo's own checks (lint from issue 01
+- [x] Fix commits pass the repo's own checks (lint from issue 01
       included) before pushing — a fix that breaks the build is a
       failed fix round, red.
-- [ ] Dry-run still touches nothing.
+- [x] Dry-run still touches nothing.
 
 ## Modules touched
 
