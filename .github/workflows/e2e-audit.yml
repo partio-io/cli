@@ -1,0 +1,112 @@
+name: E2e-need Audit
+
+on:
+  pull_request:
+    types: [opened, labeled, synchronize]
+  workflow_dispatch:
+    inputs:
+      pr_ref:
+        description: "PR reference to audit (e.g., 123 or org/repo#123)"
+        required: true
+        type: string
+      dry_run:
+        description: "Dry run (prompt generation only)"
+        required: false
+        default: false
+        type: boolean
+
+# Concurrency lives on the audit job, not the workflow: the deadcode
+# audit's fix push triggers a guard-skipped run here too, and a
+# workflow-level group would let that run cancel an in-flight audit.
+# A skipped audit job never enters the group.
+
+jobs:
+  guard:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (contains(github.event.pull_request.labels.*.name, 'minion') &&
+       !contains(github.event.pull_request.labels.*.name, 'no-audit'))
+    runs-on: github-runner-partio-minion-ai-01
+    timeout-minutes: 5
+    outputs:
+      pr_ref: ${{ steps.src.outputs.pr_ref }}
+      pr_num: ${{ steps.src.outputs.pr_num }}
+      dry_run: ${{ steps.src.outputs.dry_run }}
+      skip: ${{ steps.guard.outputs.skip }}
+    steps:
+      - name: Resolve PR reference
+        id: src
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            REF="${{ inputs.pr_ref }}"
+            echo "pr_ref=${REF}" >> "$GITHUB_OUTPUT"
+            echo "pr_num=${REF##*#}" >> "$GITHUB_OUTPUT"
+            echo "dry_run=${{ inputs.dry_run }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "pr_ref=${{ github.repository }}#${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+            echo "pr_num=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+            echo "dry_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Loop guard
+        id: guard
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          HEAD_SHA=$(gh api "repos/${{ github.repository }}/pulls/${{ steps.src.outputs.pr_num }}" --jq .head.sha)
+          SUBJECT=$(gh api "repos/${{ github.repository }}/commits/${HEAD_SHA}" --jq .commit.message | head -n1)
+          case "$SUBJECT" in
+            "audit:"*)
+              echo "Head commit is an audit fix ('${SUBJECT}'); skipping to avoid an audit loop."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "skip=false" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+  audit:
+    needs: guard
+    if: needs.guard.outputs.skip != 'true'
+    concurrency:
+      group: e2e-audit-${{ github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: true
+    runs-on: github-runner-partio-minion-ai-01
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # This checkout only runs the gate; the session's proposal
+          # push happens in the minions workspace with the PAT.
+          persist-credentials: false
+
+      - name: Install minions
+        run: |
+          go install github.com/partio-io/minions/cmd/minions@v0.0.13
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Run e2e-need audit
+        # On real runs the verdict gate owns the outcome, so a crashed
+        # audit session must not end the job before the gate fails it
+        # closed. Dry runs have no gate and fail here normally.
+        continue-on-error: ${{ needs.guard.outputs.dry_run != 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          # The audit session runs in an isolated minions worktree, so
+          # the verdict must be written to an absolute path in this
+          # workspace for the gate step to find it.
+          MINION_AUDIT_DIR: ${{ github.workspace }}/.minion-audit
+        run: |
+          rm -rf .minion-audit
+          ARGS="run .minions/programs/e2e-audit.md --pr ${{ needs.guard.outputs.pr_ref }}"
+          if [ "${{ needs.guard.outputs.dry_run }}" = "true" ]; then
+            ARGS="${ARGS} --dry-run"
+          fi
+          minions $ARGS
+
+      - name: Verdict gate
+        if: needs.guard.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: go run ./cmd/minion-audit-gate --pr ${{ needs.guard.outputs.pr_num }} --audit e2e-need
