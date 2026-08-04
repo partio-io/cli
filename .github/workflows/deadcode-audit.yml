@@ -15,23 +15,26 @@ on:
         default: false
         type: boolean
 
-# One live audit per PR; a newer head supersedes the run in flight.
-concurrency:
-  group: deadcode-audit-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
+# Concurrency lives on the audit job, not the workflow: the fix
+# round's own push triggers a guard-skipped run, and a workflow-level
+# group would let that run cancel the in-flight job doing the fixing.
+# A skipped audit job never enters the group, so only runs that will
+# actually audit supersede each other.
 
 jobs:
-  audit:
+  guard:
     if: >
       github.event_name == 'workflow_dispatch' ||
       (contains(github.event.pull_request.labels.*.name, 'minion') &&
        !contains(github.event.pull_request.labels.*.name, 'no-audit'))
     runs-on: github-runner-partio-minion-ai-01
-    timeout-minutes: 30
+    timeout-minutes: 5
+    outputs:
+      pr_ref: ${{ steps.src.outputs.pr_ref }}
+      pr_num: ${{ steps.src.outputs.pr_num }}
+      dry_run: ${{ steps.src.outputs.dry_run }}
+      skip: ${{ steps.guard.outputs.skip }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Resolve PR reference
         id: src
         run: |
@@ -63,18 +66,39 @@ jobs:
               ;;
           esac
 
+  audit:
+    needs: guard
+    if: needs.guard.outputs.skip != 'true'
+    concurrency:
+      group: deadcode-audit-${{ github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: true
+    runs-on: github-runner-partio-minion-ai-01
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The apply step pushes with the PAT explicitly: a push with
+          # the checkout-persisted GITHUB_TOKEN would not trigger the
+          # guard-skipped follow-up run the loop guard exists for.
+          persist-credentials: false
+
       - name: Install minions
-        if: steps.guard.outputs.skip != 'true'
         run: |
           go install github.com/partio-io/minions/cmd/minions@v0.0.13
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
+      # The fix session proves its repair with the repo's own checks;
+      # make lint needs the binary on the runner's PATH.
+      - name: Install golangci-lint
+        if: needs.guard.outputs.dry_run != 'true'
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+
       - name: Run deadcode audit
-        if: steps.guard.outputs.skip != 'true'
         # On real runs the verdict gate owns the outcome, so a crashed
         # audit session must not end the job before the gate fails it
         # closed. Dry runs have no gate and fail here normally.
-        continue-on-error: ${{ steps.src.outputs.dry_run != 'true' }}
+        continue-on-error: ${{ needs.guard.outputs.dry_run != 'true' }}
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
           # The audit session runs in an isolated minions worktree, so
@@ -83,14 +107,102 @@ jobs:
           MINION_AUDIT_DIR: ${{ github.workspace }}/.minion-audit
         run: |
           rm -rf .minion-audit
-          ARGS="run .minions/programs/deadcode-audit.md --pr ${{ steps.src.outputs.pr_ref }}"
-          if [ "${{ steps.src.outputs.dry_run }}" = "true" ]; then
+          ARGS="run .minions/programs/deadcode-audit.md --pr ${{ needs.guard.outputs.pr_ref }}"
+          if [ "${{ needs.guard.outputs.dry_run }}" = "true" ]; then
             ARGS="${ARGS} --dry-run"
           fi
           minions $ARGS
 
-      - name: Verdict gate
-        if: steps.guard.outputs.skip != 'true' && steps.src.outputs.dry_run != 'true'
+      # Branch point for the fix round. Parsed with plain shell — the
+      # runner is minimal Debian and jq is not a given. An absent or
+      # malformed verdict yields an empty status: no fix round, and
+      # the gate fails it closed at the end.
+      - name: Read verdict
+        id: verdict
+        if: needs.guard.outputs.dry_run != 'true'
+        run: |
+          STATUS=""
+          if [ -f .minion-audit/verdict.json ]; then
+            STATUS=$(tr -d ' \n\t' < .minion-audit/verdict.json | grep -o '"status":"[a-z]*"' | head -n1 | cut -d'"' -f4 || true)
+          fi
+          echo "status=${STATUS}" >> "$GITHUB_OUTPUT"
+          echo "Verdict status: '${STATUS}'"
+
+      # Exactly one fix attempt, ever: this step has no retry and the
+      # loop guard keeps the pushed commit from starting a new round.
+      # The session only emits a checked patch to .minion-audit/ — it
+      # never commits or pushes; the apply step below owns that.
+      - name: Fix round
+        if: steps.verdict.outputs.status == 'fail'
+        # A crashed fix session is a failed fix round, not a broken
+        # job — the re-audit or the gate still owns the outcome.
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
-        run: go run ./cmd/minion-audit-gate --pr ${{ steps.src.outputs.pr_num }} --audit dead-code
+          MINION_AUDIT_DIR: ${{ github.workspace }}/.minion-audit
+        run: minions run .minions/programs/deadcode-audit-fix.md --pr ${{ needs.guard.outputs.pr_ref }}
+
+      # Deterministic half of the fix round: apply the session's
+      # patch to the true PR head, prove it with the repo's own
+      # checks, and push one audit-prefixed commit with the PAT (a
+      # GITHUB_TOKEN push would suppress the follow-up run). Any
+      # failure leaves pushed=false and the first verdict stands.
+      - name: Apply fix
+        id: fixpush
+        if: steps.verdict.outputs.status == 'fail'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          PUSHED=false
+          PATCH="${{ github.workspace }}/.minion-audit/fix.patch"
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          if [ -s "$PATCH" ]; then
+            HEAD_REF=$(gh api "repos/${{ github.repository }}/pulls/${{ needs.guard.outputs.pr_num }}" --jq .head.ref)
+            HEAD_REPO=$(gh api "repos/${{ github.repository }}/pulls/${{ needs.guard.outputs.pr_num }}" --jq .head.repo.full_name)
+            if [ "$HEAD_REPO" = "${{ github.repository }}" ]; then
+              git fetch --no-tags "$REMOTE" "$HEAD_REF"
+              WT="${RUNNER_TEMP}/audit-fixwt"
+              git worktree remove --force "$WT" 2>/dev/null || rm -rf "$WT"
+              git worktree add --detach "$WT" FETCH_HEAD
+              BODY=""
+              if [ -f .minion-audit/fix-summary.txt ]; then
+                BODY=$(head -c 300 .minion-audit/fix-summary.txt)
+              fi
+              if git -C "$WT" apply --index "$PATCH" \
+                && (cd "$WT" && make lint && make test); then
+                git -C "$WT" -c user.name="minion audit" -c user.email="minions@partio.io" \
+                  commit -m "audit: fix dead-code findings (#${{ needs.guard.outputs.pr_num }})" -m "$BODY"
+                if git -C "$WT" push "$REMOTE" HEAD:"$HEAD_REF"; then
+                  PUSHED=true
+                fi
+              else
+                echo "Patch did not apply or failed checks; pushing nothing."
+              fi
+              git worktree remove --force "$WT" || true
+            else
+              echo "PR head lives in a fork; the fix round cannot push there."
+            fi
+          else
+            echo "Fix session exported no patch; the first verdict stands."
+          fi
+          echo "pushed=${PUSHED}" >> "$GITHUB_OUTPUT"
+
+      # Fresh session, final verdict. Only runs when the fix round
+      # actually moved the branch — an unchanged head would re-derive
+      # the verdict the gate already holds.
+      - name: Re-audit
+        if: steps.fixpush.outputs.pushed == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          MINION_AUDIT_DIR: ${{ github.workspace }}/.minion-audit
+        run: |
+          rm -rf .minion-audit
+          minions run .minions/programs/deadcode-audit.md --pr ${{ needs.guard.outputs.pr_ref }}
+
+      - name: Verdict gate
+        if: needs.guard.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: go run ./cmd/minion-audit-gate --pr ${{ needs.guard.outputs.pr_num }} --audit dead-code
