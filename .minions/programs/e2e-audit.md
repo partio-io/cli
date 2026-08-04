@@ -69,7 +69,11 @@ Work through the audit in this order:
      `gh issue list --repo <org>/<repo> --label minion-proposal --state open --search "<id>" --limit 5`,
      and also scan the open proposals' titles for the same gap under
      a different id. If one already covers it, reuse it — record the
-     existing issue in your verdict reasoning and file nothing.
+     existing issue in your verdict reasoning and file nothing. One
+     repair applies: when the covering proposal's `<!-- program: ... -->`
+     file does not exist on `origin/main`, write that file (step
+     above) and push it (step 5) so the proposal stays buildable —
+     still without filing a new issue.
    - Write a program file to `.minions/programs/<id>.md` with
      frontmatter (`id`, `target_repos`, `acceptance_criteria`,
      `pr_labels`) and a body that tells a fresh minion session
@@ -84,17 +88,22 @@ Work through the audit in this order:
      file, and the marker
      `<!-- program: .minions/programs/<id>.md -->`.
 
-5. **Commit and push the program files** the way the propose program
-   does — only if step 4 wrote any:
+5. **Commit and push the program files** to `main`, the way the
+   propose program does — only if step 4 wrote any:
 
    ```bash
    git add .minions/programs/
    git commit -m "chore: add minion proposals"
-   git push
+   git push origin HEAD:main
    ```
 
-   If the push is rejected because the local branch is behind, run
-   `git pull --rebase origin main` and push once more.
+   Your worktree sits on a session branch, so a bare `git push` will
+   not reach `main` — push `HEAD:main` explicitly, and confirm it
+   succeeded. If it is rejected because your base is behind, run
+   `git fetch origin main && git rebase origin/main` and push once
+   more. Do not leave the commit unpushed for the runtime to turn
+   into a PR of its own: the proposal is unusable until its program
+   file is on `main`.
 
 6. **Write the verdict — your final act.** Create the directory and
    write `$MINION_AUDIT_DIR/verdict.json`:
