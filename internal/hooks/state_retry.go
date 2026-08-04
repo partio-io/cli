@@ -11,7 +11,7 @@ import (
 // it does not exist yet. Pre-commit writes the state and post-commit
 // consumes it; on a fast follow-up commit the second post-commit can
 // fire before the second pre-commit's write is visible, so a bounded
-// retry bridges the handoff instead of silently skipping the
+// retry bridges the handoff instead of silently dropping the
 // checkpoint.
 func readStateWithRetry(path string, attempts int, delay time.Duration) ([]byte, error) {
 	var lastErr error
