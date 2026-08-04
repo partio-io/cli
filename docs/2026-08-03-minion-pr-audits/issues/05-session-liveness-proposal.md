@@ -33,21 +33,21 @@ that cleanup explicitly.
 
 ## Acceptance criteria
 
-- [ ] Program file exists under the programs directory with the
+- [x] Program file exists under the programs directory with the
       pipeline's standard frontmatter (id, target repo, acceptance
       criteria, PR labels).
-- [ ] `minion-proposal` issue filed on this repo, body carrying: the
+- [x] `minion-proposal` issue filed on this repo, body carrying: the
       defect description with the manual-commit misattribution
       scenario; the session-recorded-PID approach; a conservative
       fallback when no PID was recorded (fall back to current global
       detection rather than regressing capture); the dead
       condensed-session block's removal or revival; and the program
       file marker.
-- [ ] The issue's acceptance criteria explicitly require unit tests
+- [x] The issue's acceptance criteria explicitly require unit tests
       for the liveness decision (PID alive, PID dead, PID absent) and
       preservation of the PR #586 behavior: a live session's second
       commit still gets its trailer.
-- [ ] Issue body is buildable standalone: a fresh minion session given
+- [x] Issue body is buildable standalone: a fresh minion session given
       only the issue can locate the hooks, session state, and detector
       seams from the descriptions in the body.
 
