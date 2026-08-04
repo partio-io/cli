@@ -140,6 +140,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
           MINION_AUDIT_DIR: ${{ github.workspace }}/.minion-audit
+          # Fresh lint cache per step: the shared cache replays issues
+          # recorded under other (since-deleted) worktrees, whose
+          # unreadable paths defeat the test-file exclusion rules.
+          GOLANGCI_LINT_CACHE: ${{ runner.temp }}/golangci-cache-fix
         run: minions run .minions/programs/deadcode-audit-fix.md --pr ${{ needs.guard.outputs.pr_ref }}
 
       # Deterministic half of the fix round: apply the session's
@@ -153,6 +157,7 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
+          GOLANGCI_LINT_CACHE: ${{ runner.temp }}/golangci-cache-apply
         run: |
           PUSHED=false
           PATCH="${{ github.workspace }}/.minion-audit/fix.patch"
