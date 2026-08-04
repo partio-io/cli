@@ -27,9 +27,10 @@ func (r *Runner) PostCommit() error {
 }
 
 func runPostCommit(repoRoot string, cfg config.Config) error {
-	// Read pre-commit state
+	// Read pre-commit state, tolerating a brief lag on fast
+	// follow-up commits where pre-commit's write is not yet visible.
 	stateFile := filepath.Join(repoRoot, config.PartioDir, "state", "pre-commit.json")
-	data, err := os.ReadFile(stateFile)
+	data, err := readStateWithRetry(stateFile, 5, 100*time.Millisecond)
 	if err != nil {
 		slog.Warn("post-commit: no checkpoint created", "reason", "no pre-commit state found", "state_file", stateFile)
 		return nil
