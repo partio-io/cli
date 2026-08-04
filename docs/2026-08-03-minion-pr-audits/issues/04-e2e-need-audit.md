@@ -33,21 +33,21 @@ verdict (a crashed session) fails the workflow.
 
 ## Acceptance criteria
 
-- [ ] Same trigger surface as the dead-code audit: minion label
+- [x] Same trigger surface as the dead-code audit: minion label
       required, `no-audit` skip, `audit:` head-commit guard,
       concurrency cancel, same runner, same minions pin, dry-run via
       `workflow_dispatch` that touches nothing.
-- [ ] Staged PR that plainly deserves e2e coverage: exactly one
+- [x] Staged PR that plainly deserves e2e coverage: exactly one
       `minion-proposal` issue filed, body prefixed `Minion audit —`,
       with buildable acceptance criteria and the program-file
       reference; check green.
-- [ ] Re-run on the same staged PR: no duplicate proposal, still
+- [x] Re-run on the same staged PR: no duplicate proposal, still
       green.
-- [ ] Staged cosmetic PR (comment/docs-only change): no proposal, no
+- [x] Staged cosmetic PR (comment/docs-only change): no proposal, no
       comment, green.
-- [ ] Fixture-verdict proof that a missing or malformed verdict still
+- [x] Fixture-verdict proof that a missing or malformed verdict still
       fails this workflow despite findings never doing so.
-- [ ] Staged artifacts cleaned up afterwards (scratch PRs closed,
+- [x] Staged artifacts cleaned up afterwards (scratch PRs closed,
       scratch proposals closed and labeled `do-not-build`).
 
 ## Modules touched
