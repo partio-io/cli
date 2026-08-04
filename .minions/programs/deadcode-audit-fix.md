@@ -63,6 +63,13 @@ Work through the repair in this order:
      a public contract, resurrecting the dead path instead of
      removing it — leave that finding unfixed. A surviving finding
      is the correct outcome for a fix that needs a human.
+   - Hard rule, no judgment: never change or remove an exported
+     identifier — function, method, type, field, or any signature —
+     even when the finding proves part of it inert, and even if
+     that means fixing nothing. An exported contract is a design
+     decision by definition; a comment marking the choice as open
+     (a TODO, a "decide later") makes this absolute. Export-level
+     repairs always go to a human.
    - No opportunistic edits. Style, naming, or refactors beyond the
      findings are out of scope, however tempting.
    - Keep each repair coherent: removing a branch that orphans a
