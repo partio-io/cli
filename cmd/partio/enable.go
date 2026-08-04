@@ -27,7 +27,10 @@ func newEnableCmd() *cobra.Command {
 }
 
 func runEnable(cmd *cobra.Command, args []string) error {
-	absolutePath, _ := cmd.Flags().GetBool("absolute-path")
+	absolutePath, flagErr := cmd.Flags().GetBool("absolute-path")
+	if flagErr != nil {
+		slog.Debug("could not read --absolute-path flag", "error", flagErr)
+	}
 
 	repoRoot, err := git.RepoRoot()
 	if err != nil {
@@ -140,8 +143,11 @@ func ensureSettingsEnabled(settingsPath string) error {
 func addToGitignore(repoRoot, entry string) {
 	gitignore := filepath.Join(repoRoot, ".gitignore")
 
-	// Read existing content
-	existing, _ := os.ReadFile(gitignore)
+	// Read existing content; a missing .gitignore is expected (created below).
+	existing, readErr := os.ReadFile(gitignore)
+	if readErr != nil && !os.IsNotExist(readErr) {
+		slog.Debug("could not read .gitignore", "error", readErr)
+	}
 	content := string(existing)
 
 	// Check if already present
@@ -157,12 +163,20 @@ func addToGitignore(repoRoot, entry string) {
 		slog.Warn("could not update .gitignore", "error", err)
 		return
 	}
-	defer func() { _ = f.Close() }()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil {
+			slog.Warn("could not update .gitignore", "error", closeErr)
+		}
+	}()
 
 	if len(existing) > 0 && existing[len(existing)-1] != '\n' {
-		_, _ = f.WriteString("\n")
+		if _, writeErr := f.WriteString("\n"); writeErr != nil {
+			slog.Warn("could not write to .gitignore", "error", writeErr)
+		}
 	}
-	_, _ = f.WriteString(entry + "\n")
+	if _, writeErr := f.WriteString(entry + "\n"); writeErr != nil {
+		slog.Warn("could not write to .gitignore", "entry", entry, "error", writeErr)
+	}
 }
 
 func createCheckpointBranch() error {

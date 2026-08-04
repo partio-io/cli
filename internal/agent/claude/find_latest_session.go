@@ -2,6 +2,7 @@ package claude
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -35,8 +36,14 @@ func (d *Detector) FindLatestJSONLPath(repoRoot string) (string, error) {
 	}
 
 	sort.Slice(jsonlFiles, func(i, j int) bool {
-		ii, _ := jsonlFiles[i].Info()
-		jj, _ := jsonlFiles[j].Info()
+		ii, iErr := jsonlFiles[i].Info()
+		jj, jErr := jsonlFiles[j].Info()
+		if iErr != nil || jErr != nil {
+			// A file that vanished between ReadDir and Info sinks to the
+			// end of the newest-first order instead of panicking on nil.
+			slog.Debug("could not stat session file while sorting", "dir", sessionDir, "i_error", iErr, "j_error", jErr)
+			return iErr == nil
+		}
 		return ii.ModTime().After(jj.ModTime())
 	})
 

@@ -35,7 +35,9 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		return nil
 	}
 	// Remove immediately to prevent re-entry (amend triggers post-commit again)
-	_ = os.Remove(stateFile)
+	if rmErr := os.Remove(stateFile); rmErr != nil {
+		slog.Warn("could not remove pre-commit state file; amend may re-trigger checkpoint", "state_file", stateFile, "error", rmErr)
+	}
 
 	var state preCommitState
 	if err := json.Unmarshal(data, &state); err != nil {
@@ -90,7 +92,10 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 
 	// Log staged file paths and session content paths for diagnosing path mismatches.
 	if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
-		commitFiles, _ := git.DiffNameOnly(commitHash)
+		commitFiles, diffErr := git.DiffNameOnly(commitHash)
+		if diffErr != nil {
+			slog.Debug("post-commit: could not list commit files", "commit", commitHash, "error", diffErr)
+		}
 		slog.Debug("post-commit: file overlap check",
 			"commit", commitHash,
 			"staged_files", commitFiles,

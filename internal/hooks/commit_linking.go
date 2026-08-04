@@ -38,12 +38,21 @@ func promptCommitLinking(repoRoot string) bool {
 		slog.Debug("commit linking: no TTY available, auto-linking")
 		return true
 	}
-	defer func() { _ = tty.Close() }()
+	defer func() {
+		if closeErr := tty.Close(); closeErr != nil {
+			slog.Debug("commit linking: could not close tty", "error", closeErr)
+		}
+	}()
 
-	_, _ = fmt.Fprint(tty, "partio: Link this commit to the active AI session? [Y/n/a] ")
+	if _, printErr := fmt.Fprint(tty, "partio: Link this commit to the active AI session? [Y/n/a] "); printErr != nil {
+		slog.Debug("commit linking: could not write prompt to tty", "error", printErr)
+	}
 
 	reader := bufio.NewReader(tty)
-	line, _ := reader.ReadString('\n')
+	line, readErr := reader.ReadString('\n')
+	if readErr != nil {
+		slog.Debug("commit linking: could not read tty answer, using default", "error", readErr)
+	}
 	answer := strings.TrimSpace(strings.ToLower(line))
 
 	switch answer {

@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 )
@@ -45,25 +46,24 @@ func mergeFromFile(dst *Config, path string) {
 		return
 	}
 
-	if v, ok := raw["enabled"]; ok {
-		_ = json.Unmarshal(v, &dst.Enabled)
+	mergeKey(raw, "enabled", path, &dst.Enabled)
+	mergeKey(raw, "strategy", path, &dst.Strategy)
+	mergeKey(raw, "agent", path, &dst.Agent)
+	mergeKey(raw, "log_level", path, &dst.LogLevel)
+	mergeKey(raw, "commit_linking", path, &dst.CommitLinking)
+	mergeKey(raw, "strategy_options", path, &dst.StrategyOptions)
+	mergeKey(raw, "stale_session_threshold", path, &dst.StaleSessionThreshold)
+}
+
+// mergeKey unmarshals raw[key] into dst if present. A malformed value keeps
+// the previous config value; it is logged rather than silently dropped so a
+// settings typo is visible instead of reverting to defaults without a trace.
+func mergeKey(raw map[string]json.RawMessage, key, path string, dst any) {
+	v, ok := raw[key]
+	if !ok {
+		return
 	}
-	if v, ok := raw["strategy"]; ok {
-		_ = json.Unmarshal(v, &dst.Strategy)
-	}
-	if v, ok := raw["agent"]; ok {
-		_ = json.Unmarshal(v, &dst.Agent)
-	}
-	if v, ok := raw["log_level"]; ok {
-		_ = json.Unmarshal(v, &dst.LogLevel)
-	}
-	if v, ok := raw["commit_linking"]; ok {
-		_ = json.Unmarshal(v, &dst.CommitLinking)
-	}
-	if v, ok := raw["strategy_options"]; ok {
-		_ = json.Unmarshal(v, &dst.StrategyOptions)
-	}
-	if v, ok := raw["stale_session_threshold"]; ok {
-		_ = json.Unmarshal(v, &dst.StaleSessionThreshold)
+	if err := json.Unmarshal(v, dst); err != nil {
+		slog.Warn("ignoring malformed config key", "path", path, "key", key, "error", err)
 	}
 }

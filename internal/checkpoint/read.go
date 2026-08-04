@@ -3,6 +3,7 @@ package checkpoint
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/partio-io/cli/internal/git"
 )
@@ -38,10 +39,10 @@ func Read(id string) (*CheckpointData, error) {
 	}
 
 	// Read optional files — missing files are not errors
-	prompt, _ := git.ExecGit("show", prefix+"/0/prompt.txt")
-	plan, _ := git.ExecGit("show", prefix+"/0/plan.md")
-	diff, _ := git.ExecGit("show", prefix+"/0/diff.patch")
-	context, _ := git.ExecGit("show", prefix+"/0/context.md")
+	prompt := showOptional(prefix + "/0/prompt.txt")
+	plan := showOptional(prefix + "/0/plan.md")
+	diff := showOptional(prefix + "/0/diff.patch")
+	context := showOptional(prefix + "/0/context.md")
 
 	return &CheckpointData{
 		Metadata: meta,
@@ -50,4 +51,14 @@ func Read(id string) (*CheckpointData, error) {
 		Diff:     diff,
 		Context:  context,
 	}, nil
+}
+
+// showOptional reads one optional checkpoint file. Absence is expected, so
+// the failure is logged at debug and the file treated as empty.
+func showOptional(path string) string {
+	out, err := git.ExecGit("show", path)
+	if err != nil {
+		slog.Debug("optional checkpoint file not read", "path", path, "error", err)
+	}
+	return out
 }
