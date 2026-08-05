@@ -13,8 +13,7 @@ func CommitReachable(repoDir, sha string) (bool, error) {
 	if err == nil {
 		return true, nil
 	}
-	if exitErr, ok := err.(*exec.ExitError); ok {
-		_ = exitErr
+	if _, ok := err.(*exec.ExitError); ok {
 		return false, nil
 	}
 	return false, err
