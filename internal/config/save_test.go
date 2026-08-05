@@ -33,6 +33,32 @@ func TestSaveRepoSetting_NewFile(t *testing.T) {
 	}
 }
 
+func TestSaveRepoSetting_MalformedExisting(t *testing.T) {
+	dir := t.TempDir()
+	partioDir := filepath.Join(dir, PartioDir)
+	if err := os.MkdirAll(partioDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	malformed := `{"enabled": true,` // truncated JSON
+	settingsPath := filepath.Join(partioDir, "settings.json")
+	if err := os.WriteFile(settingsPath, []byte(malformed), 0o644); err != nil {
+		t.Fatalf("writing malformed settings: %v", err)
+	}
+
+	if err := SaveRepoSetting(dir, "commit_linking", CommitLinkingAlways); err == nil {
+		t.Fatal("expected error for malformed settings.json, got nil")
+	}
+
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("reading settings.json: %v", err)
+	}
+	if string(data) != malformed {
+		t.Errorf("malformed settings.json was rewritten: %q", string(data))
+	}
+}
+
 func TestSaveRepoSetting_PreservesExisting(t *testing.T) {
 	dir := t.TempDir()
 	partioDir := filepath.Join(dir, PartioDir)

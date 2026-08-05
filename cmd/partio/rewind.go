@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -116,8 +117,11 @@ func runRewindTo(id string) error {
 		return fmt.Errorf("invalid checkpoint metadata: %w", err)
 	}
 
-	// Read session context
-	context, _ := git.ExecGit("show", branch+":"+shard+"/"+rest+"/0/context.md")
+	// Read session context; the file is optional, so absence is expected.
+	context, ctxErr := git.ExecGit("show", branch+":"+shard+"/"+rest+"/0/context.md")
+	if ctxErr != nil {
+		slog.Debug("checkpoint context not read", "id", id, "error", ctxErr)
+	}
 
 	fmt.Printf("Rewinding to checkpoint %s\n", id)
 	fmt.Printf("  Commit: %s\n", meta.CommitHash)

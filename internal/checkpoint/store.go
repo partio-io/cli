@@ -91,8 +91,12 @@ func (s *Store) addToTree(currentTree, shard, rest, cpTree string) (string, erro
 	// Build shard tree with new entry
 	var shardEntries []treeEntry
 	if shardTree != "" {
-		// Read existing shard entries
-		existing, _ := s.git("ls-tree", shardTree)
+		// Read existing shard entries. A failed listing must abort: rebuilding
+		// the shard from an empty listing would drop its existing checkpoints.
+		existing, lsErr := s.git("ls-tree", shardTree)
+		if lsErr != nil {
+			return "", fmt.Errorf("listing shard tree %s: %w", shard, lsErr)
+		}
 		for _, line := range strings.Split(existing, "\n") {
 			if line == "" {
 				continue

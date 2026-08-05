@@ -131,8 +131,13 @@ func (s *Store) rebuildTreeWithout(currentTree string, keepIDs map[string]bool, 
 		}
 	}
 
-	// Read current root tree to get existing entries (in case there are non-shard entries)
-	rootListing, _ := s.git("ls-tree", currentTree)
+	// Read current root tree to get existing entries (in case there are non-shard entries).
+	// A failed listing must abort: rebuilding from an empty listing would write
+	// a root tree that silently drops every entry it failed to read.
+	rootListing, err := s.git("ls-tree", currentTree)
+	if err != nil {
+		return "", fmt.Errorf("listing checkpoint root tree: %w", err)
+	}
 
 	var rootEntries []treeEntry
 

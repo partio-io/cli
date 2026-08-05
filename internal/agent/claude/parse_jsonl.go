@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
@@ -16,7 +17,11 @@ func ParseJSONL(path string) (*agent.SessionData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opening JSONL file: %w", err)
 	}
-	defer func() { _ = f.Close() }()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil {
+			slog.Debug("closing JSONL file", "path", path, "error", closeErr)
+		}
+	}()
 
 	var (
 		messages    []agent.Message

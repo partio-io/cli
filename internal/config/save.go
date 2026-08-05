@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -15,7 +16,12 @@ func SaveRepoSetting(repoRoot, key string, value any) error {
 
 	existing, err := os.ReadFile(settingsPath)
 	if err == nil {
-		_ = json.Unmarshal(existing, &raw)
+		// Refuse to proceed on a malformed file: continuing with an empty map
+		// would rewrite settings.json with only the new key, dropping every
+		// setting the user already had.
+		if err := json.Unmarshal(existing, &raw); err != nil {
+			return fmt.Errorf("existing %s is not valid JSON, not overwriting: %w", settingsPath, err)
+		}
 	}
 
 	encoded, err := json.Marshal(value)

@@ -4,11 +4,20 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
 	"github.com/partio-io/cli/internal/agent"
 )
+
+// closeLogged closes a read-only session file, logging the error instead of
+// propagating it — a failed close after reading loses nothing.
+func closeLogged(f *os.File, path string) {
+	if err := f.Close(); err != nil {
+		slog.Debug("closing codex session file", "path", path, "error", err)
+	}
+}
 
 // jsonlLine is the top-level structure of a Codex JSONL line.
 type jsonlLine struct {
@@ -43,7 +52,7 @@ func ParseJSONL(path string) (*agent.SessionData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opening codex session: %w", err)
 	}
-	defer func() { _ = f.Close() }()
+	defer closeLogged(f, path)
 
 	data := &agent.SessionData{
 		Agent: "codex",
@@ -144,7 +153,7 @@ func PeekSessionID(path string) string {
 	if err != nil {
 		return ""
 	}
-	defer func() { _ = f.Close() }()
+	defer closeLogged(f, path)
 
 	scanner := bufio.NewScanner(f)
 	if scanner.Scan() {
@@ -165,7 +174,7 @@ func PeekCWD(path string) string {
 	if err != nil {
 		return ""
 	}
-	defer func() { _ = f.Close() }()
+	defer closeLogged(f, path)
 
 	scanner := bufio.NewScanner(f)
 	if scanner.Scan() {

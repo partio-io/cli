@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -21,13 +22,17 @@ func Uninstall(repoRoot string) error {
 		// Only remove if it's our hook
 		if data, err := os.ReadFile(hookPath); err == nil {
 			if isPartioHook(string(data)) {
-				_ = os.Remove(hookPath)
+				if rmErr := os.Remove(hookPath); rmErr != nil {
+					slog.Warn("could not remove partio hook", "path", hookPath, "error", rmErr)
+				}
 			}
 		}
 
 		// Restore backup if present
 		if _, err := os.Stat(backupPath); err == nil {
-			_ = os.Rename(backupPath, hookPath)
+			if renameErr := os.Rename(backupPath, hookPath); renameErr != nil {
+				slog.Warn("could not restore hook backup", "backup", backupPath, "path", hookPath, "error", renameErr)
+			}
 		}
 	}
 

@@ -2,6 +2,7 @@ package codex
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -38,7 +39,13 @@ func (d *Detector) FindLatestSession(repoRoot string) (string, *agent.SessionDat
 	if err != nil {
 		absRepoRoot = repoRoot
 	}
-	absRepoRoot, _ = filepath.Abs(absRepoRoot)
+	// Keep the unresolved path on failure — filepath.Abs returns "" on error,
+	// which would clobber the fallback instead of degrading gracefully.
+	if abs, absErr := filepath.Abs(absRepoRoot); absErr == nil {
+		absRepoRoot = abs
+	} else {
+		slog.Debug("could not resolve absolute repo root", "path", absRepoRoot, "error", absErr)
+	}
 
 	// Collect all .jsonl files
 	var files []string
@@ -69,7 +76,11 @@ func (d *Detector) FindLatestSession(repoRoot string) (string, *agent.SessionDat
 		if err != nil {
 			absCWD = cwd
 		}
-		absCWD, _ = filepath.Abs(absCWD)
+		if abs, absErr := filepath.Abs(absCWD); absErr == nil {
+			absCWD = abs
+		} else {
+			slog.Debug("could not resolve absolute session cwd", "path", absCWD, "error", absErr)
+		}
 
 		// Check if the session cwd matches or is a parent of the repo root
 		if absCWD == absRepoRoot || strings.HasPrefix(absRepoRoot, absCWD+"/") {

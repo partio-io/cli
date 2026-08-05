@@ -39,10 +39,16 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 		d, err := agent.NewDetector(cfg.Agent)
 		if err != nil {
 			slog.Warn("unknown configured agent", "agent", cfg.Agent, "error", err)
-		} else if r, _ := d.IsRunning(); r {
-			detector = d
-			running = true
-			slog.Debug("using configured agent", "agent", detector.Name())
+		} else {
+			r, runErr := d.IsRunning()
+			if runErr != nil {
+				slog.Warn("configured agent liveness check failed", "agent", cfg.Agent, "error", runErr)
+			}
+			if r {
+				detector = d
+				running = true
+				slog.Debug("using configured agent", "agent", detector.Name())
+			}
 		}
 	}
 
@@ -87,8 +93,14 @@ func runPreCommit(repoRoot string, cfg config.Config) error {
 		}
 	}
 
-	branch, _ := git.CurrentBranch()
-	commitHash, _ := git.CurrentCommit()
+	branch, branchErr := git.CurrentBranch()
+	if branchErr != nil {
+		slog.Debug("could not resolve current branch", "error", branchErr)
+	}
+	commitHash, commitErr := git.CurrentCommit()
+	if commitErr != nil {
+		slog.Debug("could not resolve current commit", "error", commitErr)
+	}
 
 	// If the agent supports session parsing, require a session path.
 	// Otherwise (no SessionParser), running is sufficient.

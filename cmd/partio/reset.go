@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/spf13/cobra"
 
@@ -25,8 +26,10 @@ func runReset(cmd *cobra.Command, args []string) error {
 
 	const branchName = "partio/checkpoints/v1"
 
-	// Delete existing branch
-	_, _ = git.ExecGit("branch", "-D", branchName)
+	// Delete existing branch; failure is expected when it does not exist yet.
+	if _, delErr := git.ExecGit("branch", "-D", branchName); delErr != nil {
+		slog.Debug("checkpoint branch not deleted", "branch", branchName, "error", delErr)
+	}
 
 	// Recreate
 	if err := createCheckpointBranch(); err != nil {

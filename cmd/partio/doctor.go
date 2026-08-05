@@ -51,8 +51,11 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 			fmt.Printf("[WARN] %s hook missing\n", name)
 			issues++
 		} else {
-			data, _ := os.ReadFile(hookPath)
-			if strings.Contains(string(data), "partio _hook") {
+			data, readErr := os.ReadFile(hookPath)
+			if readErr != nil {
+				fmt.Printf("[WARN] %s hook unreadable: %v\n", name, readErr)
+				issues++
+			} else if strings.Contains(string(data), "partio _hook") {
 				fmt.Printf("[OK]   %s hook installed\n", name)
 			} else {
 				fmt.Printf("[WARN] %s hook exists but not managed by partio\n", name)

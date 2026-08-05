@@ -34,7 +34,11 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		enabled = true
 	}
 
-	branch, _ := git.CurrentBranch()
+	branch, branchErr := git.CurrentBranch()
+	if branchErr != nil {
+		branch = "(unknown)"
+		slog.Debug("could not resolve current branch", "error", branchErr)
+	}
 
 	fmt.Printf("Repository: %s\n", repoRoot)
 	fmt.Printf("Branch:     %s\n", branch)
