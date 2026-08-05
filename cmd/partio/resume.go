@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"syscall"
 
@@ -17,17 +18,27 @@ import (
 
 func newResumeCmd() *cobra.Command {
 	var (
-		printFlag bool
-		copyFlag  bool
-		branchFlag bool
+		printFlag      bool
+		copyFlag       bool
+		branchFlag     bool
+		branchNameFlag string
 	)
 
 	cmd := &cobra.Command{
-		Use:   "resume <checkpoint-id>",
+		Use:   "resume [<checkpoint-id>]",
 		Short: "Resume a session from a checkpoint",
-		Long:  `Read checkpoint data from the orphan branch and launch a new Claude Code session with the previous context.`,
-		Args:  cobra.ExactArgs(1),
+		Long: `Read checkpoint data from the orphan branch and launch a new Claude Code session with the previous context.
+
+Use --branch-name to resume the most recent session from a named branch. This is the recommended
+approach for sessions whose branch was squash-merged into main.`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 && branchNameFlag == "" {
+				return fmt.Errorf("accepts 1 arg(s), received 0\nUsage: partio resume <checkpoint-id>\n       partio resume --branch-name <branch>")
+			}
+			if branchNameFlag != "" {
+				return runResumeByBranch(branchNameFlag, printFlag, copyFlag, branchFlag)
+			}
 			return runResume(args[0], printFlag, copyFlag, branchFlag)
 		},
 	}
@@ -35,8 +46,41 @@ func newResumeCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&printFlag, "print", false, "print the composed context prompt to stdout")
 	cmd.Flags().BoolVar(&copyFlag, "copy", false, "copy the context prompt to clipboard")
 	cmd.Flags().BoolVar(&branchFlag, "branch", false, "create a branch at the checkpoint's commit before launching")
+	cmd.Flags().StringVar(&branchNameFlag, "branch-name", "", "resume the most recent session from the named branch (recommended for squash-merged work)")
 
 	return cmd
+}
+
+// runResumeByBranch finds the most recent checkpoint for the given branch and resumes it.
+func runResumeByBranch(branchName string, printFlag, copyFlag, branchFlag bool) error {
+	repoDir, err := git.RepoRoot()
+	if err != nil {
+		return fmt.Errorf("must be run inside a git repository")
+	}
+
+	checkpoints, err := checkpoint.FindByBranch(repoDir, branchName)
+	if err != nil {
+		return fmt.Errorf("looking up checkpoints for branch %q: %w", branchName, err)
+	}
+
+	cp, err := pickMostRecentCheckpoint(checkpoints)
+	if err != nil {
+		return fmt.Errorf("no checkpoints found for branch %q", branchName)
+	}
+
+	return runResume(cp.ID, printFlag, copyFlag, branchFlag)
+}
+
+// pickMostRecentCheckpoint returns the checkpoint with the latest CreatedAt from the slice.
+// Returns an error if the slice is empty.
+func pickMostRecentCheckpoint(checkpoints []checkpoint.Checkpoint) (checkpoint.Checkpoint, error) {
+	if len(checkpoints) == 0 {
+		return checkpoint.Checkpoint{}, fmt.Errorf("no checkpoints")
+	}
+	sort.SliceStable(checkpoints, func(i, j int) bool {
+		return checkpoints[i].CreatedAt.After(checkpoints[j].CreatedAt)
+	})
+	return checkpoints[0], nil
 }
 
 func runResume(id string, printFlag, copyFlag, branchFlag bool) error {
