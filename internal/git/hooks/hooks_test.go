@@ -42,7 +42,11 @@ func TestInstallAndUninstall(t *testing.T) {
 		}
 
 		// Check executable permission
-		info, _ := os.Stat(path)
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Errorf("stat hook %s: %v", name, err)
+			continue
+		}
 		if info.Mode()&0o111 == 0 {
 			t.Errorf("hook %s is not executable", name)
 		}
