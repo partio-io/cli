@@ -6,6 +6,7 @@ import "time"
 type SessionData struct {
 	SessionID   string        `json:"session_id"`
 	Agent       string        `json:"agent"`
+	Model       string        `json:"model,omitempty"`
 	Prompt      string        `json:"prompt"`
 	Transcript  []Message     `json:"transcript"`
 	Context     string        `json:"context"`

@@ -10,6 +10,7 @@ import (
 type Session struct {
 	ID        string    `json:"id"`
 	Agent     string    `json:"agent"`
+	Model     string    `json:"model,omitempty"`
 	State     State     `json:"state"`
 	StartedAt time.Time `json:"started_at"`
 	EndedAt   time.Time `json:"ended_at,omitempty"`

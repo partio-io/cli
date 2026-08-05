@@ -11,6 +11,7 @@ func (c *Checkpoint) ToMetadata() Metadata {
 		Branch:       c.Branch,
 		CreatedAt:    c.CreatedAt.Format(time.RFC3339),
 		Agent:        c.Agent,
+		Model:        c.Model,
 		AgentPercent: c.AgentPct,
 		ContentHash:  c.ContentHash,
 		PlanSlug:     c.PlanSlug,
