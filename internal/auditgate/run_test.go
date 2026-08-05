@@ -34,7 +34,11 @@ func (f *fakeGitHub) server(t *testing.T) *httptest.Server {
 		}
 	})
 	mux.HandleFunc("POST /repos/partio-io/cli/issues/41/comments", func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read POST body: %v", err)
+			return
+		}
 		var payload struct {
 			Body string `json:"body"`
 		}
@@ -48,7 +52,11 @@ func (f *fakeGitHub) server(t *testing.T) *httptest.Server {
 		}
 	})
 	mux.HandleFunc("PATCH /repos/partio-io/cli/issues/comments/{id}", func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read PATCH body: %v", err)
+			return
+		}
 		var payload struct {
 			Body string `json:"body"`
 		}

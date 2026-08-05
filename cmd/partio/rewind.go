@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -14,8 +15,9 @@ import (
 
 func newRewindCmd() *cobra.Command {
 	var (
-		list bool
-		toID string
+		list       bool
+		toID       string
+		branchName string
 	)
 
 	cmd := &cobra.Command{
@@ -24,7 +26,7 @@ func newRewindCmd() *cobra.Command {
 		Long:  `List all captured checkpoints or restore the repository state to a specific checkpoint.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if list {
-				return runRewindList()
+				return runRewindList(branchName)
 			}
 			if toID != "" {
 				return runRewindTo(toID)
@@ -35,14 +37,19 @@ func newRewindCmd() *cobra.Command {
 
 	cmd.Flags().BoolVar(&list, "list", false, "list all checkpoints")
 	cmd.Flags().StringVar(&toID, "to", "", "restore to a specific checkpoint ID")
+	cmd.Flags().StringVar(&branchName, "branch", "", "filter checkpoints by branch name (recommended for squash-merged work)")
 
 	return cmd
 }
 
-func runRewindList() error {
-	_, err := git.RepoRoot()
+func runRewindList(branchName string) error {
+	repoDir, err := git.RepoRoot()
 	if err != nil {
 		return fmt.Errorf("must be run inside a git repository")
+	}
+
+	if branchName != "" {
+		return runRewindListByBranch(repoDir, branchName)
 	}
 
 	const branch = "partio/checkpoints/v1"
@@ -92,8 +99,31 @@ func runRewindList() error {
 	return nil
 }
 
+// runRewindListByBranch lists checkpoints whose Branch field exactly matches branchName.
+func runRewindListByBranch(repoDir, branchName string) error {
+	checkpoints, err := checkpoint.FindByBranch(repoDir, branchName)
+	if err != nil {
+		return fmt.Errorf("looking up checkpoints for branch %q: %w", branchName, err)
+	}
+
+	if len(checkpoints) == 0 {
+		fmt.Printf("No checkpoints found for branch %q.\n", branchName)
+		return nil
+	}
+
+	fmt.Println("Checkpoints:")
+	fmt.Println()
+
+	for _, cp := range checkpoints {
+		fmt.Printf("  %s  branch=%s  agent=%d%%  created=%s\n",
+			cp.ID, cp.Branch, cp.AgentPct, cp.CreatedAt.Format(time.RFC3339))
+	}
+
+	return nil
+}
+
 func runRewindTo(id string) error {
-	_, err := git.RepoRoot()
+	repoDir, err := git.RepoRoot()
 	if err != nil {
 		return fmt.Errorf("must be run inside a git repository")
 	}
@@ -130,13 +160,29 @@ func runRewindTo(id string) error {
 		fmt.Printf("  Context:\n%s\n", context)
 	}
 
+	// Check whether the original commit is still reachable (e.g. it may have
+	// been squash-merged and the branch deleted). If not, skip the checkout
+	// and emit a human-readable warning rather than failing fatally.
+	reachable, err := git.CommitReachable(repoDir, meta.CommitHash)
+	if err != nil {
+		return fmt.Errorf("checking commit reachability: %w", err)
+	}
+	if !reachable {
+		shortSHA := meta.CommitHash
+		if len(shortSHA) > 7 {
+			shortSHA = shortSHA[:7]
+		}
+		fmt.Printf("Warning: original commit %s is no longer reachable (likely squash-merged or gc'd); session context is still available but branch checkout is skipped.\n", shortSHA)
+		return nil
+	}
+
 	// Create a new branch at the checkpoint's commit
-	branchName := fmt.Sprintf("partio/rewind/%s", id)
-	_, err = git.ExecGit("checkout", "-b", branchName, meta.CommitHash)
+	newBranch := fmt.Sprintf("partio/rewind/%s", id)
+	_, err = git.ExecGit("checkout", "-b", newBranch, meta.CommitHash)
 	if err != nil {
 		return fmt.Errorf("creating rewind branch: %w", err)
 	}
 
-	fmt.Printf("  Created branch: %s\n", branchName)
+	fmt.Printf("  Created branch: %s\n", newBranch)
 	return nil
 }
