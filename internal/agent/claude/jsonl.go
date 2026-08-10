@@ -52,6 +52,12 @@ type jsonlEntry struct {
 	ContentBlocks []contentBlock `json:"contentBlocks,omitempty"`
 }
 
+// assistantMessage is the nested message object in assistant JSONL entries.
+// Claude Code records the model name here.
+type assistantMessage struct {
+	Model string `json:"model"`
+}
+
 type contentBlock struct {
 	Type string `json:"type"`
 	Text string `json:"text,omitempty"`

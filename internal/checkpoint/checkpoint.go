@@ -14,6 +14,7 @@ type Checkpoint struct {
 	Branch      string    `json:"branch"`
 	CreatedAt   time.Time `json:"created_at"`
 	Agent       string    `json:"agent"`
+	Model       string    `json:"model,omitempty"`
 	AgentPct    int       `json:"agent_percent"`
 	ContentHash string    `json:"content_hash"`
 	PlanSlug    string    `json:"plan_slug,omitempty"`
@@ -27,6 +28,7 @@ type Metadata struct {
 	Branch       string `json:"branch"`
 	CreatedAt    string `json:"created_at"`
 	Agent        string `json:"agent"`
+	Model        string `json:"model,omitempty"`
 	AgentPercent int    `json:"agent_percent"`
 	ContentHash  string `json:"content_hash"`
 	PlanSlug     string `json:"plan_slug,omitempty"`

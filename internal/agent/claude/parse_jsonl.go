@@ -28,6 +28,7 @@ func ParseJSONL(path string) (*agent.SessionData, error) {
 		prompt      string
 		sessionID   string
 		slug        string
+		model       string
 		totalTokens int
 		firstTS     time.Time
 		lastTS      time.Time
@@ -55,6 +56,14 @@ func ParseJSONL(path string) (*agent.SessionData, error) {
 
 		if entry.Slug != "" && slug == "" {
 			slug = entry.Slug
+		}
+
+		// Extract model name from assistant message entries.
+		if model == "" && (entry.Type == "assistant" || entry.Role == "assistant") && entry.Message != nil {
+			var am assistantMessage
+			if json.Unmarshal(entry.Message, &am) == nil && am.Model != "" {
+				model = am.Model
+			}
 		}
 
 		ts := entry.Timestamp.Time
@@ -98,6 +107,7 @@ func ParseJSONL(path string) (*agent.SessionData, error) {
 	return &agent.SessionData{
 		SessionID:   sessionID,
 		Agent:       "claude-code",
+		Model:       model,
 		Prompt:      prompt,
 		Transcript:  messages,
 		Context:     generateContext(messages),

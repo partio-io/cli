@@ -146,6 +146,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	if sessionData != nil {
 		cp.SessionID = sessionData.SessionID
 		cp.PlanSlug = sessionData.PlanSlug
+		cp.Model = sessionData.Model
 	}
 
 	// Prepare session files
@@ -168,6 +169,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		sessionFiles.Prompt = sessionData.Prompt
 		sessionFiles.Metadata.TotalTokens = sessionData.TotalTokens
 		sessionFiles.Metadata.Duration = sessionData.Duration.String()
+		sessionFiles.Metadata.Model = sessionData.Model
 	}
 
 	if sessionData != nil && sessionData.PlanSlug != "" {
