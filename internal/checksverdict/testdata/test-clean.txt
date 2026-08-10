@@ -1,0 +1,10 @@
+=== RUN   TestLoadMergesRepoOverGlobal
+--- PASS: TestLoadMergesRepoOverGlobal (0.00s)
+PASS
+ok  	github.com/partio-io/cli/internal/config	(cached)
+=== RUN   TestCalculateSplitsAgentAndHumanLines
+--- PASS: TestCalculateSplitsAgentAndHumanLines (0.00s)
+=== RUN   TestCalculateHandlesEmptyDiff
+--- PASS: TestCalculateHandlesEmptyDiff (0.00s)
+PASS
+ok  	github.com/partio-io/cli/internal/attribution	0.001s

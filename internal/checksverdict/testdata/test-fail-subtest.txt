@@ -1,0 +1,16 @@
+=== RUN   TestLoadMergesLayers
+=== RUN   TestLoadMergesLayers/repo_over_global
+=== RUN   TestLoadMergesLayers/local_over_repo
+    load_test.go:17: merged value = "global", want "local"
+=== RUN   TestLoadMergesLayers/env_over_local
+    load_test.go:17: merged value = "global", want "local"
+--- FAIL: TestLoadMergesLayers (0.00s)
+    --- PASS: TestLoadMergesLayers/repo_over_global (0.00s)
+    --- FAIL: TestLoadMergesLayers/local_over_repo (0.00s)
+    --- FAIL: TestLoadMergesLayers/env_over_local (0.00s)
+=== RUN   TestPanicsAreCaptured
+    load_test.go:24: this one is fine
+--- PASS: TestPanicsAreCaptured (0.00s)
+FAIL
+FAIL	github.com/partio-io/cli/internal/config	0.001s
+FAIL

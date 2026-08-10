@@ -1,0 +1,8 @@
+=== RUN   TestLoadMergesRepoOverGlobal
+--- PASS: TestLoadMergesRepoOverGlobal (0.00s)
+PASS
+ok  	github.com/partio-io/cli/internal/config	(cached)
+# github.com/partio-io/cli/internal/attribution [github.com/partio-io/cli/internal/attribution.test]
+internal/attribution/lines.go:3:37: undefined: undefinedThing
+FAIL	github.com/partio-io/cli/internal/attribution [build failed]
+FAIL
