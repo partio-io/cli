@@ -59,17 +59,18 @@ Work through the repair in this order:
    names. Rules:
 
    - Do not guess. If a repair requires a decision the finding does
-     not settle — choosing between two plausible behaviors, changing
-     a public contract, resurrecting the dead path instead of
-     removing it — leave that finding unfixed. A surviving finding
-     is the correct outcome for a fix that needs a human.
-   - Hard rule, no judgment: never change or remove an exported
-     identifier — function, method, type, field, or any signature —
-     even when the finding proves part of it inert, and even if
-     that means fixing nothing. An exported contract is a design
-     decision by definition; a comment marking the choice as open
-     (a TODO, a "decide later") makes this absolute. Export-level
-     repairs always go to a human.
+     not settle — choosing between two plausible behaviors,
+     resurrecting the dead path instead of removing it — leave that
+     finding unfixed. A surviving finding is the correct outcome
+     for a fix that needs a human.
+   - An exported identifier is fair game. Every Go file in this
+     module lives under `internal/` or `cmd/`, and Go forbids
+     importing an `internal/` package from outside the module that
+     declares it — so no package here is importable and a capital
+     letter is not a public contract. Repair a proven-inert
+     exported function, method, type, field, or signature exactly
+     as you would an unexported one. What bounds you is the proof
+     in the finding's reasoning, not the case of the first letter.
    - No opportunistic edits. Style, naming, or refactors beyond the
      findings are out of scope, however tempting.
    - Keep each repair coherent: removing a branch that orphans a
