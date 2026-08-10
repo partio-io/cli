@@ -26,17 +26,17 @@ PRD user stories 15, 16, 17, 18.
 
 ## Acceptance criteria
 
-- [ ] When repair rounds are exhausted and findings survive, the
+- [x] When repair rounds are exhausted and findings survive, the
       check's pull request comment names the surviving findings.
-- [ ] That comment states how many repair rounds ran.
-- [ ] The comment is distinguishable from a first-round failure comment,
+- [x] That comment states how many repair rounds ran.
+- [x] The comment is distinguishable from a first-round failure comment,
       so "gave up after spending the budget" reads differently from
       "failed on the first pass".
-- [ ] Repeated rounds upsert a single comment per check rather than
+- [x] Repeated rounds upsert a single comment per check rather than
       appending a new one each round.
-- [ ] The pull request is left red and open. Nothing closes it, rebuilds
+- [x] The pull request is left red and open. Nothing closes it, rebuilds
       it, or re-runs the build.
-- [ ] Tests cover the rounds-exhausted comment body and the upsert path
+- [x] Tests cover the rounds-exhausted comment body and the upsert path
       that replaces a prior comment rather than appending.
 
 ## Modules touched

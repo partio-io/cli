@@ -48,7 +48,7 @@ PRD user stories 1, 2, 3, 30.
       command and still requires the skip marker as its final act.
 - [x] A dry run of the dead-code audit fix program generates a prompt
       that contains no exported-identifier prohibition.
-- [ ] Post-merge verification: re-running the dead-code audit on PR
+- [x] Post-merge verification: re-running the dead-code audit on PR
       #622 completes with no surviving findings, and the inert `Model`
       field on the session type is removed by the pipeline with no
       human edit.

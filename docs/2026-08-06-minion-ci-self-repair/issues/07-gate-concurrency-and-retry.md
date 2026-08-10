@@ -36,19 +36,19 @@ PRD user stories 20, 21, 22, 24.
 
 ## Acceptance criteria
 
-- [ ] All three gates share a concurrency group keyed on the pull
+- [x] All three gates share a concurrency group keyed on the pull
       request number.
-- [ ] The group is scoped to the job that audits, not to the workflow,
+- [x] The group is scoped to the job that audits, not to the workflow,
       so a repair's follow-up run cannot cancel the job performing the
       repair.
-- [ ] A job that skips without auditing does not enter the group.
-- [ ] Two gates failing on the same pull request cannot push repairs
+- [x] A job that skips without auditing does not enter the group.
+- [x] Two gates failing on the same pull request cannot push repairs
       concurrently.
-- [ ] A crashed e2e audit session, or one that writes no verdict, is
+- [x] A crashed e2e audit session, or one that writes no verdict, is
       retried once.
-- [ ] A second failed attempt leaves the check red; an infrastructure
+- [x] A second failed attempt leaves the check red; an infrastructure
       failure is never reported as a pass.
-- [ ] The e2e audit's judgment is otherwise unchanged: findings still
+- [x] The e2e audit's judgment is otherwise unchanged: findings still
       become proposal issues and still never fail a pull request.
 
 ## Modules touched
