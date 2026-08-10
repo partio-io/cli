@@ -15,11 +15,20 @@ on:
         default: false
         type: boolean
 
-# Concurrency lives on the audit job, not the workflow: the fix
-# round's own push triggers a guard-skipped run, and a workflow-level
-# group would let that run cancel the in-flight job doing the fixing.
-# A skipped audit job never enters the group, so only runs that will
-# actually audit supersede each other.
+# Concurrency lives on the audit job, not the workflow: a run whose
+# repair budget is spent skips the audit job and never enters the
+# group, so only runs that will actually audit queue against each
+# other.
+#
+# The group is shared with the e2e audit and the checks gate, and keyed
+# on the pull request number, so at most one gate pushes a repair to a
+# branch at a time. Two gates can fail on the same pull request, and
+# two repairs pushing at once lose one of them.
+#
+# It does not cancel what is running. Since accounting replaced the
+# loop guard, a fix round's own push starts a run that does audit, and
+# cancelling would kill the in-flight job part-way through the push
+# that started it. The follow-up run waits its turn instead.
 
 jobs:
   guard:
@@ -33,7 +42,8 @@ jobs:
       pr_ref: ${{ steps.src.outputs.pr_ref }}
       pr_num: ${{ steps.src.outputs.pr_num }}
       dry_run: ${{ steps.src.outputs.dry_run }}
-      skip: ${{ steps.guard.outputs.skip }}
+      skip: ${{ steps.budget.outputs.skip }}
+      round: ${{ steps.budget.outputs.round }}
     steps:
       - name: Resolve PR reference
         id: src
@@ -49,29 +59,29 @@ jobs:
             echo "dry_run=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Loop guard
-        id: guard
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Accounting, not prohibition. The command counts the dead-code
+      # repair commits already on the branch and reports whether
+      # another round may start. Counting is per check, so a dead-code
+      # repair never spends the budget a failing test needs, and it
+      # reads commit subjects, so human commits count for nothing.
+      #
+      # A failure here fails the job on purpose: auditing on a count we
+      # do not have is how a repair loop starts.
+      - name: Repair-round budget
+        id: budget
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
-        run: |
-          HEAD_SHA=$(gh api "repos/${{ github.repository }}/pulls/${{ steps.src.outputs.pr_num }}" --jq .head.sha)
-          SUBJECT=$(gh api "repos/${{ github.repository }}/commits/${HEAD_SHA}" --jq .commit.message | head -n1)
-          case "$SUBJECT" in
-            "audit:"*)
-              echo "Head commit is an audit fix ('${SUBJECT}'); skipping to avoid an audit loop."
-              echo "skip=true" >> "$GITHUB_OUTPUT"
-              ;;
-            *)
-              echo "skip=false" >> "$GITHUB_OUTPUT"
-              ;;
-          esac
+        run: go run ./cmd/minion-repair-round --pr ${{ steps.src.outputs.pr_num }} --check dead-code
 
   audit:
     needs: guard
     if: needs.guard.outputs.skip != 'true'
     concurrency:
-      group: deadcode-audit-${{ github.event.pull_request.number || github.run_id }}
-      cancel-in-progress: true
+      group: minion-gate-${{ github.event.pull_request.number || needs.guard.outputs.pr_num }}
+      cancel-in-progress: false
     runs-on: github-runner-partio-minion-ai-01
     timeout-minutes: 60
     steps:
@@ -79,8 +89,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           # The apply step pushes with the PAT explicitly: a push with
-          # the checkout-persisted GITHUB_TOKEN would not trigger the
-          # guard-skipped follow-up run the loop guard exists for.
+          # the checkout-persisted GITHUB_TOKEN would trigger no
+          # follow-up run at all, and the next repair round is a
+          # follow-up run.
           persist-credentials: false
 
       - name: Install minions
@@ -128,10 +139,10 @@ jobs:
           echo "status=${STATUS}" >> "$GITHUB_OUTPUT"
           echo "Verdict status: '${STATUS}'"
 
-      # Exactly one fix attempt, ever: this step has no retry and the
-      # loop guard keeps the pushed commit from starting a new round.
-      # The session only emits a checked patch to .minion-audit/ — it
-      # never commits or pushes; the apply step below owns that.
+      # One attempt per run, up to the budget: this step has no retry,
+      # and the round it belongs to is the run the guard admitted. The
+      # session only emits a checked patch to .minion-audit/ — it never
+      # commits or pushes; the apply step below owns that.
       - name: Fix round
         if: steps.verdict.outputs.status == 'fail'
         # A crashed fix session is a failed fix round, not a broken
@@ -148,9 +159,13 @@ jobs:
 
       # Deterministic half of the fix round: apply the session's
       # patch to the true PR head, prove it with the repo's own
-      # checks, and push one audit-prefixed commit with the PAT (a
-      # GITHUB_TOKEN push would suppress the follow-up run). Any
-      # failure leaves pushed=false and the first verdict stands.
+      # checks, and push one commit with the PAT (a GITHUB_TOKEN push
+      # would suppress the follow-up run, and the next repair round is
+      # a follow-up run). internal/patchapply owns the whole sequence,
+      # so the second gate reuses it instead of copying it, and the
+      # commit subject is built by the same package that later counts
+      # it. Any failure leaves pushed=false and the first verdict
+      # stands.
       - name: Apply fix
         id: fixpush
         if: steps.verdict.outputs.status == 'fail'
@@ -159,39 +174,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_PAT }}
           GOLANGCI_LINT_CACHE: ${{ runner.temp }}/golangci-cache-apply
         run: |
-          PUSHED=false
-          PATCH="${{ github.workspace }}/.minion-audit/fix.patch"
-          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
-          if [ -s "$PATCH" ]; then
-            HEAD_REF=$(gh api "repos/${{ github.repository }}/pulls/${{ needs.guard.outputs.pr_num }}" --jq .head.ref)
-            HEAD_REPO=$(gh api "repos/${{ github.repository }}/pulls/${{ needs.guard.outputs.pr_num }}" --jq .head.repo.full_name)
-            if [ "$HEAD_REPO" = "${{ github.repository }}" ]; then
-              git fetch --no-tags "$REMOTE" "$HEAD_REF"
-              WT="${RUNNER_TEMP}/audit-fixwt"
-              git worktree remove --force "$WT" 2>/dev/null || rm -rf "$WT"
-              git worktree add --detach "$WT" FETCH_HEAD
-              BODY=""
-              if [ -f .minion-audit/fix-summary.txt ]; then
-                BODY=$(head -c 300 .minion-audit/fix-summary.txt)
-              fi
-              if git -C "$WT" apply --index "$PATCH" \
-                && (cd "$WT" && make lint && make test); then
-                git -C "$WT" -c user.name="minion audit" -c user.email="minions@partio.io" \
-                  commit -m "audit: fix dead-code findings (#${{ needs.guard.outputs.pr_num }})" -m "$BODY"
-                if git -C "$WT" push "$REMOTE" HEAD:"$HEAD_REF"; then
-                  PUSHED=true
-                fi
-              else
-                echo "Patch did not apply or failed checks; pushing nothing."
-              fi
-              git worktree remove --force "$WT" || true
-            else
-              echo "PR head lives in a fork; the fix round cannot push there."
-            fi
-          else
-            echo "Fix session exported no patch; the first verdict stands."
-          fi
-          echo "pushed=${PUSHED}" >> "$GITHUB_OUTPUT"
+          go run ./cmd/minion-apply-fix \
+            --pr ${{ needs.guard.outputs.pr_num }} \
+            --check dead-code \
+            --patch "${{ github.workspace }}/.minion-audit/fix.patch" \
+            --summary "${{ github.workspace }}/.minion-audit/fix-summary.txt" \
+            --worktree "${RUNNER_TEMP}/audit-fixwt"
 
       # Fresh session, final verdict. Only runs when the fix round
       # actually moved the branch — an unchanged head would re-derive
@@ -206,8 +194,21 @@ jobs:
           rm -rf .minion-audit
           minions run .minions/programs/deadcode-audit.md --pr ${{ needs.guard.outputs.pr_ref }}
 
+      # The round travels from the guard so the gate can tell a spent
+      # budget from a first-pass failure. On the last round a surviving
+      # finding gets the "gave up" comment: the run that would have
+      # been round four never reaches this step, because the guard
+      # skips the whole audit job, so this is the pipeline's last word
+      # on the pull request. An absent round falls back to 0, which
+      # means no accounting: the gate then reports as it did before,
+      # rather than failing on a flag it cannot parse.
       - name: Verdict gate
         if: needs.guard.outputs.dry_run != 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
-        run: go run ./cmd/minion-audit-gate --pr ${{ needs.guard.outputs.pr_num }} --audit dead-code
+        run: |
+          ROUND="${{ needs.guard.outputs.round }}"
+          go run ./cmd/minion-audit-gate \
+            --pr ${{ needs.guard.outputs.pr_num }} \
+            --audit dead-code \
+            --round "${ROUND:-0}"
