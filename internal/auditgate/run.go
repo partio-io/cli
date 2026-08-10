@@ -18,6 +18,20 @@ type Config struct {
 	APIBaseURL  string       // GitHub API root, e.g. https://api.github.com
 	Token       string       // token for the comment upsert
 	HTTPClient  *http.Client // nil means http.DefaultClient
+
+	// Round is the repair round this run belongs to, as counted by
+	// internal/repairround; 1 is the first attempt. MaxRounds is the
+	// cap for this check. Both zero means the caller keeps no round
+	// accounting, and every failure reads as a first-pass failure.
+	Round     int
+	MaxRounds int
+}
+
+// budgetSpent reports whether this run is the last repair round the
+// check gets. The gate runs after the round's repair attempt, so a
+// surviving finding at the cap is one no further round will address.
+func (c Config) budgetSpent() bool {
+	return c.MaxRounds > 0 && c.Round >= c.MaxRounds
 }
 
 // Result is the gate's outcome. Green maps to exit 0, red to exit 1.
@@ -38,6 +52,14 @@ func Run(cfg Config) (Result, error) {
 	}
 	if v.Status == "pass" {
 		return Result{Green: true, Reason: "verdict: pass"}, nil
+	}
+	if cfg.budgetSpent() {
+		if err := upsertComment(cfg, exhaustedBody(cfg.AuditName, v, cfg.Round)); err != nil {
+			return Result{}, err
+		}
+		return Result{Green: false, Reason: fmt.Sprintf(
+			"verdict: fail with %d finding(s) after %d repair round(s); budget spent",
+			len(v.Findings), cfg.Round)}, nil
 	}
 	if err := upsertComment(cfg, failBody(cfg.AuditName, v)); err != nil {
 		return Result{}, err

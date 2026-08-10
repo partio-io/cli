@@ -17,8 +17,17 @@ on:
 
 # Concurrency lives on the audit job, not the workflow: the deadcode
 # audit's fix push triggers a guard-skipped run here too, and a
-# workflow-level group would let that run cancel an in-flight audit.
+# workflow-level group would let that run supersede an in-flight audit.
 # A skipped audit job never enters the group.
+#
+# The group is shared with the dead-code audit and the checks gate, and
+# keyed on the pull request number, so at most one gate pushes a repair
+# to a branch at a time. This audit pushes no repair itself, but it
+# holds the same lock: its session reads a branch the other two write.
+#
+# It does not cancel what is running. A repair's own push starts a
+# follow-up run, and cancelling would kill the job part-way through the
+# push that started it. The follow-up run waits its turn instead.
 
 jobs:
   guard:
@@ -69,8 +78,8 @@ jobs:
     needs: guard
     if: needs.guard.outputs.skip != 'true'
     concurrency:
-      group: e2e-audit-${{ github.event.pull_request.number || github.run_id }}
-      cancel-in-progress: true
+      group: minion-gate-${{ github.event.pull_request.number || needs.guard.outputs.pr_num }}
+      cancel-in-progress: false
     runs-on: github-runner-partio-minion-ai-01
     timeout-minutes: 60
     steps:
@@ -90,6 +99,17 @@ jobs:
         # On real runs the verdict gate owns the outcome, so a crashed
         # audit session must not end the job before the gate fails it
         # closed. Dry runs have no gate and fail here normally.
+        #
+        # The session gets two attempts. This audit never fails a pull
+        # request on findings — they become proposal issues — so its
+        # only red state is infrastructure: the session crashed, or it
+        # finished without writing the verdict it owes. Neither is a
+        # defect in the pull request, and one flaky session should not
+        # read as one.
+        #
+        # A second attempt that also produces nothing leaves no verdict
+        # behind, and the gate below fails closed on a missing verdict.
+        # An infrastructure failure goes red; it is never a pass.
         continue-on-error: ${{ needs.guard.outputs.dry_run != 'true' }}
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
@@ -98,12 +118,27 @@ jobs:
           # workspace for the gate step to find it.
           MINION_AUDIT_DIR: ${{ github.workspace }}/.minion-audit
         run: |
-          rm -rf .minion-audit
-          ARGS="run .minions/programs/e2e-audit.md --pr ${{ needs.guard.outputs.pr_ref }}"
+          # A dry run writes no verdict and has no gate, so it runs once
+          # and reports its own exit status.
           if [ "${{ needs.guard.outputs.dry_run }}" = "true" ]; then
-            ARGS="${ARGS} --dry-run"
+            minions run .minions/programs/e2e-audit.md \
+              --pr ${{ needs.guard.outputs.pr_ref }} --dry-run
+            exit
           fi
-          minions $ARGS
+
+          for attempt in 1 2; do
+            rm -rf "${MINION_AUDIT_DIR}"
+            if minions run .minions/programs/e2e-audit.md \
+                 --pr ${{ needs.guard.outputs.pr_ref }} \
+               && [ -s "${MINION_AUDIT_DIR}/verdict.json" ]; then
+              exit 0
+            fi
+            echo "Attempt ${attempt} of 2 produced no readable verdict."
+          done
+
+          echo "The audit session produced no verdict twice."
+          echo "The gate below fails this check closed."
+          exit 1
 
       - name: Verdict gate
         if: needs.guard.outputs.dry_run != 'true'

@@ -34,24 +34,24 @@ PRD user stories 4, 5, 6, 19, 25.
 
 ## Acceptance criteria
 
-- [ ] A new package owns the decision "may another repair round start
+- [x] A new package owns the decision "may another repair round start
       for this check, and which round is it?", taking the branch's
       commit subjects, the check name, and the cap as input.
-- [ ] Repair commits are marked so that the check that produced them is
+- [x] Repair commits are marked so that the check that produced them is
       recoverable from the commit subject alone.
-- [ ] Counting for one check ignores repair commits belonging to another
+- [x] Counting for one check ignores repair commits belonging to another
       check.
-- [ ] The cap is three rounds per check, and the package reports the
+- [x] The cap is three rounds per check, and the package reports the
       round number so a caller can distinguish the first attempt from
       the last.
-- [ ] Human-authored commits and near-miss subjects are not counted as
+- [x] Human-authored commits and near-miss subjects are not counted as
       repair rounds.
-- [ ] The dead-code audit workflow consults the package instead of its
+- [x] The dead-code audit workflow consults the package instead of its
       inline shell skip guard, and stops auditing once the budget for
       that check is spent.
-- [ ] A pull request whose first repair leaves findings receives a
+- [x] A pull request whose first repair leaves findings receives a
       second repair attempt rather than going red immediately.
-- [ ] The package is covered by table-driven tests over commit-subject
+- [x] The package is covered by table-driven tests over commit-subject
       lists: no prior rounds, one, at the cap, over the cap, another
       check's rounds interleaved, human commits interleaved, an empty
       branch, and a subject that resembles a marker without being one.

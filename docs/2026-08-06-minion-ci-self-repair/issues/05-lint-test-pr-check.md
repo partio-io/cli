@@ -34,24 +34,24 @@ PRD user stories 7, 8, 9, 23, 29.
 
 ## Acceptance criteria
 
-- [ ] `make lint` and `make test` run as a check on every pull request,
+- [x] `make lint` and `make test` run as a check on every pull request,
       including pull requests with no minion label.
-- [ ] Failures are converted into the same verdict shape the audits
+- [x] Failures are converted into the same verdict shape the audits
       emit, one finding per failing package or linter finding.
-- [ ] Each finding carries a location and reasoning sufficient to act on
+- [x] Each finding carries a location and reasoning sufficient to act on
       without re-running the command.
-- [ ] A clean run yields a pass verdict and a green check.
-- [ ] The check reports through the existing pull request comment
+- [x] A clean run yields a pass verdict and a green check.
+- [x] The check reports through the existing pull request comment
       surface, upserting one comment rather than appending per run.
-- [ ] A missing or malformed verdict fails the check closed, matching
+- [x] A missing or malformed verdict fails the check closed, matching
       how the audits behave — a gate must never pass by producing
       nothing.
-- [ ] No repair is attempted and no commit is pushed by this slice, on
+- [x] No repair is attempted and no commit is pushed by this slice, on
       any pull request.
-- [ ] The verdict conversion is covered by tests over captured command
+- [x] The verdict conversion is covered by tests over captured command
       output fixtures: a clean run, a failing test, a lint finding, and
       unparseable output — asserting the resulting status and findings.
-- [ ] The work requires no minions release and no version-pin bump.
+- [x] The work requires no minions release and no version-pin bump.
 
 ## Modules touched
 

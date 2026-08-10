@@ -35,27 +35,29 @@ PRD user stories 10, 11, 12, 27.
 
 ## Acceptance criteria
 
-- [ ] A failing lint/test verdict on a minion-labeled pull request
+- [x] A failing lint/test verdict on a minion-labeled pull request
       triggers a repair round.
-- [ ] Repair is skipped for pull requests without the minion label, and
+- [x] Repair is skipped for pull requests without the minion label, and
       no commit is pushed to them.
-- [ ] Repair is skipped for pull requests whose head branch lives in a
+- [x] Repair is skipped for pull requests whose head branch lives in a
       fork, with a clear reason and no push attempt.
-- [ ] The repair session may modify implementation code and may modify
+- [x] The repair session may modify implementation code and may modify
       tests the same pull request added.
-- [ ] The repair session does not modify tests that predate the pull
+- [x] The repair session does not modify tests that predate the pull
       request; a failure in one survives as a finding and the check goes
       red.
-- [ ] The session produces a patch only, and runs no git write command
+- [x] The session produces a patch only, and runs no git write command
       on any path.
-- [ ] Rounds are capped at three for this check, counted independently
+- [x] Rounds are capped at three for this check, counted independently
       of the dead-code check's rounds.
-- [ ] Repairs are applied, proven, and pushed through the shared applier
+- [x] Repairs are applied, proven, and pushed through the shared applier
       from slice [04](./04-shared-patch-apply.md), not through new
       inline shell.
-- [ ] A pull request whose failing test the minion itself wrote goes
-      green without human edits.
-- [ ] Rounds exhausted with findings surviving produces the give-up
+- [ ] Post-merge verification: a pull request whose failing test the
+      minion itself wrote goes green without human edits. This one needs
+      the workflow live on `main` and a minion pull request that breaks
+      its own test; it cannot be shown from the working tree.
+- [x] Rounds exhausted with findings surviving produces the give-up
       comment from slice [03](./03-rounds-exhausted-comment.md), naming
       the survivors and the round count.
 

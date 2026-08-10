@@ -1,0 +1,15 @@
+internal/config/load.go:11:5: Error return value of `os.Create` is not checked (errcheck)
+	f, _ := os.Create(path)
+	   ^
+internal/config/load.go:12:15: Error return value of `f.WriteString` is not checked (errcheck)
+	f.WriteString(Name())
+	             ^
+internal/config/load.go:13:9: Error return value of `f.Close` is not checked (errcheck)
+	f.Close()
+	       ^
+internal/config/load.go:8:6: func unusedHelper is unused (unused)
+func unusedHelper() string { return "nobody calls me" }
+     ^
+4 issues:
+* errcheck: 3
+* unused: 1

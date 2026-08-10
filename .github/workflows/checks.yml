@@ -1,0 +1,274 @@
+name: Checks
+
+# Every pull request, not only the minion ones. The audits guard on the
+# "minion" label because they cost a model session; lint and test cost
+# a build, and a hand-written pull request breaks them just as easily.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# The check reads the code and comments on the pull request. The repair
+# job pushes, and it pushes with the personal access token rather than
+# with this permission — a push made with the Actions token starts no
+# follow-up run, and the next repair round is a follow-up run.
+permissions:
+  contents: read
+
+# Concurrency is deliberately absent here, and lives on the repair job
+# instead. Lint and test run on every pull request and push nothing, so
+# they must never queue behind a model session; only the job that
+# pushes joins the gate group. See the note on that job.
+
+jobs:
+  # Everything the repair path needs to know, decided before either of
+  # the jobs below starts, and decided in Go: whether this pull request
+  # may receive a repair commit at all, and how many rounds it has
+  # already had.
+  #
+  # The label is read from the API rather than from the event payload.
+  # The payload is a snapshot taken when the run was queued, and a
+  # minion pull request is labelled moments after it opens — an "opened"
+  # run would see no label and refuse to repair its own branch.
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      repairable: ${{ steps.budget.outputs.repairable }}
+      reason: ${{ steps.budget.outputs.reason }}
+      skip: ${{ steps.budget.outputs.skip }}
+      prior: ${{ steps.budget.outputs.prior }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # Failing softly on purpose, unlike the audits' guard. There the
+      # count decides whether to audit at all; here it decides only
+      # whether to repair, and the check itself must still report on
+      # every pull request. An unanswered question leaves the outputs
+      # empty, which reads as "do not repair" below.
+      - name: Repair budget
+        id: budget
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          go run ./cmd/minion-repair-round \
+            --pr ${{ github.event.pull_request.number }} \
+            --check checks \
+            --repairable
+
+  checks:
+    needs: guard
+    # The guard informs this job; it does not gate it. A guard that
+    # dies must not take the only build signal on the pull request down
+    # with it.
+    if: always()
+    # A hosted runner, unlike the audits: lint and test need no model
+    # session and no credentials, and this runs on every pull request,
+    # so it must not queue behind the audits on the single self-hosted
+    # box.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # This job reports and stops. With no persisted credentials
+          # no step here can push, whatever it is later asked to do.
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+
+      # Writes the verdict; it never decides the outcome. A crash here
+      # leaves no verdict, which the gate below turns into a red check
+      # and a comment saying so — the same fail-closed path a crashed
+      # audit session takes.
+      - name: Run checks
+        continue-on-error: true
+        env:
+          # A cache of its own, so a lint cache shared with another
+          # checkout cannot replay issues from paths that no longer
+          # exist. The runner is ephemeral today; this keeps the
+          # guarantee if it ever stops being.
+          GOLANGCI_LINT_CACHE: ${{ runner.temp }}/golangci-cache-checks
+        run: |
+          rm -rf .minion-checks
+          go run ./cmd/minion-checks-verdict \
+            --out "${{ github.workspace }}/.minion-checks/verdict.json"
+
+      # Always runs, because a check that reports nothing when the step
+      # before it dies is a check that passes by producing nothing.
+      #
+      # The round reported is the number of repair rounds already on
+      # the branch, not the one this run may start: unlike the audits,
+      # this gate runs before its run's repair rather than after it. So
+      # the run that finds three repair commits is the run whose
+      # findings no further round will address, and it is the one that
+      # says the pipeline gave up. An absent count falls back to 0,
+      # which means no accounting and the plain failure comment.
+      - name: Verdict gate
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          PRIOR="${{ needs.guard.outputs.prior }}"
+          go run ./cmd/minion-audit-gate \
+            --pr ${{ github.event.pull_request.number }} \
+            --audit checks \
+            --round "${PRIOR:-0}" \
+            --verdict "${{ github.workspace }}/.minion-checks/verdict.json"
+
+  # The repair round. It runs only for a pull request the pipeline
+  # opened, whose branch lives here, and which has rounds left — the
+  # guard decided all three. A hand-written or forked pull request gets
+  # the check above and nothing else.
+  repair:
+    needs: [guard, checks]
+    if: >
+      needs.guard.outputs.repairable == 'true' &&
+      needs.guard.outputs.skip != 'true' &&
+      needs.checks.result == 'failure'
+    # The same group the two audits hold, keyed on the pull request
+    # number: this gate and the dead-code gate can both fail on one
+    # pull request, and two repairs pushing to one branch at the same
+    # time lose one of them. A run that does not repair never reaches
+    # this job, so it never enters the group.
+    #
+    # It does not cancel what is running. A repair's own push starts a
+    # follow-up run, and cancelling would kill the job part-way through
+    # the push that started it. The follow-up run waits its turn.
+    concurrency:
+      group: minion-gate-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    # The self-hosted box, because a fix session is a model session.
+    runs-on: github-runner-partio-minion-ai-01
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Two commits, so the merge commit's first parent is present
+          # and the pull request's own diff can be taken from it below.
+          fetch-depth: 2
+          # The apply step pushes with the personal access token
+          # explicitly; a checkout-persisted token would push a commit
+          # that starts no follow-up run.
+          persist-credentials: false
+
+      - name: Install minions
+        run: |
+          go install github.com/partio-io/minions/cmd/minions@v0.0.13
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      # The fix session proves its repair with the repo's own checks;
+      # make lint needs the binary on the runner's PATH.
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+
+      # Derived here rather than carried over from the job above. The
+      # findings are what the session repairs, and a verdict taken on
+      # this runner describes the tree the session is about to edit.
+      - name: Run checks
+        continue-on-error: true
+        env:
+          GOLANGCI_LINT_CACHE: ${{ runner.temp }}/golangci-cache-repair
+        run: |
+          rm -rf .minion-checks
+          go run ./cmd/minion-checks-verdict \
+            --out "${{ github.workspace }}/.minion-checks/verdict.json"
+
+      # Branch point for the fix round. Parsed with plain shell — the
+      # runner is minimal Debian and jq is not a given. An absent or
+      # malformed verdict yields an empty status and no fix round; the
+      # gate in the job above has already failed the check closed.
+      - name: Read verdict
+        id: verdict
+        run: |
+          STATUS=""
+          if [ -f .minion-checks/verdict.json ]; then
+            STATUS=$(tr -d ' \n\t' < .minion-checks/verdict.json | grep -o '"status":"[a-z]*"' | head -n1 | cut -d'"' -f4 || true)
+          fi
+          echo "status=${STATUS}" >> "$GITHUB_OUTPUT"
+          echo "Verdict status: '${STATUS}'"
+
+      # The session's one hard boundary, decided in Go and handed over.
+      # A session that works out for itself which tests are fair game is
+      # a session that can talk itself into deleting an assertion a
+      # person wrote.
+      #
+      # HEAD is the merge commit GitHub builds for the pull request, so
+      # its first parent is the base branch and the diff between them is
+      # exactly what the pull request changes. A HEAD that is not a
+      # merge commit leaves the list empty, which bounds the session to
+      # implementation code.
+      - name: List the tests this pull request added
+        if: steps.verdict.outputs.status == 'fail'
+        run: |
+          FILES="${RUNNER_TEMP}/pr-files.txt"
+          if git rev-parse --verify --quiet "HEAD^2" >/dev/null; then
+            git diff --name-status "HEAD^1" HEAD > "${FILES}"
+          else
+            echo "HEAD is not a merge commit; no test file is in bounds"
+            : > "${FILES}"
+          fi
+          go run ./cmd/minion-checks-verdict \
+            --pr-files "${FILES}" \
+            --tests-out "${{ github.workspace }}/.minion-checks/added-tests.txt"
+
+      # One attempt per run, up to the budget: this step has no retry,
+      # and the round it belongs to is the run the guard admitted. The
+      # session only emits a checked patch to .minion-checks/ — it never
+      # commits or pushes; the apply step below owns that.
+      - name: Fix round
+        if: steps.verdict.outputs.status == 'fail'
+        # A crashed fix session is a failed fix round, not a broken
+        # job — the next run's gate still owns the outcome.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          # The session runs in an isolated minions worktree, so it
+          # reads the verdict and the boundary through an absolute path
+          # into this workspace.
+          MINION_AUDIT_DIR: ${{ github.workspace }}/.minion-checks
+          # Fresh lint cache per step: the shared cache replays issues
+          # recorded under other (since-deleted) worktrees, whose
+          # unreadable paths defeat the test-file exclusion rules.
+          GOLANGCI_LINT_CACHE: ${{ runner.temp }}/golangci-cache-fix
+        run: |
+          minions run .minions/programs/checks-fix.md \
+            --pr ${{ github.repository }}#${{ github.event.pull_request.number }}
+
+      # Deterministic half of the fix round, and the same package the
+      # dead-code gate uses: apply the session's patch to the true PR
+      # head, prove it with the repo's own checks, and push one commit
+      # with the personal access token. A patch that does not apply, or
+      # one that leaves the checks red, pushes nothing and leaves the
+      # verdict standing. The commit subject carries this check's
+      # marker, which is what the guard counts on the next run.
+      - name: Apply fix
+        id: fixpush
+        if: steps.verdict.outputs.status == 'fail'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          GOLANGCI_LINT_CACHE: ${{ runner.temp }}/golangci-cache-apply
+        run: |
+          go run ./cmd/minion-apply-fix \
+            --pr ${{ github.event.pull_request.number }} \
+            --check checks \
+            --patch "${{ github.workspace }}/.minion-checks/fix.patch" \
+            --summary "${{ github.workspace }}/.minion-checks/fix-summary.txt" \
+            --worktree "${RUNNER_TEMP}/checks-fixwt"

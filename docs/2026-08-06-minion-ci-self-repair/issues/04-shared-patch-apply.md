@@ -39,21 +39,21 @@ PRD user stories 13, 14, 26, 28.
 
 ## Acceptance criteria
 
-- [ ] A new package owns fetch, detach, apply, prove, commit, and push
+- [x] A new package owns fetch, detach, apply, prove, commit, and push
       for a repair patch, given the patch, the pull request reference,
       and the check name.
-- [ ] The dead-code audit workflow uses the package instead of its
+- [x] The dead-code audit workflow uses the package instead of its
       inline shell, and its end-to-end repair behavior is unchanged.
-- [ ] A patch that fails to apply results in nothing pushed, reported as
+- [x] A patch that fails to apply results in nothing pushed, reported as
       a failed round rather than a job error.
-- [ ] A patch that applies but fails `make lint` or `make test` results
+- [x] A patch that applies but fails `make lint` or `make test` results
       in nothing pushed.
-- [ ] The push is made with the personal access token, not the default
+- [x] The push is made with the personal access token, not the default
       Actions token.
-- [ ] A fork head is refused before any fetch, with a clear reason.
-- [ ] The commit subject carries the per-check repair marker that slice
+- [x] A fork head is refused before any fetch, with a clear reason.
+- [x] The commit subject carries the per-check repair marker that slice
       [02](./02-count-repair-rounds.md) counts.
-- [ ] Tests drive the package against temporary git repositories created
+- [x] Tests drive the package against temporary git repositories created
       by the test, pushing to a local bare repository so no test touches
       the network, and cover: a patch that applies and passes, one that
       does not apply, one that applies but fails the checks, and a fork

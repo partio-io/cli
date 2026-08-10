@@ -1,0 +1,24 @@
+=== RUN   TestToMetadataCarriesTheSessionID
+    checkpoint_test.go:9: metadata session id = "", want "s-42"
+--- FAIL: TestToMetadataCarriesTheSessionID (0.00s)
+=== RUN   TestNewID
+--- PASS: TestNewID (0.00s)
+=== RUN   TestShard
+--- PASS: TestShard (0.00s)
+=== RUN   TestToMetadata
+--- PASS: TestToMetadata (0.00s)
+=== RUN   TestFindByBranch
+=== RUN   TestFindByBranch/single_match
+=== RUN   TestFindByBranch/multiple_matches
+=== RUN   TestFindByBranch/no_match
+=== RUN   TestFindByBranch/partial_branch_name_does_not_match
+--- PASS: TestFindByBranch (0.11s)
+    --- PASS: TestFindByBranch/single_match (0.03s)
+    --- PASS: TestFindByBranch/multiple_matches (0.04s)
+    --- PASS: TestFindByBranch/no_match (0.02s)
+    --- PASS: TestFindByBranch/partial_branch_name_does_not_match (0.02s)
+=== RUN   TestFindByBranchNoBranch
+--- PASS: TestFindByBranchNoBranch (0.00s)
+FAIL
+FAIL	github.com/partio-io/cli/internal/checkpoint	0.115s
+FAIL
