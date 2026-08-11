@@ -370,12 +370,44 @@ implementation — a research run produces review artifacts only.
    - Line 1, exactly: `<!-- minion:research-slices parent=#<N> -->`
      where `<N>` is `$MINION_ISSUE_NUMBER`.
    - A blank line, then a `## Proposed slices` heading.
-   - One readable section per slice, in slice order, rendered from the
-     slicer's blocks: a `### Slice <n> — <Title>` heading, then the
-     slice Description, its Acceptance criteria checklist, its Modules
-     touched list, and its Out of scope list. Convert the slicer's
-     plain `=== SLICE <n> ===` field format into this readable Markdown
-     — do not paste the raw `===` delimiters.
+   - One section per slice, in slice order, rendered from the slicer's
+     blocks. Convert the slicer's plain `=== SLICE <n> ===` field
+     format into the Markdown shape below — do not paste the raw `===`
+     delimiters.
+
+   Each slice section must use exactly this shape:
+
+   ```
+   ### Slice <n> — <Title>
+
+   <Description paragraphs>
+
+   #### Acceptance criteria
+
+   - [ ] <criterion>
+
+   #### Modules touched
+
+   - <module>
+
+   #### Out of scope
+
+   - <deferred item>
+   ```
+
+   The four headings are a machine contract, not a style choice. The
+   build step parses this comment, and it routes each field by its
+   heading text. Write the field labels as Markdown headings exactly as
+   shown.
+
+   Do NOT write a field label as bold text (`**Acceptance criteria:**`)
+   or as a plain line. A bold label is not a heading: the parser never
+   leaves the Description section, every later line is swallowed into
+   the description, and the build fails with `slice plan: slice 1
+   (...): no acceptance criteria`.
+
+   Keep the em dash in the slice heading, and number the slices from 1
+   without gaps.
 
    Then post it as a comment on the parent issue:
 
