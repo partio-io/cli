@@ -9,14 +9,10 @@ import (
 
 // Calculate computes attribution for a commit based on whether an agent was active.
 func Calculate(commitHash string, agentActive bool) (*Result, error) {
-	// Get numstat for the commit
+	// DiffNumstat uses git diff-tree --root, which handles initial commits natively.
 	numstat, err := git.DiffNumstat(commitHash)
 	if err != nil {
-		// If this is the first commit, try diff against empty tree
-		numstat, err = git.ExecGit("diff", "--numstat", "4b825dc642cb6eb9a060e54bf899d69f82cf7ee2", commitHash)
-		if err != nil {
-			return &Result{}, nil
-		}
+		return &Result{}, nil
 	}
 
 	totalAdded := 0
