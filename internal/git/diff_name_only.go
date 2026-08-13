@@ -1,15 +1,13 @@
 package git
 
-import "strings"
-
 // DiffNameOnly returns the list of file paths changed in a specific commit.
 func DiffNameOnly(commitHash string) ([]string, error) {
-	out, err := execGit("diff", "--name-only", commitHash+"~1", commitHash)
+	lines, err := diffTree("", commitHash, "--name-only")
 	if err != nil {
 		return nil, err
 	}
-	if out == "" {
+	if len(lines) == 0 {
 		return nil, nil
 	}
-	return strings.Split(out, "\n"), nil
+	return lines, nil
 }

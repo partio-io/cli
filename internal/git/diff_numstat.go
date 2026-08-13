@@ -1,6 +1,12 @@
 package git
 
+import "strings"
+
 // DiffNumstat returns numstat for a specific commit.
 func DiffNumstat(commitHash string) (string, error) {
-	return execGit("diff", "--numstat", commitHash+"~1", commitHash)
+	lines, err := diffTree("", commitHash, "--numstat")
+	if err != nil {
+		return "", err
+	}
+	return strings.Join(lines, "\n"), nil
 }
