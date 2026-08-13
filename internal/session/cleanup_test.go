@@ -64,7 +64,10 @@ func TestCleanupStale_RecentActiveSession(t *testing.T) {
 		t.Error("should not clean up a recently updated session")
 	}
 
-	cur, _ := mgr.Current()
+	cur, err := mgr.Current()
+	if err != nil {
+		t.Fatalf("unexpected error reading current session: %v", err)
+	}
 	if cur.State != StateActive {
 		t.Errorf("expected state=active, got %s", cur.State)
 	}
@@ -96,7 +99,10 @@ func TestCleanupStale_OldActiveSession_NoPID(t *testing.T) {
 		t.Fatal("expected session to be set in result")
 	}
 
-	cur, _ := mgr.Current()
+	cur, err := mgr.Current()
+	if err != nil {
+		t.Fatalf("unexpected error reading current session: %v", err)
+	}
 	if cur.State != StateEnded {
 		t.Errorf("expected state=ended after cleanup, got %s", cur.State)
 	}
@@ -131,7 +137,10 @@ func TestCleanupStale_OldIdleSession_NoPID(t *testing.T) {
 		t.Error("expected stale idle session to be cleaned up")
 	}
 
-	cur, _ := mgr.Current()
+	cur, err := mgr.Current()
+	if err != nil {
+		t.Fatalf("unexpected error reading current session: %v", err)
+	}
 	if cur.State != StateEnded {
 		t.Errorf("expected state=ended after cleanup, got %s", cur.State)
 	}
