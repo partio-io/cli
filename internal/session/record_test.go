@@ -30,12 +30,18 @@ func TestRecordActive_RefreshesExistingSession(t *testing.T) {
 	if err := mgr.RecordActive("claude-code", "main", "/tmp/repo", 1); err != nil {
 		t.Fatalf("first RecordActive: %v", err)
 	}
-	first, _ := mgr.Current()
+	first, err := mgr.Current()
+	if err != nil {
+		t.Fatalf("Current after first RecordActive: %v", err)
+	}
 
 	if err := mgr.RecordActive("claude-code", "main", "/tmp/repo", 2); err != nil {
 		t.Fatalf("second RecordActive: %v", err)
 	}
-	second, _ := mgr.Current()
+	second, err := mgr.Current()
+	if err != nil {
+		t.Fatalf("Current after second RecordActive: %v", err)
+	}
 
 	if second.ID != first.ID {
 		t.Errorf("session ID changed on refresh: %s -> %s", first.ID, second.ID)
@@ -61,7 +67,10 @@ func TestRecordActive_ReplacesEndedSession(t *testing.T) {
 		t.Fatalf("RecordActive: %v", err)
 	}
 
-	s, _ := mgr.Current()
+	s, err := mgr.Current()
+	if err != nil {
+		t.Fatalf("Current: %v", err)
+	}
 	if s.State != StateActive {
 		t.Errorf("state = %s, want active", s.State)
 	}
