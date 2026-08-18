@@ -58,7 +58,36 @@ jobs:
           go install github.com/partio-io/minions/cmd/minions@v0.0.13
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
+      # The premise is checked before the build starts, not inside it. The
+      # runtime creates the branch before the agent session runs and pushes
+      # unconditionally, so a build that stops partway still leaves a branch
+      # and a pull request behind. Stopping here leaves neither.
+      - name: Run premise gate
+        id: gate
+        if: steps.program.outputs.issue_num != ''
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          MINION_ISSUE_NUMBER: ${{ steps.program.outputs.issue_num }}
+        run: |
+          ISSUE_NUM="${{ steps.program.outputs.issue_num }}"
+          REPO="${{ github.repository }}"
+
+          minions run .minions/programs/premise-gate.md --issue "$ISSUE_NUM"
+
+          # The gate reports its verdict by labelling the issue — the same
+          # signal the approval program already treats as a skip condition.
+          # Read the label back rather than the run's exit code: the gate
+          # succeeds whether the premise held or not.
+          if gh issue view "$ISSUE_NUM" --repo "$REPO" --json labels \
+              --jq '.labels[].name' | grep -qx 'do-not-build'; then
+            echo "::notice::Premise does not hold for #${ISSUE_NUM}; skipping the build."
+            echo "blocked=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "blocked=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run program
+        if: steps.gate.outputs.blocked != 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
@@ -71,8 +100,11 @@ jobs:
           fi
           minions $ARGS
 
+      # A blocked run is not a completion and not a failure. Both of the
+      # steps below are skipped so the gate's comment stays the only account
+      # of what happened, and the issue is neither closed nor marked failed.
       - name: Mark done
-        if: success() && steps.program.outputs.issue_num != ''
+        if: success() && steps.program.outputs.issue_num != '' && steps.gate.outputs.blocked != 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
@@ -106,7 +138,7 @@ jobs:
             --comment "Minion completed — see PR #${PR}."
 
       - name: Mark failed
-        if: failure() && steps.program.outputs.issue_num != ''
+        if: failure() && steps.program.outputs.issue_num != '' && steps.gate.outputs.blocked != 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |

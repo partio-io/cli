@@ -32,9 +32,19 @@ For each feature idea, output a JSON object with these fields:
   "user_relevance": "Why this change is relevant to Partio users — how it improves their experience, workflow, or the value they get from Partio.",
   "target_repos": ["cli"],
   "context_hints": ["cli/internal/relevant/path/"],
-  "acceptance_criteria": ["specific testable criterion 1", "specific testable criterion 2"]
+  "acceptance_criteria": ["specific testable criterion 1", "specific testable criterion 2"],
+  "premise": [
+    {
+      "claim": "one factual statement about Partio that this idea depends on",
+      "evidence": "the path, symbol or command that settles the claim, e.g. 'cli/internal/hooks/post_commit.go' or 'go doc ./internal/attribution'"
+    }
+  ]
 }
 ```
+
+`premise` lists what the idea assumes to be true about Partio today. State each assumption as one claim, and attach the evidence that decides it. A claim you cannot attach evidence to is not written with an empty `evidence` field: find the evidence, or drop the idea. A claim about Partio's current behavior is a premise; a statement about what Partio should do next is not — that belongs in `description`.
+
+**Ground every claim in the checked-out tree, not in the source material.** The source describes a different product. Its problems are not Partio's problems until you have seen them here. Write a claim only about what the checked-out tree shows, and name the path, symbol or command in that tree that shows it. Do not infer Partio's current behavior from how the source product behaves, from the wording of a changelog entry or issue, or from how projects of this kind usually work. A claim you cannot ground this way is dropped along with the idea that needed it.
 
 Do NOT include `docs` in `target_repos`. Documentation updates are handled automatically by the doc minion after code PRs merge — speculative docs PRs created alongside code changes become stale during review and get orphaned if the code PR is rejected.
 
