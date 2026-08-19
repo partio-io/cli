@@ -227,7 +227,10 @@ func TestHoldingPremiseLetsTheBuildProceedUnchanged(t *testing.T) {
 	for _, want := range []string{
 		"record every claim",
 		"the excerpt that produced it",
-		"for a block that holds",
+		// "premise", not "block": the gate also verifies claims extracted
+		// from the prose of a proposal filed before the block format, and
+		// those record their evidence on the holding path too.
+		"for a premise that holds",
 	} {
 		if !containsPhrase(checker, want) {
 			t.Errorf("### premise-checker does not record %q, so a build that proceeds carries no evidence", want)
@@ -296,6 +299,40 @@ func TestImplementProgramInstructionsReachTheModel(t *testing.T) {
 	} {
 		if !containsPhrase(agents, want) {
 			t.Errorf("the instruction %q does not live under ## Agents, so the parser drops it", want)
+		}
+	}
+}
+
+// TestBuildVerifiesAProposalThatCarriesNoBlock pins the case that covers the
+// whole backlog. No open proposal carried a premise block when the gate
+// shipped, so a gate that treats a blockless issue as out of scope labels
+// nothing. The workflow reads a missing label as "not blocked" and builds, and
+// the gate passes every issue it was added to stop. The verifier already
+// describes where those claims come from, so the gate routes to it and does
+// not stop.
+func TestBuildVerifiesAProposalThatCarriesNoBlock(t *testing.T) {
+	if !containsPhrase(readRepoFile(t, verifierDoc), NoBlockSection) {
+		t.Fatalf("%s no longer carries %q, so no stage has a described route for a blockless proposal",
+			VerifierPath, NoBlockSection)
+	}
+
+	checker, ok := section(readRepoFile(t, gateProgram), "### premise-checker")
+	if !ok {
+		t.Fatalf("%s has no ### premise-checker agent", gateProgram)
+	}
+
+	if !containsPhrase(checker, NoBlockSection) {
+		t.Errorf("### premise-checker never routes to %q in %s, so a proposal with no block is never verified",
+			NoBlockSection, VerifierPath)
+	}
+
+	// The exact wording that shipped the bug. A gate that tells the checker to
+	// stop on a blockless issue reaches no verdict, and a build with no verdict
+	// runs.
+	for _, escape := range []string{"out of scope", "Leave the issue alone"} {
+		if containsPhrase(checker, escape) {
+			t.Errorf("### premise-checker says %q of a blockless issue; that is every open proposal, so every build goes through ungated",
+				escape)
 		}
 	}
 }

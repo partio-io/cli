@@ -13,6 +13,12 @@ const (
 	// VerifierMarker names the description and its format version. Exactly
 	// one file carries it, which is what makes "described once" checkable.
 	VerifierMarker = "<!-- partio:premise-verifier:v1 -->"
+
+	// NoBlockSection is where the description covers a proposal filed before
+	// the block format existed. Its claims come from the issue prose. Every
+	// proposal open when the gate shipped was in that state, so a stage that
+	// treats a blockless issue as out of scope exempts the entire backlog.
+	NoBlockSection = "## When there is no block"
 )
 
 // Verdict is the outcome of checking one claim against the tree.
