@@ -14,7 +14,7 @@ pr_labels:
 
 # Auto-elect checkpoint sync remote from observed push behavior
 
-## Problem
+### Problem
 
 Partio's pre-push hook defaults to `origin` when deciding where to sync
 `partio/checkpoints/v1`. Users who routinely push to a non-origin remote
@@ -25,7 +25,7 @@ The current behavior requires manual intervention: the user must discover the
 mismatch via `partio status` and then hand-configure `push_sessions_remote` in
 `.partio/settings.json`.
 
-## Desired behavior
+### Desired behavior
 
 After the first successful checkpoint sync, Partio should observe the remote
 name it used (available from the pre-push hook's `$1` argument) and persist it

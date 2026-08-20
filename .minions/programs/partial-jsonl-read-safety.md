@@ -14,7 +14,7 @@ pr_labels:
 
 # JSONL parser: handle partial trailing lines from in-progress Claude sessions
 
-## Problem
+### Problem
 
 Partio's post-commit hook parses the Claude Code JSONL session file immediately
 after a commit. A commit can happen mid-session — the user (or an agent) runs
@@ -37,7 +37,7 @@ creation entirely, even though all prior messages parsed successfully.
 The result: a mid-session commit either silently loses the last conversation
 turn from the checkpoint, or fails checkpoint creation altogether.
 
-## Desired behavior
+### Desired behavior
 
 The JSONL parser should treat a malformed trailing line as a soft warning, not
 a hard error:
