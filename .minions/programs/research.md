@@ -10,8 +10,13 @@ Unattended research pipeline for complex `partio-io/cli` issues. A
 parent issue labeled `minion-research` (or commented `/minion
 research`) fires `research.yml`, which runs this program.
 
-This program runs the research → PRD → slice → publish pipeline:
+This program runs the verify → research → PRD → slice → publish
+pipeline:
 
+- `premise-checker` rechecks the parent issue's premise against the
+  checked-out tree before anything is planned, and stops the run when
+  the premise no longer holds. A premise checked at filing time says
+  nothing about the tree months later.
 - `researcher` drives a `/code-research`-style interview against the
   parent issue and writes the questions to a shared transcript.
 - `persona` answers each question the way jcleira would, grounded in
@@ -45,10 +50,17 @@ between agents. State is therefore exchanged through stable paths
 outside any worktree. The stable paths used across agents are:
 
 ```
+PREMISE="/tmp/minion-research-premise-${MINION_ISSUE_NUMBER:-0}.md"
 TRANSCRIPT="/tmp/minion-research-transcript-${MINION_ISSUE_NUMBER:-0}.md"
 PRD_DRAFT="/tmp/minion-research-prd-draft-${MINION_ISSUE_NUMBER:-0}.md"
 SLICES="/tmp/minion-research-slices-${MINION_ISSUE_NUMBER:-0}.md"
 ```
+
+`$PREMISE` carries the premise verdict forward. Every agent after
+`premise-checker` reads its first line and stops immediately unless it
+reads `PREMISE_OK`. That line is how a blocked run produces no plan:
+each agent is its own session, so a stopped stage is every later agent
+declining to work, not one agent returning early.
 
 The parent issue number is in `$MINION_ISSUE_NUMBER`. The parent
 issue body is also provided to every agent under an "Issue" section of
@@ -60,12 +72,97 @@ changes" and the run ends without a PR. That is intended.
 
 ## Context
 
+- `cli/.minions/premise-verifier.md`
+- `cli/.minions/stage-gate.md`
 - `cli/.minions/persona/telos/MISSION.md`
 - `cli/.minions/persona/telos/GOALS.md`
 - `cli/.minions/persona/telos/PROJECTS.md`
 - `cli/.minions/persona/telos/BELIEFS.md`
 
 ## Agents
+
+### premise-checker
+
+```capabilities
+tools:
+  - Read
+  - Write
+  - Glob
+  - Grep
+  - Bash
+max_turns: 60
+```
+
+You recheck the parent issue's premise against the tree in front of
+you, before this run plans anything. Issue #30 was filed on 2026-03-26
+and built on 2026-08-10 — four and a half months in which this codebase
+moved underneath it. The proposer's verdict was about March. Yours is
+about today, and only yours decides whether this run continues.
+
+The repository the claims are about is already checked out in your
+working directory. Read it. Do not decide a claim from the issue text,
+and do not decide it from memory of how similar projects work.
+
+1. Read the parent issue body, which is provided under the "Issue"
+   section of your prompt, and take the `## Premise` section that
+   carries the `<!-- partio:premise:v1 -->` marker. That block is what
+   you verify.
+
+2. Apply `.minions/premise-verifier.md` to that block against the
+   checked-out tree. It describes verification once, for every stage
+   that needs it. Follow it as written — gather the evidence each claim
+   names, then decide, then record the excerpt that decided it. Do not
+   restate its procedure and do not invent your own.
+
+3. Apply `.minions/stage-gate.md` to the verdict it produced. That file
+   describes what a stage does when a premise does not hold, and what it
+   does when it holds. Follow it as written.
+
+4. Compute the shared path and write the verdict where the later agents
+   read it:
+
+   ```
+   PREMISE="/tmp/minion-research-premise-${MINION_ISSUE_NUMBER:-0}.md"
+   ```
+
+   Write `$PREMISE` fresh, truncating any stale content from a previous
+   run. Its first line is exactly `PREMISE_OK` when the block holds, and
+   exactly `PREMISE_BLOCKED` when it does not. Below that first line,
+   record every claim, the evidence it named, its verdict, and the
+   excerpt that produced it — for a block that holds as well as for one
+   that does not. A run that passed carries its evidence too.
+
+5. When the block does not hold, the gate has already labelled the
+   issue and posted the comment naming what you checked and what you
+   found. Stop there. Produce no PRD, no slice plan and no further
+   artifact, and do not close the issue. Which label the gate applies,
+   and how the operator overrules it, are the gate's to state — not
+   this program's, and not yours to decide from the issue's current
+   labels. Verify against the tree on every run, whatever labels the
+   issue already carries.
+
+6. When the block holds, refresh the premise section in the parent issue
+   with the evidence you just gathered, so the build stage checks against
+   today's facts rather than the filing-time ones.
+
+   Read the current body, replace the evidence excerpts inside the
+   `## Premise` section with what you read on this run, and keep the
+   section's marker and every claim. Leave the rest of the body untouched
+   — you are refreshing evidence, not rewriting the proposal. Then write
+   the whole body to the shared path and put it back:
+
+   ```
+   REFRESHED_BODY="/tmp/minion-research-body-${MINION_ISSUE_NUMBER:-0}.md"
+   gh issue edit "$MINION_ISSUE_NUMBER" --repo partio-io/cli --body-file "$REFRESHED_BODY"
+   ```
+
+A parent issue whose body carries no `## Premise` section at all is out
+of scope for this program and is not your call to make. Write
+`PREMISE_OK` and continue.
+
+Write only `$PREMISE` and the refreshed issue body. Do not create or
+modify any file in the working directory, do not run `git`, and do not
+open a PR.
 
 ### researcher
 
@@ -78,6 +175,19 @@ tools:
   - Bash
 max_turns: 40
 ```
+
+Before anything else, read the premise verdict and stop unless it
+passed:
+
+```
+PREMISE="/tmp/minion-research-premise-${MINION_ISSUE_NUMBER:-0}.md"
+head -1 "$PREMISE"
+```
+
+If that first line is not exactly `PREMISE_OK`, the premise-checker
+blocked this run. Write nothing, ask nothing, and stop immediately.
+Producing a plan for a premise the tree contradicts is the outcome this
+gate exists to stop.
 
 You are the researcher. Interview the parent issue relentlessly, in
 the spirit of the `/code-research` skill: walk down every branch of
@@ -130,6 +240,17 @@ tools:
 max_turns: 40
 ```
 
+Before anything else, read the premise verdict and stop unless it
+passed:
+
+```
+PREMISE="/tmp/minion-research-premise-${MINION_ISSUE_NUMBER:-0}.md"
+head -1 "$PREMISE"
+```
+
+If that first line is not exactly `PREMISE_OK`, the premise-checker
+blocked this run. Write nothing and stop immediately.
+
 You answer each research question as jcleira would.
 
 Privacy directive (load-bearing — must not be edited away): Use TELOS
@@ -179,6 +300,17 @@ tools:
   - Bash
 max_turns: 20
 ```
+
+Before anything else, read the premise verdict and stop unless it
+passed:
+
+```
+PREMISE="/tmp/minion-research-premise-${MINION_ISSUE_NUMBER:-0}.md"
+head -1 "$PREMISE"
+```
+
+If that first line is not exactly `PREMISE_OK`, the premise-checker
+blocked this run. Write no PRD and stop immediately.
 
 You synthesize the completed research transcript into a PRD body. You
 do NOT interview, ask questions, or modify the transcript — the
@@ -238,6 +370,17 @@ tools:
   - Bash
 max_turns: 20
 ```
+
+Before anything else, read the premise verdict and stop unless it
+passed:
+
+```
+PREMISE="/tmp/minion-research-premise-${MINION_ISSUE_NUMBER:-0}.md"
+head -1 "$PREMISE"
+```
+
+If that first line is not exactly `PREMISE_OK`, the premise-checker
+blocked this run. Write no slice plan and stop immediately.
 
 You decompose the PRD that `prd-writer` produced into vertical slices,
 one block per slice. You do NOT interview, synthesize a new PRD, or
@@ -303,6 +446,20 @@ tools:
   - Bash
 max_turns: 30
 ```
+
+Before anything else, read the premise verdict and stop unless it
+passed:
+
+```
+PREMISE="/tmp/minion-research-premise-${MINION_ISSUE_NUMBER:-0}.md"
+head -1 "$PREMISE"
+```
+
+If that first line is not exactly `PREMISE_OK`, the premise-checker
+blocked this run. Post no comment, add no label, and stop immediately.
+The gate has already posted the comment that explains the block; a
+`minion-research-completed` label on a blocked issue would say the
+opposite of what happened.
 
 You publish the research output: post the PRD as a comment, post the
 slice plan as a second comment, and mark the parent issue as

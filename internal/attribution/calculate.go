@@ -1,6 +1,7 @@
 package attribution
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -9,14 +10,11 @@ import (
 
 // Calculate computes attribution for a commit based on whether an agent was active.
 func Calculate(commitHash string, agentActive bool) (*Result, error) {
-	// Get numstat for the commit
+	// Get numstat for the commit. A git failure is a failed measurement, not
+	// an empty commit. The error goes to the caller so the two stay apart.
 	numstat, err := git.DiffNumstat(commitHash)
 	if err != nil {
-		// If this is the first commit, try diff against empty tree
-		numstat, err = git.ExecGit("diff", "--numstat", "4b825dc642cb6eb9a060e54bf899d69f82cf7ee2", commitHash)
-		if err != nil {
-			return &Result{}, nil
-		}
+		return nil, fmt.Errorf("measuring commit %s: %w", commitHash, err)
 	}
 
 	totalAdded := 0

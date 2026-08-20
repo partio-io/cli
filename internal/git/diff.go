@@ -2,5 +2,10 @@ package git
 
 // Diff returns the unified diff for a specific commit.
 func Diff(commitHash string) (string, error) {
-	return execGit("diff", commitHash+"~1", commitHash)
+	from, to, err := commitRange(commitHash)
+	if err != nil {
+		return "", err
+	}
+
+	return execGit("diff", from, to)
 }
