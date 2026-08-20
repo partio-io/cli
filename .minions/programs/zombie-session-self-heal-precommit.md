@@ -12,7 +12,7 @@ pr_labels:
   - enhancement
 ---
 
-## Self-heal zombie sessions on pre-commit
+# Self-heal zombie sessions on pre-commit
 
 Partio records a new active session in the pre-commit hook (`internal/hooks/precommit.go`). When an agent crashes without running a stop hook, it leaves a session in ACTIVE or IDLE state indefinitely. Today the only way to resolve it is to run `partio cleanup` or `partio status` manually.
 
