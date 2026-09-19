@@ -349,3 +349,139 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #1882–#2073 (dependency updates, CI hang fix, trail backend retirement, dispatch routing, telemetry, release channel, OpenCode plugin, Cursor/Codex subagent fixes, search TUI changes, changelog PRs)`
 - reason: `irrelevant`
 - note: The bulk of PRs in this range are dependency version bumps, CI configuration fixes (e.g. #2072 apt hang), platform routing changes (e.g. #2046–#2051 cell targets, dispatch), telemetry (#2023–#2024), trail backend retirement (#2021, #2037), OpenCode plugin changes (#2018, #2027, #2053), Cursor/Codex subagent bug fixes (#2066–#2071), search TUI updates (#2022, #2044), and changelog/credit PRs (#2039, #2050, #2073). None of these map to Partio's domain of git hook-based session capture and checkpoint storage.
+
+## No new pulls > #2073
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #2074–present`
+- reason: `irrelevant`
+- note: `gh pr list --repo entireio/cli` returned no pull requests with number > 2073 in this run. Nothing to ingest.
+
+## changelog 0.10.3: subagent survival into checkpoints, process-ancestry session linking, zombie self-heal, redaction config, doctor trace, telemetry, search TUI, git status lock fix, condensation/OPF fixes
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.10.3`
+- reason: `irrelevant`
+- note: The bulk of 0.10.3 covers Entire-specific cloud infrastructure. Subagent checkpoint survival and process-ancestry session linking are analogous to Partio proposals already filed as issues #673 and #677. Zombie self-heal was already filed as #679. Redaction engine config, doctor trace, telemetry signals, and search TUI are Entire-specific. The `git status --no-optional-locks` fix is for Entire's background status calls; Partio does not call `git status` in any hook. The condensation/OPF pipeline fixes have no equivalent in Partio's orphan-branch checkpoint model.
+
+## changelog 0.10.4: Entire-native repo cloning, jurisdiction dispatch, trail JSON output, os.Root filesystem anchors, OAuth and plugin resolver hardening
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.10.4`
+- reason: `irrelevant`
+- note: All 0.10.4 items are Entire-specific: Entire-native `/et/` path cloning, `--jurisdiction` dispatch flag, trail `original_branch` JSON field, reduced runner scaffolding, `os.Root` filesystem confinement for Entire's plugin/server paths, OAuth cross-host redirect restriction, and plugin resolver `$PATH` hardening. Partio has no equivalent paths for any of these.
+
+## changelog 0.10.5: async mirror creation, full.jsonl release after condensation, cross-federation git clone, cluster login domain restriction, checkpoint explain verification
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.10.5`
+- reason: `irrelevant`
+- note: All 0.10.5 items are Entire-specific: async mirror requests, session full.jsonl release on condensation (Partio has no condensation), cross-federation clone auth, cluster login domain scoping, and checkpoint explain server-response verification. None of these concepts exist in Partio's orphan-branch model.
+
+## changelog 0.10.6: Windows PowerShell installer, runner setup, trail pre-push hook, symlink validation in enable, concurrent checkpoint/OPF fixes, UTF-8 truncation, settings trust security
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.10.6`
+- reason: `irrelevant`
+- note: All 0.10.6 items are Entire-specific: Windows PowerShell installer (Partio has no Windows installer), enhanced runner setup (no runners), trail pre-push hook (no trails), symlink validation in Entire's enable flow (different from Partio's hook installation — Partio's install.go renames symlinks via os.Rename before writing, so the Entire-specific `--force` clobbering scenario does not arise), concurrent OPF checkpoint writes (no OPF), UTF-8 truncation in model prompts (Partio does not send prompts to models in its core hooks), and settings trust gate hardening for external_agents (no external agent commands in Partio).
+
+## issues #2518, #2402, #2401, #2393, #2378, #2368, #2362, #2350, #2360, #2204, #2197, #2196, #2148, #2091, #2087: Entire cloud/OPF/condensation infrastructure bugs
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2518, #2402, #2401, #2393, #2378, #2368, #2362, #2350, #2360, #2204, #2197, #2196, #2148, #2091, #2087`
+- reason: `irrelevant`
+- note: These issues describe bugs in Entire's cloud and storage infrastructure: mirror credential routing (#2518), ULID checkpoint ref case-collision on case-insensitive filesystems (#2402/#2401), git-refs async push bookkeeping (#2393), uncondensed checkpoint cleanup races (#2378), backfilled session token accounting (#2368), multi-session status collapsing (#2362), shadow-ref cleanup on malformed session state (#2350), pushurl-only remote election (#2360), go-git OPF CAS race (#2204), persistent lock file accumulation (#2197), MigrateBranchToRefs per-checkpoint lock overhead (#2196), finalizeAllTurnCheckpoints deadline (#2148), hook latency remaining work (#2091), and OPF 9th-layer bypass (#2087). None of these concepts (ULID shards, OPF layers, condensation, async push queues, cloud mirrors) exist in Partio's orphan-branch model.
+
+## issues #2394, #2318, #2276, #2218, #2203, #2098: platform and installer bugs
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2394, #2318, #2276, #2218, #2203, #2098`
+- reason: `irrelevant`
+- note: These cover Entire-specific platform and installer issues: Homebrew tap-before-trust docs error (#2394), install.sh hiding API auth errors (#2318), Windows installer URL serving a login page (#2276), Windows PE metadata reporting version 0.0.0.0 (#2218), install.sh missing shellcheck (#2203), and a CLI performance regression after enabling full-repository features (#2098). Partio has no install.sh, no Windows installer, no PE metadata, and no full-repository indexing feature.
+
+## issues #2328, #2160: Devin and Goose/Qwen Code agent integrations
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2328 (Add Devin agent support), #2160 (Feature request: Goose and Qwen Code agent integrations)`
+- reason: `irrelevant`
+- note: Partio already has an open proposal for Goose integration (#681). Devin and Qwen Code have no published session JSONL format or hook interface documented in this repository; adding them would require a new detector with no grounding in the checked-out tree. These are new integrations, not fixes to existing behavior.
+
+## issues #2271, #2121, #2126, #2137, #2089: docs, semantic search, agent picker UI, OpenCode Desktop, explain scan limit
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2271, #2121, #2126, #2137, #2089`
+- reason: `irrelevant`
+- note: Docs security page data-residency (#2271) is marketing documentation. Semantic search 401 for EU accounts (#2121) and checkpoint explain scan-limit false negative (#2089) require Entire's cloud search backend. Agent picker height bug (#2126) is in Entire's interactive TUI. OpenCode Desktop hooks (#2137) requires OpenCode support. None of these exist in Partio.
+
+## issues #2201, #2202, #2203: Entire test and CI infrastructure
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2201, #2202, #2203`
+- reason: `irrelevant`
+- note: auth-go lock directory isolation (#2201), structural git isolation in tests (#2202), and install.sh shellcheck (#2203) are Entire's internal test/CI infrastructure. Partio has its own test conventions (table-driven, t.TempDir, no external frameworks) that don't involve these components.
+
+## issues #2115, #2098, #2091: hook timeouts, performance regression, hook latency
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2115, #2098, #2091`
+- reason: `irrelevant`
+- note: Entire's flat 30s hook timeout (#2115) and hook latency work (#2091) are specific to Entire's multi-agent stop/start hook pipeline and telemetry. Partio's pre-commit and post-commit hooks do not have configurable timeouts. The CLI performance regression (#2098) is tied to Entire's full-repository indexing feature which Partio does not have.
+
+## issues #2260, #2257, #2249: metadata read rules, external agent settings leak, stale configure hints
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2260, #2257, #2249`
+- reason: `irrelevant`
+- note: The `.entire/metadata/` read-deny rule (#2260) is specific to Entire's Claude Code permission config. The external-agent settings scope leak (#2257) requires Entire's `agent add` command. Stale `entire configure --agent` hints (#2249) reference Entire's configure subcommand. Partio has none of these: no metadata permission rules, no `partio agent` subcommand, no `partio configure` command.
+
+## issues #2255, #2256: forged checkpoint trailer lines, AppendCheckpointTrailer grammar mismatch
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2255 (forged Entire-Checkpoint lines), #2256 (AppendCheckpointTrailer emits invalid trailer)`
+- reason: `irrelevant`
+- note: Partio writes `Partio-Checkpoint: <id>` trailers via `git.AmendTrailers` (`internal/git/amend_trailers.go`) but does not parse checkpoint IDs back from commit bodies — the checkpoint branch is the source of truth, not commit trailers. The trailer forging and grammar-mismatch bugs in Entire depend on a round-trip where the trailer is parsed to select or mutate checkpoint storage; Partio has no such round-trip.
+
+## issues #2416, #2410: doctor stuck-session interactive prompt, enable --force symlink clobber
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2416 (doctor stuck-session prompt bypasses interactive check), #2410 (enable --force through symlink)`
+- reason: `irrelevant`
+- note: Partio's `doctor` command (`cmd/partio/doctor.go`) has no interactive prompts — it reports status and exits, so #2416 has nothing to bypass. Partio's `enable` command has no `--force` flag; the specific clobber scenario in #2410 requires `--force` to skip the backup-existence check that would otherwise prevent it.
+
+## issues #2274, #2263: disable doesn't reach linked worktrees, lefthook overwrite classification
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2274 (disable doesn't reach linked worktrees), #2263 (lefthook classified as not overwriting hooks)`
+- reason: `irrelevant`
+- note: Partio's `disable` removes git hooks (installed to `git rev-parse --git-common-dir`, shared across worktrees) and optionally removes `.partio/`; it does not write `enabled: false` to `settings.local.json`, so the per-worktree re-enable scenario in #2274 does not apply. Partio's hook-manager detection (`internal/git/hooks/detect_hook_managers.go`) emits the same warning for all managers regardless of whether they overwrite hooks; there is no `OverwritesHooks` classification to be wrong about, so #2263 has no equivalent bug to port.
+
+## issues #2215, #2111: Claude Code SubagentStop dropped, git index emptied between staging and commit
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2215 (Claude Code SubagentStop dropped), #2111 (index emptied between staging and commit → empty tree)`
+- reason: `irrelevant`
+- note: Partio has no subagent session tracking; it captures one JSONL transcript per commit via git hooks rather than correlating `SubagentStop` events with hook invocations (#2215). The empty-tree-via-index-lock race (#2111) requires concurrent `git status` writes from Entire's background stop hooks; Partio does not call `git status` in any hook path.
+
+## issues #2367, #2237, #2264: session dir ignores CLAUDE_CONFIG_DIR, hook backup overwritten on reinstall, status reports installed for foreign hooks
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2367, #2237, #2264`
+- reason: `irrelevant`
+- note: All three ideas extracted from these issues were verified against the checked-out tree and the premises held, but proposals for identical findings had already been filed in a prior run: #708 (FindSessionDir ignores CLAUDE_CONFIG_DIR), #710 (installHooks silently overwrites existing backup), #704 (status reports "Hooks: installed" for foreign hook files). Not re-filed to avoid duplicates.
