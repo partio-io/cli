@@ -77,28 +77,21 @@ func TestProposeProgramKeepsItsExistingProposalBehaviour(t *testing.T) {
 		"--label minion-proposal",
 		`--title "<title>"`,
 		"<description",
-		"link to program file",
-		"<!-- program: .minions/programs/<id>.md --> marker",
 	} {
 		if !strings.Contains(create, want) {
 			t.Errorf("the gh issue create instruction lost %q:\n%s", want, create)
 		}
 	}
 
-	for _, want := range []string{
-		`gh issue list --repo <this-repo> --label minion-proposal --search "<feature-id>" --limit 1`,
-		"write a program file to `.minions/programs/<id>.md`",
-	} {
-		if !strings.Contains(src, want) {
-			t.Errorf("propose program lost %q", want)
-		}
+	if want := `gh issue list --repo <this-repo> --label minion-proposal --search "<feature-id>" --limit 1`; !strings.Contains(src, want) {
+		t.Errorf("propose program lost %q", want)
 	}
 }
 
 // TestProposeProgramDropsAnIdeaWhosePremiseFails checks the order the proposer
 // works in. Verifying after the issue exists changes nothing: the proposal is
 // already filed and the operator is already reading it. The check has to come
-// first, and a failed check has to leave no program file and no issue behind.
+// first, and a failed check has to leave no issue behind.
 func TestProposeProgramDropsAnIdeaWhosePremiseFails(t *testing.T) {
 	raw, err := os.ReadFile(proposeProgram)
 	if err != nil {
@@ -119,7 +112,6 @@ func TestProposeProgramDropsAnIdeaWhosePremiseFails(t *testing.T) {
 		// that is a different event from a premise that was checked and
 		// failed.
 		{"drop an idea whose premise does not hold", "does not hold, drop the idea"},
-		{"write the program file", "write a program file"},
 		{"create the issue", "gh issue create"},
 	}
 	at := make([]int, len(steps))
@@ -134,10 +126,8 @@ func TestProposeProgramDropsAnIdeaWhosePremiseFails(t *testing.T) {
 	}
 
 	drop, _, _ := strings.Cut(agents[at[1]:], "\n   - ")
-	for _, want := range []string{"no program file", "no issue"} {
-		if !strings.Contains(drop, want) {
-			t.Errorf("dropping an idea leaves %q unsaid, so a failed check still files something:\n%s", want, drop)
-		}
+	if !strings.Contains(drop, "no issue") {
+		t.Errorf("dropping an idea leaves %q unsaid, so a failed check still files something:\n%s", "no issue", drop)
 	}
 }
 
@@ -227,6 +217,45 @@ func TestProposeProgramFilesTheEvidenceItGathered(t *testing.T) {
 	}
 	if !strings.Contains(create, "gathered evidence") {
 		t.Errorf("the issue body carries the premise but not the evidence gathered for it:\n%s", create)
+	}
+}
+
+// TestProposeProgramKeepsTheWholeProposalInTheIssue checks that a proposal is
+// one GitHub issue and nothing else. A build reads the issue and never a file in
+// the tree, so a proposal split across the two loses to the build whatever sits
+// in the file. On 2026-09-22, 490 of the 500 program files that open proposals
+// linked to did not exist on main, and 171 of those proposals carried no
+// acceptance criteria in the issue.
+func TestProposeProgramKeepsTheWholeProposalInTheIssue(t *testing.T) {
+	raw, err := os.ReadFile(proposeProgram)
+	if err != nil {
+		t.Fatalf("read propose program: %v", err)
+	}
+	agents, ok := section(string(raw), "## Agents")
+	if !ok {
+		t.Fatal("propose program has no agents section")
+	}
+
+	create, ok := lineContaining(agents, "gh issue create")
+	if !ok {
+		t.Fatal("propose program gives no gh issue create instruction")
+	}
+	for _, want := range []string{"what to build", "acceptance criteria", "proposal id"} {
+		if !strings.Contains(create, want) {
+			t.Errorf("the issue body leaves out %q, so no build ever sees it:\n%s", want, create)
+		}
+	}
+
+	// The duplicate check searches the issues for the id. With no program
+	// marker to carry it, the id line is what the search finds.
+	if !strings.Contains(agents, "`Proposal id: <id>`") {
+		t.Error("the proposer is never told to end the issue with its id, so the duplicate check has nothing to find")
+	}
+
+	for _, gone := range []string{"write a program file", "<!-- program:"} {
+		if strings.Contains(agents, gone) {
+			t.Errorf("the proposer is still told %q; a proposal is an issue, not a file", gone)
+		}
 	}
 }
 

@@ -12,8 +12,8 @@ This program runs one agent, `proposer`, as a single one-shot Claude
 session. The agent reads the monitored-source cursors, fetches what is
 new since each cursor, applies the ingest prompt to decide what is
 relevant to this project, and files one proposal per relevant idea as a
-program file plus a GitHub issue. It then advances the cursors and
-commits the result.
+GitHub issue. The issue is the whole proposal: a build reads the issue
+and nothing else. It then advances the cursors and commits the result.
 
 The repository for all `gh` calls against this project is
 `partio-io/cli`.
@@ -68,7 +68,7 @@ create feature proposals. Work through the steps below in order.
 
      One claim per line, and every claim names the path, symbol or command that settles it. A claim you cannot attach evidence to is not filed with an empty field: find the evidence, or drop the idea.
    - **Verify the premise before you file anything.** This repository is already checked out in your working directory. Apply `.minions/premise-verifier.md` to the premise section you just built, against that tree. Gather the evidence each claim names — read the file, find the symbol, run the command — and decide each claim from what you gathered. The ideas come from a sibling product, so a claim that is true of that product is not thereby true here. Verify it here.
-   - **If the block does not hold, drop the idea.** Write no program file and create no issue for it. A `fails` or `unresolved` verdict is not a pass. Keep the claim, the evidence and the verdict for the summary.
+   - **If the block does not hold, drop the idea.** Create no issue for it. A `fails` or `unresolved` verdict is not a pass. Keep the claim, the evidence and the verdict for the summary.
    - **Record every rejection in `.minions/rejections.md`.** Append one entry per dropped idea. Never rewrite an entry that is already there. Use this format exactly:
 
      ```markdown
@@ -97,17 +97,20 @@ create feature proposals. Work through the steps below in order.
      ```
 
      Keep the two kinds apart. A dropped idea was checked and this repository contradicted it; a skipped item was never about this project. A reader who cannot tell them apart cannot tell a bar set too high from a source that has gone quiet, which is the one question this log answers.
-   - If the block holds, write a program file to `.minions/programs/<id>.md` with frontmatter (id, target_repos, acceptance_criteria, pr_labels) and description
-   - Create a GitHub issue: `gh issue create --repo <this-repo> --label minion-proposal --title "<title>" --body "<description + premise section + gathered evidence + link to program file + <!-- program: .minions/programs/<id>.md --> marker>"`
+   - If the block holds, create a GitHub issue: `gh issue create --repo <this-repo> --label minion-proposal --title "<title>" --body "<description + what to build + acceptance criteria + premise section + gathered evidence + proposal id line>"`
+
+     The issue is the whole proposal. A build reads the issue and nothing else, so the body carries everything a fresh session needs to build from: what to build, in full, and the acceptance criteria as a `- [ ]` checklist under `## Acceptance Criteria`. Write no file for the proposal. `.minions/programs/` holds the programs the workflows run, and a proposal is not one of them.
 
      The gathered evidence is the verifier's output: each claim, the evidence it named, the verdict, and the excerpt that produced it. A proposal that passed the check carries the evidence that passed it.
 
+     End the body with the id on a line of its own: `Proposal id: <id>`. The duplicate check above searches for that id. An issue without it can be filed a second time on the next run.
+
 5. **Update `last_version`** in `.minions/sources.yaml` for each processed source (latest version string for changelogs, highest item number for issues/pulls).
 
-6. **Commit and push** all new program files, the updated sources.yaml and the rejection log, in one commit:
+6. **Commit and push** the updated sources.yaml and the rejection log, in one commit:
    ```bash
-   git add .minions/programs/ .minions/sources.yaml .minions/rejections.md
-   git commit -m "chore: add minion proposals"
+   git add .minions/sources.yaml .minions/rejections.md
+   git commit -m "chore: advance minion sources and record rejections"
    git push
    ```
 
