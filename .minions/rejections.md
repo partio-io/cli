@@ -797,3 +797,195 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #2074–#2569`
 - reason: `irrelevant`
 - note: The bulk of PRs in this range are dependency version bumps (#2520, #2530, #2540), CI fixes (#2465, #2526, #2527, #2537, #2542, #2555, #2565, #2567, #2569), control-plane command unification (#2502, #2547), cloud infrastructure (trail RFD-026 migration #2507, repo protection #2516–#2517, GitLab #2528, cluster list #2480, mirror management #2529), auth consolidation (#2471, #2494–#2495, #2509–#2512, #2539), agent changes (IsPreview removal #2554, worktree hook wrapper #2487, Codex transcript #2536, #2501), checkpoint delivery (#2519, #2521–#2522, #2533, #2550), and Entire-specific fixes (#2463–#2475, #2476–#2499). None of these map to Partio's domain of local git hook-based session capture and checkpoint storage on an orphan branch.
+
+## changelog 0.11.0–0.11.2: cloud-infrastructure, auth, repo management, and session-ID features
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.11.0 and 0.11.2`
+- reason: `irrelevant`
+- note: The two new changelog versions ship features that require Entire's cloud stack or CLI structure that Partio has no equivalent of: auth command renames (auth use → auth switch), native repository reference format (/et/<project>/<repo>), cluster list with regions, repo remote url, branch protection rule management, auth switch with saved-context picker, GitLab checkpoint remotes, async mirror creation, RFD-026 cell contract compliance, trailing .git in repo-name handling, and ENTIRE_CHECKPOINT_TOKEN scoping for direct git transports. Partio has no auth commands, no cluster infrastructure, no repository reference system, no checkpoint tokens, and no mirror commands. The session-ID validation feature (reject IDs with unsafe chars) is also irrelevant: Partio generates checkpoint IDs as 12-character lowercase hex strings (crypto/rand → hex.EncodeToString), which contain only [0-9a-f] and are always safe.
+
+## Claude Code: subagent backgrounded by default treated as foreground (issue #2556)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2556`
+- reason: `irrelevant`
+- note: Entire detects whether a Claude Code Agent launch is background by inspecting `tool_response.status` in the Claude Code hook payload. Partio does not use Claude Code's hook event system at all; it reads JSONL session files from disk after the commit via the `agent.SessionParser` interface. There is no `tool_response`, no `isBackgroundLaunch` logic, and no task-record pipeline in Partio. The bug class does not exist here.
+
+## session resume: branch name NFD/NFC mismatch (issue #2551)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2551`
+- reason: `irrelevant`
+- note: Partio has no `partio session resume` command. The `cmd/partio/` directory contains enable, disable, status, doctor, rewind, explain, hook, prune, reset, clean, resume (session state only), and version — none of these match Entire's `entire session resume <branch>` which restores a transcript to a new branch. The Unicode normalization bug is Entire-specific.
+
+## `entire enable --force` exits 0 without TTY (issue #2535)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2535`
+- reason: `irrelevant`
+- note: Partio's `partio enable` command has no `--force` flag (`cmd/partio/enable.go` defines only `--absolute-path`). The interactive re-installation path the issue describes does not exist.
+
+## `entire doctor` stuck-session prompt bypasses interactive check (issue #2416)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2416`
+- reason: `irrelevant`
+- note: Partio's `partio doctor` command (`cmd/partio/doctor.go`) performs only file-existence and hook-content checks. It prints `[OK]` or `[WARN]` lines and returns. It has no interactive prompts, no `huh`/`bubbletea` form, and no stuck-session cleanup step. The bug class does not apply.
+
+## ULID checkpoint refs permanently unreadable on case-insensitive filesystems (issue #2401)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2401`
+- reason: `irrelevant`
+- note: Entire stores individual checkpoint refs under `refs/entire/checkpoints/<shard>/<id>`. Partio stores all checkpoints as commits on a single orphan branch (`partio/checkpoints/v1`). There are no per-checkpoint git refs in Partio's storage model, so the ULID shard collision issue does not apply.
+
+## Non-ASCII filenames in checkpoint linking (issue #2398)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2398`
+- reason: `irrelevant`
+- note: In Entire, `getStagedFiles` used `git diff --cached --name-only` (without -z) to build file lists for session matching, and C-escaped filenames broke the match. In Partio, `git.DiffNameOnly` is called only inside a `slog.LevelDebug` guard (`internal/hooks/postcommit.go:94`) for diagnostic logging; the output is never used to make linking decisions. The bug class is absent because file-name comparison is not part of Partio's checkpoint-creation path.
+
+## git-refs writes return success without durable push bookkeeping (issue #2393)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2393`
+- reason: `irrelevant`
+- note: Partio has no asynchronous push queue. The pre-push hook pushes the checkpoint branch synchronously with a single `git push` call. There is no `enqueueForPush` path and no push-queue journal file.
+
+## Cleanup can delete uncondensed checkpoint commits on state expiry (issue #2378)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2378`
+- reason: `irrelevant`
+- note: Partio has no checkpoint condensation pipeline and no shadow branches. Each commit on the orphan branch is a standalone checkpoint; there is no pending/uncondensed state that could be garbage-collected prematurely.
+
+## session resume writes to ~/.claude instead of $CLAUDE_CONFIG_DIR (issue #2367)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2367`
+- reason: `irrelevant`
+- note: Partio has no `entire session resume`-equivalent command that writes transcripts. `cmd/partio/resume.go` manages session state (ACTIVE/IDLE/ENDED) within `.partio/sessions/`; it does not write to `~/.claude/`.
+
+## checkpoint_push_remote accepts pushurl-only remote (issue #2360)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2360`
+- reason: `irrelevant`
+- note: Partio has no `checkpoint_push_remote` configuration key. The pre-push hook pushes to `origin` unconditionally when `push_sessions` is enabled. There is no remote-election logic.
+
+## Post-push cleanup deletes shadow ref when state is malformed (issue #2350)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2350`
+- reason: `irrelevant`
+- note: Partio has no shadow branches and no post-push cleanup step that reads session-state JSON to protect refs. The cleanup path described does not exist.
+
+## Install script hides GitHub API auth errors (issue #2318)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2318`
+- reason: `irrelevant`
+- note: Partio has no install script. Distribution is via `make install` or manual binary placement.
+
+## `entire disable` does not reach linked worktrees (issue #2274)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2274`
+- reason: `irrelevant`
+- note: In Entire, `entire disable` writes `settings.local.json` with `enabled: false` per-worktree, so a new worktree comes back enabled. Partio's `partio disable` only uninstalls git hooks (`cmd/partio/disable.go:39`), which are installed to `git rev-parse --git-common-dir` (shared across all worktrees). Uninstalling once affects all worktrees. Partio does not write `enabled: false` to any settings file on disable, so the per-worktree re-enable problem does not apply.
+
+## Lefthook classified as not overwriting hooks (issue #2263)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2263`
+- reason: `irrelevant`
+- note: Partio's hook manager detection (`internal/git/hooks/detect_hook_managers.go`) prints a warning when managers are detected but does not classify them as overwriting vs. non-overwriting. There is no two-tier message system (`OverwritesHooks` flag) and no differentiated remediation path. The bug class does not exist in Partio's simpler detection model.
+
+## Read deny rule blocks auto-mode (issue #2260)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2260`
+- reason: `irrelevant`
+- note: Partio does not write to `.claude/settings.json`. The deny-rule that blocked Claude Code automode was inserted by `entire enable`; Partio's `partio enable` writes only to `.partio/settings.json` and `.gitignore`. The bug class does not apply.
+
+## AppendCheckpointTrailer emits a trailer the final-block parser rejects (issue #2256)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2256`
+- reason: `irrelevant`
+- note: Partio's `git.AmendTrailers` appends trailer lines after two newlines (`internal/git/amend_trailers.go:23`). There is no separate strict parser that re-reads the trailer block, no `finalTrailerBlock` function, and no `ParseCheckpointFromFinalTrailerBlock` equivalent. The grammar mismatch between writer and reader that the issue describes does not exist.
+
+## Forged Partio-Checkpoint lines in commit bodies (issue #2255)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2255`
+- reason: `irrelevant`
+- note: Partio's post-commit hook does not read existing `Partio-Checkpoint` trailers from the commit message to decide whether to create, reuse, or mutate checkpoint storage. The hook reads `.partio/state/pre-commit.json` to decide whether to run, then unconditionally creates a new checkpoint and appends new trailers. A forged trailer in the commit body is ignored by the capture path. (The `partio rewind` command reads trailers to locate a checkpoint, but that is a read-only lookup, not storage mutation, so a forged trailer there would cause a lookup miss, not corruption.)
+
+## Re-install discards newer third-party hook and chains to stale backup (issue #2237)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2237`
+- reason: `irrelevant`
+- note: Partio's reinstall path (`internal/git/hooks/install.go:38–44`) reads the current hook file and, if it is not a Partio hook, renames it to the backup path with `os.Rename`. If the hook at the path is a third party's fresh reinstall, `os.Rename` overwrites the older backup with the newer content — the backup is updated to the latest version. Partio chains to the backup, so it chains to the freshest copy. The specific bug in Entire (chaining to the OLD backup while discarding the NEW hook) does not apply given Partio's rename-overwrites-backup behaviour.
+
+## Claude Code SubagentStop dropped (issue #2215)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2215`
+- reason: `irrelevant`
+- note: Partio does not process Claude Code hook events (SubagentStop, tool_use_id correlation, etc.). It reads the JSONL session file from disk after the commit completes. There is no event-correlation pipeline, no task record system, and no SubagentStop handling in Partio's architecture.
+
+## Unattributed reserved-host authors (issues #2249, and PRs #2524, #2523)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2249, entireio-cli-pulls #2524, #2523`
+- reason: `irrelevant`
+- note: Issue #2249 is about stale `entire configure --agent` hints in error messages; Partio has no `configure --agent` command. PRs #2524 and #2523 add COR-1289 alias management for unattributed reserved-host authors against Entire's cloud API. Partio has no cloud alias management.
+
+## Test isolation and auth infrastructure improvements (issues #2202, #2201, #2197)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2202, #2201, #2197`
+- reason: `irrelevant`
+- note: These are internal engineering improvements to Entire's test isolation (git env vars at call sites, auth-go lock dir in subprocesses) and persistent-ref lock file reaping. None of these patterns exist in Partio's codebase: Partio's tests use `t.TempDir()` for isolation, there is no auth-go lock, and there are no per-checkpoint ref lock files.
+
+## Hook timeout and index-emptied commit issues (issues #2148, #2115, #2111, #2098)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2148, #2115, #2111, #2098`
+- reason: `irrelevant`
+- note: #2148 and #2115 are about `finalizeAllTurnCheckpoints` lacking a total deadline and Codex hook timeout tuning — Partio has no turn-finalization pipeline or configurable hook timeouts. #2111 is about git staging race conditions in Entire's workflow; Partio's post-commit hook reads from `.partio/state/` written before the commit and does not interact with the index. #2098 is a performance regression report specific to Entire's repository-scale processing.
+
+## Entire PRs #2382–#2574 (cloud stack, auth, org, trail, search, repo, plugin, and dependency changes)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #2382–#2574 (excluding #2574)`
+- reason: `irrelevant`
+- note: The bulk of this range is cloud infrastructure (trail system, cell routing, mirror management, auth cross-site, RFD-026), org and access control (repo grant, org invite, grantee pickers), search TUI, plugin tracking, repo management (repo view, repo remote, repo clone --nearest), Gemini CLI removal, Codex model/transcript improvements, auth status redesign, dependency bumps, and internal refactors (go-git characterization tests, test isolation, session-follows-worktree rework, OPF dedup). None of these map to Partio's domain. PR #2531 (session follows worktree) would require Partio to discover sibling worktrees via git-common-dir to match a session started in the main checkout to commits made in a linked worktree — Partio's `FindSessionDir` checks only `repoRoot` and `filepath.Dir(repoRoot)`, which covers parent-dir launches but not sibling worktrees. This is a real gap but the fix involves significant session-discovery rework and no filed proposal from this source yet precisely captures Partio's narrower gap. PR #2532 (user settings tier) added a per-user settings file above the per-worktree tier in Entire; Partio already has `~/.config/partio/settings.json` as the global/user tier, so the gap the PR fixed is already absent. PR #2534 is a test-only regression test for #2410, which is covered by the filed proposal.
