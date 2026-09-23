@@ -86,8 +86,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # This checkout only runs the gate; the session's proposal
-          # push happens in the minions workspace with the PAT.
+          # This checkout only runs the gate. The session pushes
+          # nothing: its proposal is a GitHub issue.
           persist-credentials: false
 
       - name: Install minions

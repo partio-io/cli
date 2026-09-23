@@ -5,7 +5,7 @@ target_repos:
 acceptance_criteria:
   - "The verdict file exists at $MINION_AUDIT_DIR/verdict.json, is valid JSON, and its status is pass whenever the audit ran to completion"
   - "Each distinct e2e-coverage gap has exactly one open minion-proposal issue; pre-existing proposals are reused, never duplicated"
-  - "Filed proposals start with the Minion audit — body prefix and carry acceptance criteria plus a program-file reference a fresh session can build from"
+  - "Filed proposals start with the Minion audit — body prefix and carry the test specification and acceptance criteria a fresh session can build from"
   - "The PR itself is untouched: no comments, no edits, no commits to its branch"
 ---
 
@@ -69,43 +69,21 @@ Work through the audit in this order:
      `gh issue list --repo <org>/<repo> --label minion-proposal --state open --search "<id>" --limit 5`,
      and also scan the open proposals' titles for the same gap under
      a different id. If one already covers it, reuse it — record the
-     existing issue in your verdict reasoning and file nothing. One
-     repair applies: when the covering proposal's `<!-- program: ... -->`
-     file does not exist on `origin/main`, write that file (step
-     above) and push it (step 5) so the proposal stays buildable —
-     still without filing a new issue.
-   - Write a program file to `.minions/programs/<id>.md` with
-     frontmatter (`id`, `target_repos`, `acceptance_criteria`,
-     `pr_labels`) and a body that tells a fresh minion session
-     exactly what end-to-end test to build: the flow to drive, where
-     the test lives, and what it asserts. The acceptance criteria
-     must be concrete enough to build from the issue alone.
+     existing issue in your verdict reasoning and file nothing.
    - Create the issue:
      `gh issue create --repo <org>/<repo> --label minion-proposal --title "e2e: <flow under test>" --body <body>`.
      The body starts with `Minion audit — ` followed by the PR
      reference that triggered it, then the gap and why unit tests
-     cannot close it, the acceptance criteria, a link to the program
-     file, and the marker
-     `<!-- program: .minions/programs/<id>.md -->`.
+     cannot close it. Next, it tells a fresh minion session exactly
+     what end-to-end test to build: the flow to drive, where the test
+     lives, and what it asserts. Then come the acceptance criteria, as
+     a `- [ ]` checklist under `## Acceptance Criteria`, concrete
+     enough to build from the issue alone. The body ends with the id
+     on a line of its own: `Proposal id: <id>`.
+   - The issue is the whole proposal. A build reads the issue and
+     nothing else, so write no file for it.
 
-5. **Commit and push the program files** to `main`, the way the
-   propose program does — only if step 4 wrote any:
-
-   ```bash
-   git add .minions/programs/
-   git commit -m "chore: add minion proposals"
-   git push origin HEAD:main
-   ```
-
-   Your worktree sits on a session branch, so a bare `git push` will
-   not reach `main` — push `HEAD:main` explicitly, and confirm it
-   succeeded. If it is rejected because your base is behind, run
-   `git fetch origin main && git rebase origin/main` and push once
-   more. Do not leave the commit unpushed for the runtime to turn
-   into a PR of its own: the proposal is unusable until its program
-   file is on `main`.
-
-6. **Write the verdict — your final act.** Create the directory and
+5. **Write the verdict — your final act.** Create the directory and
    write `$MINION_AUDIT_DIR/verdict.json`:
 
    ```json
@@ -129,7 +107,6 @@ Work through the audit in this order:
    the workflow, so write it even when there are no findings.
 
 Do **not** comment on the PR, edit files in its branch, or run any
-`git` write command other than the program-file commit in step 5.
-Read-only `git`/`gh` is otherwise fine. The verdict file lives
+`git` write command. Read-only `git`/`gh` is fine. The verdict file lives
 outside your checkout on purpose — leave the working tree exactly as
 you found it.

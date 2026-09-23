@@ -498,7 +498,7 @@ func TestLogTravelsWithTheCursor(t *testing.T) {
 	if !ok {
 		t.Fatal("the proposer stages nothing")
 	}
-	for _, want := range []string{LogPath, ".minions/sources.yaml", ".minions/programs/"} {
+	for _, want := range []string{LogPath, ".minions/sources.yaml"} {
 		if !strings.Contains(add, want) {
 			t.Errorf("the single commit leaves out %q:\n%s", want, add)
 		}
