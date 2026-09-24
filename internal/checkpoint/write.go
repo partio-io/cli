@@ -3,10 +3,17 @@ package checkpoint
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 )
 
 // Write stores a checkpoint and its associated session data on the orphan branch.
+// Before writing, it reconciles the local branch with the remote (origin) so
+// that checkpoints added on other devices are merged in first.
 func (s *Store) Write(cp *Checkpoint, sessionData *SessionFiles) error {
+	if err := ReconcileWithRemote(s.repoRoot, "origin"); err != nil {
+		slog.Warn("could not reconcile checkpoint branch before write", "error", err)
+		// Continue — a failed reconciliation must not block checkpoint capture.
+	}
 	shard := Shard(cp.ID)
 	rest := Rest(cp.ID)
 

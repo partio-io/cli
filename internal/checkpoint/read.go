@@ -18,9 +18,18 @@ type CheckpointData struct {
 }
 
 // Read retrieves all checkpoint data from the orphan branch by ID.
+// Before reading, it reconciles the local branch with the remote (origin) so
+// that checkpoints added on other devices are visible locally.
 func Read(id string) (*CheckpointData, error) {
 	if len(id) != 12 {
 		return nil, fmt.Errorf("checkpoint ID must be 12 characters (got %d)", len(id))
+	}
+
+	if repoRoot, err := git.RepoRoot(); err == nil {
+		if err := ReconcileWithRemote(repoRoot, "origin"); err != nil {
+			slog.Warn("could not reconcile checkpoint branch before read", "error", err)
+			// Continue — stale local data is better than no data.
+		}
 	}
 
 	shard := Shard(id)
