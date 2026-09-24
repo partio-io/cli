@@ -989,3 +989,11 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #2382–#2574 (excluding #2574)`
 - reason: `irrelevant`
 - note: The bulk of this range is cloud infrastructure (trail system, cell routing, mirror management, auth cross-site, RFD-026), org and access control (repo grant, org invite, grantee pickers), search TUI, plugin tracking, repo management (repo view, repo remote, repo clone --nearest), Gemini CLI removal, Codex model/transcript improvements, auth status redesign, dependency bumps, and internal refactors (go-git characterization tests, test isolation, session-follows-worktree rework, OPF dedup). None of these map to Partio's domain. PR #2531 (session follows worktree) would require Partio to discover sibling worktrees via git-common-dir to match a session started in the main checkout to commits made in a linked worktree — Partio's `FindSessionDir` checks only `repoRoot` and `filepath.Dir(repoRoot)`, which covers parent-dir launches but not sibling worktrees. This is a real gap but the fix involves significant session-discovery rework and no filed proposal from this source yet precisely captures Partio's narrower gap. PR #2532 (user settings tier) added a per-user settings file above the per-worktree tier in Entire; Partio already has `~/.config/partio/settings.json` as the global/user tier, so the gap the PR fixed is already absent. PR #2534 is a test-only regression test for #2410, which is covered by the filed proposal.
+
+## Entire PRs #2575–#2578 (coreapi spec, background subagent records, strategy carry-forward fix, E2E)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #2575, #2576, #2577, #2578`
+- reason: `irrelevant`
+- note: #2575 lands a vendored Core spec refresh (cloud API change, Partio has no cloud API). #2576 fixes Claude Code default background subagent task records (Partio has no task-record pipeline; session capture is file-based at commit time). #2577 stops Entire's OPF strategy from carrying forward files a skipped-hook commit already took (Partio has no OPF strategy or file carry-forward logic). #2578 fixes control-plane E2E after `entire repo remote url` was removed (Partio has no control-plane E2E or `repo remote url` command).
