@@ -75,6 +75,12 @@ func TestBuildStageVerifiesBeforeItWritesCode(t *testing.T) {
 // has been found not to hold.
 const gateGuard = "steps.gate.outputs.blocked != 'true'"
 
+// researchGuard is the condition that keeps a step from running once research
+// has ended without a slice plan. The runtime falls back to a single
+// whole-issue session when no plan comment exists, so a build left unguarded
+// here would silently become the unplanned build the chain exists to remove.
+const researchGuard = "steps.researched.outputs.blocked != 'true'"
+
 // TestBuildRestatesNeitherVerificationNorGating pins that the build stage
 // applies the two shared descriptions rather than carrying its own copies. A
 // pasted copy is what a stray marker looks like.
@@ -237,8 +243,12 @@ func TestHoldingPremiseLetsTheBuildProceedUnchanged(t *testing.T) {
 		}
 	}
 
-	// Only a blocked verdict stops the build. Any other condition on that step
-	// would make a holding premise change how the build runs.
+	// Only a blocking verdict stops the build, and exactly two can block: the
+	// premise gate, and research when it ends with no slice plan. Any further
+	// condition on that step would make a holding premise change how the build
+	// runs, which is what this test exists to stop.
+	wantGuard := "if: " + gateGuard + " && " + researchGuard
+
 	steps := buildSteps(t)
 	at := stepContaining(steps, "minions $ARGS")
 	if at < 0 {
@@ -248,8 +258,9 @@ func TestHoldingPremiseLetsTheBuildProceedUnchanged(t *testing.T) {
 		if !strings.HasPrefix(strings.TrimSpace(line), "if:") {
 			continue
 		}
-		if strings.TrimSpace(line) != "if: "+gateGuard {
-			t.Errorf("the build step is conditioned on %q, not only on a blocked premise", strings.TrimSpace(line))
+		if strings.TrimSpace(line) != wantGuard {
+			t.Errorf("the build step is conditioned on %q, want %q: only a blocking verdict may stop the build",
+				strings.TrimSpace(line), wantGuard)
 		}
 	}
 }

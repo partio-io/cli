@@ -6,9 +6,16 @@ target_repos:
 
 # Research minion
 
-Unattended research pipeline for complex `partio-io/cli` issues. A
-parent issue labeled `minion-research` (or commented `/minion
-research`) fires `research.yml`, which runs this program.
+Unattended research pipeline for complex `partio-io/cli` issues. Two
+paths run this program:
+
+- A parent issue labeled `minion-research` (or commented `/minion
+  research`) fires `research.yml`, which runs this program and stops.
+- A parent issue labeled `minion-approved` (or commented `/minion
+  build`) fires `minion.yml`. When that issue carries no slice plan, the
+  workflow runs this program first, then builds from the plan it
+  produces, in the same run. An approved issue is therefore never built
+  from an unplanned single session.
 
 This program runs the verify → research → PRD → slice → publish
 pipeline:
@@ -33,15 +40,17 @@ pipeline:
   parent `minion-research-completed`. It does NOT open child issues and
   does NOT apply `minion-approved` — a research run produces review
   artifacts only. The parent issue is intentionally left open and never
-  receives `minion-done`. Implementation is triggered manually after
-  review: when jcleira labels the parent `minion-approved` (or comments
-  `/minion build`), `minion.yml` fires `implement.md` once on the parent
-  and produces a single feature PR.
+  receives `minion-done`. What happens next depends on the path that
+  started this run. Under `research.yml` the run stops here, and jcleira
+  reads the PRD and the slice plan before approval. Under `minion.yml`
+  the same run continues into `implement.md`, which builds the parent
+  one slice per session and produces a single feature PR.
 
 This run writes a run-scoped idempotency marker on each comment but does
 not yet check for it; re-runs do not skip existing artifacts. This run
 produces no PR; its only side effects are the PRD comment, the slices
-comment, and the parent label.
+comment, and the parent label. A PR, when there is one, comes from
+`implement.md` after this program ends.
 
 Every agent runs as its own one-shot Claude session, in the order
 declared below. Each agent gets a fresh, isolated worktree that is
@@ -578,8 +587,10 @@ Hard constraints:
   the parent issue, not as separate issues — a research run must not
   create any GitHub issue.
 - Do NOT apply `minion-approved` (or `minion-ready`) to the parent or
-  anything else, and do NOT trigger `implement.md`. Implementation is
-  started manually by jcleira after he reviews the PRD and slice plan.
+  anything else, and do NOT trigger `implement.md` yourself. Your last
+  act is the slice-plan comment. When `minion.yml` started this run, the
+  workflow reads that comment and starts the build itself; when
+  `research.yml` started it, the run ends with your comment.
 - Do NOT add the `minion-done` label to the parent issue, and do NOT
   call `gh issue close` on it. The parent stays open until jcleira
   closes it manually.

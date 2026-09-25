@@ -31,7 +31,14 @@ jobs:
       (github.event_name == 'issues' && (github.event.label.name == 'minion-ready' || github.event.label.name == 'minion-approved')) ||
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/minion build'))
     runs-on: github-runner-partio-minion-ai-01
-    timeout-minutes: 60
+    timeout-minutes: 180
+
+    # The pattern partio-minions uses to find the slice-plan comment
+    # (internal/slices/slices.go, planMarkerRe). Two steps below read it, and
+    # a build that reads a different pattern than the runtime is a build that
+    # researches a planned issue, or builds an unplanned one.
+    env:
+      SLICE_PLAN_MARKER: '^[[:space:]]*<!--[[:space:]]*minion:research-slices([[:space:]][^>]*)?-->[[:space:]]*$'
 
     steps:
       - uses: actions/checkout@v4
@@ -86,8 +93,77 @@ jobs:
             echo "blocked=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # A slice plan is the contract between research and the build. The
+      # runtime reads the latest comment that carries the marker and builds
+      # one slice per session; when no comment carries it, the build falls
+      # back to a single unplanned session without a word on the issue
+      # (internal/executor/slice.go, resolveSlicePlan). Detect the plan with
+      # the pattern the runtime itself uses, so the two never disagree.
+      - name: Look for a slice plan
+        id: slices
+        if: steps.program.outputs.issue_num != '' && steps.gate.outputs.blocked != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          ISSUE_NUM="${{ steps.program.outputs.issue_num }}"
+          REPO="${{ github.repository }}"
+
+          if gh issue view "$ISSUE_NUM" --repo "$REPO" --json comments \
+              --jq '.comments[].body' | grep -qE "$SLICE_PLAN_MARKER"; then
+            echo "::notice::#${ISSUE_NUM} carries a slice plan; research is not needed."
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::#${ISSUE_NUM} carries no slice plan; research runs first."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # An approved issue with no slice plan has never been researched.
+      # Research it here, in this run, so the build works from a PRD and a
+      # slice plan instead of one unplanned session. research.md runs its own
+      # premise check and posts the PRD comment, the slice comment and the
+      # minion-research-completed label.
+      - name: Run research
+        if: steps.slices.outputs.present == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          MINION_ISSUE_NUMBER: ${{ steps.program.outputs.issue_num }}
+        run: |
+          minions run .minions/programs/research.md --issue "${{ steps.program.outputs.issue_num }}"
+
+      # research.md produces no slice plan when its own premise-checker blocks
+      # the run. Without this step the build would fall back to the single
+      # unplanned session that this chain exists to remove, so the plan is
+      # confirmed before the build is allowed to start.
+      - name: Confirm research produced a slice plan
+        id: researched
+        if: steps.slices.outputs.present == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          ISSUE_NUM="${{ steps.program.outputs.issue_num }}"
+          REPO="${{ github.repository }}"
+
+          if gh issue view "$ISSUE_NUM" --repo "$REPO" --json comments \
+              --jq '.comments[].body' | grep -qE "$SLICE_PLAN_MARKER"; then
+            echo "blocked=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # research.md's premise-checker applies stage-gate.md, which labels
+          # the issue do-not-build. That is a block, not a failure: the gate
+          # has already posted the comment that explains it.
+          if gh issue view "$ISSUE_NUM" --repo "$REPO" --json labels \
+              --jq '.labels[].name' | grep -qx 'do-not-build'; then
+            echo "::notice::Research blocked the premise for #${ISSUE_NUM}; skipping the build."
+            echo "blocked=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "::error::Research produced no slice plan for #${ISSUE_NUM} and did not block the premise; refusing to build unplanned."
+          exit 1
+
       - name: Run program
-        if: steps.gate.outputs.blocked != 'true'
+        if: steps.gate.outputs.blocked != 'true' && steps.researched.outputs.blocked != 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
@@ -100,11 +176,13 @@ jobs:
           fi
           minions $ARGS
 
-      # A blocked run is not a completion and not a failure. Both of the
-      # steps below are skipped so the gate's comment stays the only account
-      # of what happened, and the issue is neither closed nor marked failed.
+      # A blocked run is not a completion and not a failure. Either gate can
+      # block it: the premise gate above, or research's own premise-checker.
+      # Both of the steps below are skipped so the blocking gate's comment
+      # stays the only account of what happened, and the issue is neither
+      # closed nor marked failed.
       - name: Mark done
-        if: success() && steps.program.outputs.issue_num != '' && steps.gate.outputs.blocked != 'true'
+        if: success() && steps.program.outputs.issue_num != '' && steps.gate.outputs.blocked != 'true' && steps.researched.outputs.blocked != 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
@@ -138,7 +216,7 @@ jobs:
             --comment "Minion completed — see PR #${PR}."
 
       - name: Mark failed
-        if: failure() && steps.program.outputs.issue_num != '' && steps.gate.outputs.blocked != 'true'
+        if: failure() && steps.program.outputs.issue_num != '' && steps.gate.outputs.blocked != 'true' && steps.researched.outputs.blocked != 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
