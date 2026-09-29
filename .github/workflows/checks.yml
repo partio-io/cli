@@ -170,7 +170,7 @@ jobs:
 
       - name: Install minions
         run: |
-          go install github.com/partio-io/minions/cmd/minions@v0.0.13
+          go install github.com/partio-io/minions/cmd/minions@v0.0.14
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       # The fix session proves its repair with the repo's own checks;
