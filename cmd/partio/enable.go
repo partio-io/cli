@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/partio-io/cli/internal/checkpoint"
 	"github.com/partio-io/cli/internal/config"
 	"github.com/partio-io/cli/internal/git"
 	githooks "github.com/partio-io/cli/internal/git/hooks"
@@ -75,6 +76,16 @@ func runEnable(cmd *cobra.Command, args []string) error {
 	// Create orphan checkpoint branch
 	if err := createCheckpointBranch(); err != nil {
 		slog.Warn("could not create checkpoint branch (may already exist)", "error", err)
+	}
+
+	// Reconcile local and remote checkpoint branches so a second device gets
+	// existing history instead of starting with a fresh orphan branch.
+	store := checkpoint.NewStore(repoRoot)
+	if err := store.Reconcile(); err != nil {
+		slog.Warn("could not reconcile checkpoint branches", "error", err)
+		fmt.Printf("\nWarning: could not reconcile remote checkpoint branch: %v\n", err)
+		fmt.Println("  Your local and remote checkpoint histories may be out of sync.")
+		fmt.Println("  Re-run 'partio enable' once the remote is reachable to reconcile.")
 	}
 
 	// Warn about external hook managers that may conflict with partio's hooks

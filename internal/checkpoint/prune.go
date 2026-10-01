@@ -3,6 +3,7 @@ package checkpoint
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 )
@@ -17,6 +18,13 @@ type PruneResult struct {
 // the checkpoint linked to currentCommitHash. If dryRun is true, no changes
 // are made.
 func (s *Store) Prune(olderThan time.Duration, currentCommitHash string, dryRun bool) (*PruneResult, error) {
+	// Reconcile local and remote branches before enumerating checkpoints so
+	// pruning operates on the full set from both sides. A reconciliation error
+	// is non-fatal.
+	if err := s.Reconcile(); err != nil {
+		slog.Warn("checkpoint: reconcile before prune failed", "error", err)
+	}
+
 	cutoff := time.Now().Add(-olderThan)
 	result := &PruneResult{}
 
