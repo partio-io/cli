@@ -18,7 +18,7 @@ permissions:
 jobs:
   propose:
     runs-on: github-runner-partio-minion-ai-01
-    timeout-minutes: 15
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
