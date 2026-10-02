@@ -517,3 +517,167 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #2074–#2642`
 - reason: `irrelevant`
 - note: The bulk of PRs in this range address cloud platform concerns (cluster routing, auth jurisdiction, trail/review APIs, Secure Enclave, native repo management), agent integrations with no Partio equivalent (OpenCode, Antigravity, Cursor subagents), internal infrastructure (dependency bumps, CI, Windows installer), and improvements to Entire features Partio does not have (session attach, checkpoint restore, OPF scanner, history import). The handful of PRs relevant to Partio's domain (#2641 hook backup rotation, #2611 ignored-file protection, #2586 non-ASCII filenames, #2576 background subagent records, #2552 Unicode normalization, #2534 symlink hook test, #2531 worktree session tracking, #2532 user settings tier) all map to proposals already on file (#710, #730, #713, #641–642, #718, #714, #665, #634 respectively).
+
+## git commit --amend -m drops Partio-Checkpoint trailer
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2637 (git commit --amend -m/-F drops the commit's Entire-Checkpoint trailer)`
+- reason: `irrelevant`
+- note: The equivalent proposal was already filed for Partio as issue #735. Not re-filed to avoid duplicates.
+
+## Claude Code subagent backgrounded by default treated as foreground session
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2556 (Claude Code: a subagent backgrounded by default is treated as foreground, and its task record is dropped at launch)`
+- reason: `premise-failed`
+- claim: A backgrounded Claude Code subagent creates a separate JSONL file in the same session directory as the foreground agent, with a more recent modification time, causing `find_latest_session.go` to select the wrong session. [evidence: `internal/agent/claude/find_latest_session.go`]
+- verdict: `unresolved`
+- found: `find_latest_session.go` sorts JSONL files by modification time and picks the most recent. Whether a backgrounded subagent creates a distinct JSONL in the same directory is a claim about Claude Code's internal session storage behavior, which the Partio codebase does not settle. No path, symbol, or command in this repository confirms that subagents produce separate session files. The premise cannot be grounded here.
+
+## Cross-worktree session contamination from shared Codex app-server daemon
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2612 (Commit linking attaches an unrelated Codex session from another worktree when sessions share the Codex app-server daemon)`
+- reason: `premise-failed`
+- claim: Codex sessions from one worktree appear in another worktree's session directory because Codex's app-server daemon is shared, causing Partio to capture the wrong session. [evidence: `internal/agent/claude/find_session_dir.go`]
+- verdict: `unresolved`
+- found: `find_session_dir.go` resolves the session directory using a sanitized version of the repo root path (`sanitizePath(dir)`). Different worktrees are at different filesystem paths and therefore produce different sanitized paths and different session directories. The shared-daemon scenario described is specific to Entireio's Codex integration architecture. No evidence in the Partio codebase confirms that Codex sessions bleed across worktrees through Partio's session discovery path.
+
+## Surface refused agent relocation variable in partio status
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2627 (Surface a refused agent relocation variable in entire status)`
+- reason: `irrelevant`
+- note: Partio has no concept of agent relocation or a refused relocation variable. Agent selection is via `PARTIO_AGENT` env var or config; there is no relocation mechanism.
+
+## Honor PI_CODING_AGENT_SESSION_DIR when resolving session directory
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2626 (pi: honor PI_CODING_AGENT_SESSION_DIR when resolving the session dir)`
+- reason: `irrelevant`
+- note: This is specific to the "PI" (Planar Interdimensional) agent integration in Entireio. Partio has no PI agent, no PI-specific env vars, and no PI session directory resolution.
+
+## Codex hook trust check ignores single-quoted TOML keys
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2606 (Codex hook trust check ignores single-quoted TOML keys, so every hook shows as needing approval on Windows)`
+- reason: `irrelevant`
+- note: Partio has no Codex hook trust mechanism. Hook installation is managed via Partio's own scripts (`internal/git/hooks/install.go`); there is no TOML-based trust check.
+
+## Session resume silently overwrites ignored untracked files during branch checkout
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2604 (session resume can silently overwrite ignored untracked files during branch checkout)`
+- reason: `irrelevant`
+- note: Partio's `partio resume` command (`cmd/partio/resume.go`) does not perform a `git checkout` of a branch with untracked file management. The bug described is specific to Entireio's session resume workflow which checks out a branch as part of resumption.
+
+## Register Partio as a Git config-based hook on Git 2.54+
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2580 (hooks: register Entire as a Git config-based hook on Git 2.54+)`
+- reason: `irrelevant`
+- note: The specific Git 2.54+ hook registration mechanism described cannot be grounded in the Partio codebase. Partio installs file-based hooks via `internal/git/hooks/install.go`. Translating to a git config-based approach would require knowing the exact git 2.54 API, which is not present in this repository and cannot be verified here.
+
+## Unicode-equivalent branch names not resolved during session resume
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2551 (entire session resume <branch> reports "branch not found" for a Unicode-equivalent (NFC vs NFD) branch name that git resolves fine)`
+- reason: `irrelevant`
+- note: Partio's `partio resume` does not resolve branch names by Unicode equivalence; it passes branch names directly to git commands which handle normalization. The bug described is specific to Entireio's in-process branch lookup that does string comparison before invoking git.
+
+## `repo grant list` of a mirror picks a placement without checking credentials
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2518 (\`repo grant list\` of a mirror picks a placement without checking the active credentials can reach it)`
+- reason: `irrelevant`
+- note: Partio has no repo grant command or credential-based placement logic.
+
+## `entire enable --force` writes hook wrapper through a symlink, clobbering target
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2410 (\`entire enable --force\` writes the hook wrapper through a symlink, clobbering the target file and creating a self-chaining hook)`
+- reason: `irrelevant`
+- note: Partio's `partio enable` has no `--force` flag. Hook installation uses `os.WriteFile` directly; it does not follow symlinks differently.
+
+## ULID checkpoint refs become permanently unreadable on case-insensitive filesystems
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2402 / #2401 (ULID checkpoint refs become permanently unreadable when their shard case-collides with an existing shard on a case-insensitive filesystem)`
+- reason: `irrelevant`
+- note: Partio uses 12-character lowercase hex checkpoint IDs (`internal/checkpoint/checkpoint.go:NewID()`), not ULIDs. Checkpoint data is stored as blob objects on an orphan branch, not as sharded refs keyed by ULID. The case-collision issue is specific to Entireio's ULID-based ref sharding scheme.
+
+## Non-ASCII filenames cause checkpoint linking to fail
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2398 (Checkpoint linking fails for non-ASCII filenames)`
+- reason: `irrelevant`
+- note: Partio's `DiffNameOnly` (`internal/git/diff_name_only.go`) is used only for debug logging in `postcommit.go`. It does not gate checkpoint creation or linking. Non-ASCII filenames in the commit do not affect whether a checkpoint is created or linked.
+
+## applyBackfilledSessionTokenUsage overwrites session-wide token total
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2368 (applyBackfilledSessionTokenUsage overwrites the session-wide token total with the checkpoint window delta for every non-Copilot agent)`
+- reason: `irrelevant`
+- note: Partio does not track per-checkpoint or per-window token deltas. Session metadata stores a single `TotalTokens` field read from the JSONL; there is no backfill or per-agent token accumulation path.
+
+## session resume writes to ~/.claude instead of $CLAUDE_CONFIG_DIR
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2367 (session resume writes to ~/.claude instead of \$CLAUDE_CONFIG_DIR)`
+- reason: `irrelevant`
+- note: Partio does not write to `~/.claude` or `$CLAUDE_CONFIG_DIR`. It reads the Claude session directory for parsing but never writes to it.
+
+## entire status collapses multiple sessions per agent and mutates session state while reporting
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2362 (entire status collapses multiple sessions per agent, and mutates session state while reporting it)`
+- reason: `irrelevant`
+- note: Partio's `partio status` (`cmd/partio/status.go`) reads checkpoint metadata and reports it; it does not manage multiple concurrent sessions per agent or mutate session state.
+
+## checkpoint_push_remote election accepts a push-url-only remote
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2360 (checkpoint_push_remote: election accepts a pushurl-only remote that status then reports as working)`
+- reason: `irrelevant`
+- note: Partio's pre-push hook pushes the checkpoint branch to `origin` unconditionally when `push_sessions` is enabled. There is no remote election or push-url-only detection.
+
+## Add Devin agent support
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2328 (Add Devin agent support)`
+- reason: `irrelevant`
+- note: Adding a new agent integration requires a detector and session parser specific to Devin's session format, which is not present in this codebase. This is not an adaptation of an existing feature; it is a new integration with no grounding in the current tree.
+
+## Windows install script URL gives you a login page rather than the script
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2276 (The windows install script url gives you a login page rather than the script)`
+- reason: `irrelevant`
+- note: Partio has no Windows install script. Distribution is via `go install` or `make install`.
+
+## entire status reports "Checkpoints sync to: origin" when hooks are not installed
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2264 (entire status reports "Checkpoints sync to: origin" when the git hooks are not installed)`
+- reason: `irrelevant`
+- note: Partio's `partio status` does not report a checkpoint sync target. It reads checkpoint metadata and session state; there is no "sync to" line that could be misleading.
