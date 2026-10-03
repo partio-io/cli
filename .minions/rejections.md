@@ -681,3 +681,51 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-issues #2264 (entire status reports "Checkpoints sync to: origin" when the git hooks are not installed)`
 - reason: `irrelevant`
 - note: Partio's `partio status` does not report a checkpoint sync target. It reads checkpoint metadata and session state; there is no "sync to" line that could be misleading.
+
+## finalizeAllTurnCheckpoints has no total deadline: slow remote outlasts hook timeout
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2148 (finalizeAllTurnCheckpoints loop has no enclosing deadline; slow remote outlasts the agent's hook timeout)`
+- reason: `irrelevant`
+- note: Partio's post-commit hook writes checkpoints to a local orphan branch using git plumbing commands. No remote network calls are made in the checkpoint write path; there is no git-refs store, ref fetch, or blob fetch. The timeout problem described is specific to Entire's git-refs backend.
+
+## Grok Build encrypted_content field corrupted by entropy redaction
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2157 (Grok Build encrypted_content reasoning-block field not covered by signature-skip rule; entropy scanner redacts it)`
+- reason: `irrelevant`
+- note: Partio has no Grok Build agent integration (filed as proposal #702 but not yet implemented). There is no Grok-specific session parser or redaction skip rule in this repository. The fix depends on a Grok parser that does not yet exist here.
+
+## OPF writers bypass the cross-process checkpoint ref lock
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2204 (OPF writers still CAS checkpoint refs via go-git, racing the native update-ref lock introduced in #1926)`
+- reason: `irrelevant`
+- note: Partio has no Online Privacy Filter (OPF) pipeline and no git-refs checkpoint backend. All checkpoint ref updates are made via `git update-ref` inside `internal/checkpoint/write.go`; there is no go-git CAS operation or concurrent writer race.
+
+## Homebrew installation docs: tap before trust fails in Homebrew 6
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2394 (documentation instructs brew tap before brew trust, which fails in Homebrew 6)`
+- reason: `irrelevant`
+- note: Not a code issue. Documentation updates are handled by the doc minion after code changes merge.
+
+## Codex hook trust check ignores single-quoted TOML keys on Windows
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2606 (Codex TOML writer uses single-quoted keys on Windows; codexTrustStateHeaderRegex only accepts double-quoted keys, so every hook shows as needing approval)`
+- reason: `irrelevant`
+- note: Partio has no Codex trust state mechanism. Partio does not read or write Codex's TOML hook trust file. Partio captures Codex sessions through its own git hooks (pre-commit, post-commit); there is no approval flow.
+
+## PR #2643: Husky v9 chaining fix (exec-based dispatch)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #2643 (hooks: keep Husky v9 hooks running when Entire chains them — Entire renames Husky's wrapper to pre-commit.pre-entire and exec-chains it, breaking Husky's h helper which looks up the hook by its own filename)`
+- reason: `irrelevant`
+- note: Partio's hook chaining (via `exec "$hooks_dir/<hook>.partio-backup"`) has the same structural exposure with Husky v9, but the applicable improvement is already tracked under Partio proposals #344 and #710. No new idea is produced. The pulls cursor is advanced to 2643 to cover this PR.
