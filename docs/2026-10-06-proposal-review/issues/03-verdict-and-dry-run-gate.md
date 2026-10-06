@@ -66,17 +66,17 @@ is supported in this slice; without it the command exits 2.
 
 ## Acceptance criteria
 
-- [ ] The `review` package defines the verdict contract as a Go type with the JSON field names above.
-- [ ] The loader returns "no verdict" for each case listed above, and each case has a test.
-- [ ] A close is accepted only with the evidence its reason needs, and a keep or rewrite that contradicts its own parts is rejected.
-- [ ] `minion-review gate --dry-run` with a valid verdict writes exactly one row and makes no other request against the reviewed issue: no comment, no label, no edit, no close.
-- [ ] The gate finds the tracking issue by label and body marker, never by title or author, and creates the label and the issue once when they are absent.
-- [ ] One night's rows share one comment, found by its dated marker and updated in place; a second issue on the same night appends a row.
-- [ ] A dry-run row for a rewrite carries the full proposed body in a collapsed section.
-- [ ] A missing or malformed verdict writes a "no verdict" row with the cause, and the command exits 1.
-- [ ] The gate uses the shared GitHub client from slice 01; tests run it against a fake GitHub server and assert the exact requests.
-- [ ] The command is a thin wrapper with no tests of its own, like the other minion commands.
-- [ ] `make test` and `make lint` pass.
+- [x] The `review` package defines the verdict contract as a Go type with the JSON field names above.
+- [x] The loader returns "no verdict" for each case listed above, and each case has a test.
+- [x] A close is accepted only with the evidence its reason needs, and a keep or rewrite that contradicts its own parts is rejected.
+- [x] `minion-review gate --dry-run` with a valid verdict writes exactly one row and makes no other request against the reviewed issue: no comment, no label, no edit, no close.
+- [x] The gate finds the tracking issue by label and body marker, never by title or author, and creates the label and the issue once when they are absent.
+- [x] One night's rows share one comment, found by its dated marker and updated in place; a second issue on the same night appends a row.
+- [x] A dry-run row for a rewrite carries the full proposed body in a collapsed section.
+- [x] A missing or malformed verdict writes a "no verdict" row with the cause, and the command exits 1.
+- [x] The gate uses the shared GitHub client from slice 01; tests run it against a fake GitHub server and assert the exact requests.
+- [x] The command is a thin wrapper with no tests of its own, like the other minion commands.
+- [x] `make test` and `make lint` pass.
 
 ## Modules touched
 

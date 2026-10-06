@@ -12,7 +12,7 @@ import (
 // fakeComments serves the issue-comments endpoints for repo o/r,
 // issue 9, and records every write.
 type fakeComments struct {
-	comments []comment
+	comments []Comment
 	writes   []string // "METHOD path body"
 }
 
@@ -35,16 +35,16 @@ func (f *fakeComments) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func TestUpsertComment(t *testing.T) {
-	filler := func(n int) []comment {
-		cs := make([]comment, n)
+	filler := func(n int) []Comment {
+		cs := make([]Comment, n)
 		for i := range cs {
-			cs[i] = comment{ID: int64(i + 1), Body: "unrelated"}
+			cs[i] = Comment{ID: int64(i + 1), Body: "unrelated"}
 		}
 		return cs
 	}
 	tests := []struct {
 		name      string
-		comments  []comment
+		comments  []Comment
 		wantWrite string
 	}{
 		{
@@ -54,17 +54,17 @@ func TestUpsertComment(t *testing.T) {
 		},
 		{
 			name:      "updates the first match in place",
-			comments:  append(filler(2), comment{ID: 50, Body: "Minion audit — x old"}, comment{ID: 51, Body: "Minion audit — x older"}),
+			comments:  append(filler(2), Comment{ID: 50, Body: "Minion audit — x old"}, Comment{ID: 51, Body: "Minion audit — x older"}),
 			wantWrite: "PATCH /repos/o/r/issues/comments/50 Minion audit — x new",
 		},
 		{
 			name:      "finds a match past the first page",
-			comments:  append(filler(150), comment{ID: 500, Body: "Minion audit — x old"}),
+			comments:  append(filler(150), Comment{ID: 500, Body: "Minion audit — x old"}),
 			wantWrite: "PATCH /repos/o/r/issues/comments/500 Minion audit — x new",
 		},
 		{
 			name:      "does not match a prefix in the middle of a body",
-			comments:  []comment{{ID: 1, Body: "see Minion audit — x"}},
+			comments:  []Comment{{ID: 1, Body: "see Minion audit — x"}},
 			wantWrite: "POST /repos/o/r/issues/9/comments Minion audit — x new",
 		},
 	}
