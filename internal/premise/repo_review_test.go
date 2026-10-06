@@ -203,11 +203,13 @@ func TestReviewExtractsTheAssumedFacts(t *testing.T) {
 	}
 }
 
-// TestReviewCorrectsAFalseFactTheIdeaDoesNotRestOn pins the decision of
+// TestReviewCorrectsAFalseFactTheIdeaDoesNotRestOn pins the decisions of
 // 2026-10-06: a failing claim closes the issue only when the idea rests on
-// it. When the problem survives the correction, the review rewrites the issue
-// on the correct fact, and the verdict carries the correction that the gate
-// requires.
+// it. When the problem survives the correction, the review rewrites the issue,
+// and the verdict carries the correction that the gate requires. The rewrite
+// designs nothing new: it adds a criterion for each correction and removes the
+// design that breaks one. The third dry run on #31 found the false fact but
+// kept the union merge that brings pruned checkpoints back.
 func TestReviewCorrectsAFalseFactTheIdeaDoesNotRestOn(t *testing.T) {
 	agent := reviewer(t)
 
@@ -217,7 +219,11 @@ func TestReviewCorrectsAFalseFactTheIdeaDoesNotRestOn(t *testing.T) {
 		"decide whether the idea rests on it",
 		"the fact that holds instead",
 		`"correction": "…"`,
-		"Name each failing claim and its correction in `rewrite.changes`.",
+		"A rewrite with a corrected premise designs nothing new.",
+		"add an acceptance criterion that a build can test",
+		"Remove each one that breaks a criterion or takes the false fact for granted.",
+		"Add nothing in its place",
+		"each criterion you added and each part you removed in `rewrite.changes`",
 	} {
 		if !containsPhrase(agent, want) {
 			t.Errorf("%s does not carry %q", reviewAgentH3, want)
