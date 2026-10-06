@@ -90,15 +90,11 @@ func TestLoadVerdictNoVerdict(t *testing.T) {
 	}
 }
 
+// failingClaim fails the claim of the verdict, with the fact that holds
+// instead: every failing claim carries its correction.
 func failingClaim(v *Verdict) {
 	v.Premise.Verdict = Fails
 	v.Premise.Claims[0].Verdict = Fails
-}
-
-// correctedClaim fails the claim of the verdict and gives it the fact
-// that holds instead.
-func correctedClaim(v *Verdict) {
-	failingClaim(v)
 	v.Premise.Claims[0].Correction = "the pre-push hook retries once, in internal/hooks/retry.go"
 }
 
@@ -155,29 +151,28 @@ func TestLoadVerdictCloseEvidenceAndContradictions(t *testing.T) {
 		}), wantCause: "duplicate of itself"},
 
 		{name: "keep with a failing premise", edit: failingClaim, wantCause: "keep with a failing premise"},
-		{name: "keep with a failing claim only", edit: func(v *Verdict) { v.Premise.Claims[0].Verdict = Fails },
-			wantCause: "keep with a failing premise"},
+		{name: "keep with a failing claim only", edit: func(v *Verdict) {
+			v.Premise.Claims[0].Verdict, v.Premise.Claims[0].Correction = Fails, "it retries"
+		}, wantCause: "keep with a failing premise"},
 		{name: "keep that does not apply", edit: func(v *Verdict) { v.Fit.Applies = false }, wantCause: "keep with applies: false"},
 		{name: "keep that is built", edit: func(v *Verdict) { v.Built.Built = true }, wantCause: "keep with built: true"},
 		{name: "keep with a close reason", edit: func(v *Verdict) { v.CloseReason = ReasonBuilt }, wantCause: `keep carries close_reason "built"`},
-		{name: "rewrite with a failing claim and no correction", edit: func(v *Verdict) { asRewrite(v); failingClaim(v) },
-			wantCause: "rewrite with failing claim 1 and no correction"},
-		{name: "rewrite with a corrected premise", edit: func(v *Verdict) { asRewrite(v); correctedClaim(v) }},
-		{name: "rewrite with one of two failing claims corrected", edit: func(v *Verdict) {
-			asRewrite(v)
-			correctedClaim(v)
+		{name: "rewrite with a failing premise", edit: func(v *Verdict) { asRewrite(v); failingClaim(v) },
+			wantCause: "rewrite with a failing premise"},
+		{name: "rewrite with a failing premise verdict only", edit: func(v *Verdict) { asRewrite(v); v.Premise.Verdict = Fails },
+			wantCause: "rewrite with a failing premise"},
+		{name: "failing claim without a correction", edit: asClose(ReasonFalsePremise, func(v *Verdict) {
+			failingClaim(v)
+			v.Premise.Claims[0].Correction = ""
+		}), wantCause: "claim 1 fails and has no correction"},
+		{name: "second failing claim without a correction", edit: asClose(ReasonFalsePremise, func(v *Verdict) {
+			failingClaim(v)
 			v.Premise.Claims = append(v.Premise.Claims, Claim{
 				Claim: "pushes go to one remote", Evidence: "internal/hooks/prepush.go", Verdict: Fails, Excerpt: "for _, r := range remotes",
 			})
-		}, wantCause: "rewrite with failing claim 2 and no correction"},
-		{name: "rewrite with a failing premise and no failing claim", edit: func(v *Verdict) { asRewrite(v); v.Premise.Verdict = Fails },
-			wantCause: "rewrite with a failing premise and no failing claim to correct"},
-		{name: "corrected rewrite that does not apply", edit: func(v *Verdict) { asRewrite(v); correctedClaim(v); v.Fit.Applies = false },
-			wantCause: "rewrite with applies: false"},
-		{name: "keep with a corrected claim", edit: correctedClaim, wantCause: "keep with a failing premise"},
+		}), wantCause: "claim 2 fails and has no correction"},
 		{name: "correction on a claim that holds", edit: func(v *Verdict) { v.Premise.Claims[0].Correction = "it retries" },
 			wantCause: "claim 1: a correction on a claim whose verdict is holds"},
-		{name: "false premise with a corrected claim", edit: asClose(ReasonFalsePremise, correctedClaim)},
 		{name: "rewrite that does not apply", edit: func(v *Verdict) { asRewrite(v); v.Fit.Applies = false },
 			wantCause: "rewrite with applies: false"},
 		{name: "rewrite that is built", edit: func(v *Verdict) { asRewrite(v); v.Built.Built = true },

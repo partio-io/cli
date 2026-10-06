@@ -67,7 +67,7 @@ func closeVerdictFor(reason string) string {
 	claims, premise := `[]`, "no-claims"
 	switch reason {
 	case ReasonFalsePremise:
-		claims, premise = `[{"claim": "push has no retry", "evidence": "internal/hooks/prepush.go", "verdict": "fails", "excerpt": "retry(push)"}]`, "fails"
+		claims, premise = `[{"claim": "push has no retry", "evidence": "internal/hooks/prepush.go", "verdict": "fails", "excerpt": "retry(push)", "correction": "internal/hooks/retry.go already retries the push once"}]`, "fails"
 	case ReasonCouldNotVerify:
 		claims, premise = `[{"claim": "pushes fail often", "evidence": "no push logs in the repo", "verdict": "unresolved", "excerpt": "(no log files)"}]`, "unresolved"
 	}
@@ -324,34 +324,22 @@ func TestGateRewriteCommentListsTheChanges(t *testing.T) {
 	}
 }
 
-// A rewrite may carry a failing claim when it corrects that claim. The
-// gate acts on it as on any rewrite, and the evidence comment says that
-// the issue as filed rests on a false fact, with the correction under the
-// claim.
-func TestGateRewriteWithACorrectedPremise(t *testing.T) {
+// A false-premise close shows the correction under each failing claim,
+// and tells the operator how to keep the idea: reopen the issue and
+// correct its text.
+func TestGateFalsePremiseCloseShowsTheCorrection(t *testing.T) {
 	gh := newFakeGitHub()
 	gh.trackingIssue(77)
-	noClaims := `"premise": {"verdict": "no-claims", "claims": []}`
-	if !strings.Contains(rewriteVerdict, noClaims) {
-		t.Fatalf("rewriteVerdict no longer carries %s", noClaims)
-	}
-	verdict := strings.Replace(rewriteVerdict, noClaims,
-		`"premise": {"verdict": "fails", "claims": [{"claim": "'for append-only data': nothing deletes a checkpoint", `+
-			`"evidence": "internal/checkpoint/prune.go", "verdict": "fails", "excerpt": "update-ref -d", `+
-			`"correction": "partio prune and partio reset delete checkpoints"}]}`, 1)
 
-	res := runAct(t, gh, 12, writeVerdict(t, verdict))
+	res := runAct(t, gh, 12, writeVerdict(t, closeVerdictFor(ReasonFalsePremise)))
 
-	if !res.Valid || res.Outcome != OutcomeRewrite {
-		t.Fatalf("Result = %+v, want a valid rewrite", res)
-	}
-	if gh.issues[12]["title"] != "Retry the pre-push once on a network error" {
-		t.Errorf("title = %q, want the rewrite title", gh.issues[12]["title"])
+	if !res.Valid || res.Outcome != OutcomeClose {
+		t.Fatalf("Result = %+v, want a valid close", res)
 	}
 	body := gh.comments[12][0]["body"].(string)
 	for _, want := range []string{
-		"### Premise: fails\n\nThe issue as filed rests on a false fact.",
-		"- **fails** · 'for append-only data': nothing deletes a checkpoint\n  - Correction: partio prune and partio reset delete checkpoints\n",
+		"### Premise: fails\n\nTo keep the idea, reopen the issue and correct its text.",
+		"- **fails** · push has no retry\n  - Correction: internal/hooks/retry.go already retries the push once\n",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("comment does not carry %q:\n%s", want, body)

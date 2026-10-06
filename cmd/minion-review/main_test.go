@@ -286,7 +286,7 @@ func TestCheckPrintsTheCauseAndChangesNothing(t *testing.T) {
 		{"valid keep", `{"issue": 12, ` + keep + `, "premise": {"verdict": "no-claims", "claims": []}}`,
 			0, "the verdict passes the checks of the gate"},
 		{"keep with a failing claim", `{"issue": 12, ` + keep + `, "premise": {"verdict": "fails", "claims": [` +
-			`{"claim": "c", "evidence": "e", "verdict": "fails", "excerpt": "x"}]}}`,
+			`{"claim": "c", "evidence": "e", "verdict": "fails", "excerpt": "x", "correction": "not c"}]}}`,
 			1, "no verdict: keep with a failing premise"},
 	}
 	for _, tt := range tests {

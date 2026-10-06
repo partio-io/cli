@@ -203,30 +203,30 @@ func TestReviewExtractsTheAssumedFacts(t *testing.T) {
 	}
 }
 
-// TestReviewCorrectsAFalseFactTheIdeaDoesNotRestOn pins the decisions of
-// 2026-10-06: a failing claim closes the issue only when the idea rests on
-// it. When the problem survives the correction, the review rewrites the issue,
-// and the verdict carries the correction that the gate requires. The rewrite
-// designs nothing new: it adds a criterion for each correction and removes the
-// design that breaks one. The third dry run on #31 found the false fact but
-// kept the union merge that brings pruned checkpoints back.
-func TestReviewCorrectsAFalseFactTheIdeaDoesNotRestOn(t *testing.T) {
+// TestReviewClosesOnAFailingClaimWithItsCorrection pins the decision of
+// 2026-10-06, after the fifth dry run: a failing claim closes the issue, and
+// the verdict states the fact that holds instead. The review does not correct
+// the issue. Five runs showed that it judges a false fact unreliably: when it
+// could rewrite on a corrected premise, it kept #31's union merge, and it
+// rewrote #30, whose idea rests wholly on its false fact.
+func TestReviewClosesOnAFailingClaimWithItsCorrection(t *testing.T) {
 	agent := reviewer(t)
 
 	for _, want := range []string{
-		"`false-premise` when a claim fails and the idea rests on it",
-		"`rewrite` with a corrected premise",
-		"decide whether the idea rests on it",
-		"the fact that holds instead",
+		"`false-premise` when a claim fails;",
+		"**A failing claim closes the issue**",
+		"Give each failing claim a `correction`",
+		"The operator reopens an idea worth keeping and corrects its text.",
 		`"correction": "…"`,
-		"A rewrite with a corrected premise designs nothing new.",
-		"add an acceptance criterion that a build can test",
-		"Remove each one that breaks a criterion or takes the false fact for granted.",
-		"Add nothing in its place",
-		"each criterion you added and each part you removed in `rewrite.changes`",
+		"Set `correction` on each failing claim",
 	} {
 		if !containsPhrase(agent, want) {
 			t.Errorf("%s does not carry %q", reviewAgentH3, want)
+		}
+	}
+	for _, gone := range []string{"corrected premise", "rests on it"} {
+		if containsPhrase(agent, gone) {
+			t.Errorf("%s carries %q: a failing claim closes the issue, and the review does not correct it", reviewAgentH3, gone)
 		}
 	}
 }

@@ -517,3 +517,13 @@ correction, and it removes each step of "What to build" that breaks a
 criterion or takes the false fact for granted. Research designs the
 rest. On #31 the review found the false fact, but its own design kept
 the union merge, which brings pruned checkpoints back.
+
+**2026-10-06, after the fifth dry run: back to close.** A failing claim
+closes the issue again, and the two entries above no longer apply. The
+verdict gives each failing claim a `correction`, the fact that holds
+instead, and the evidence comment of the close shows it. The operator
+reopens an idea worth keeping and corrects its text. Five dry runs
+showed that the review judges a false fact unreliably. With a rewrite
+path, it kept the union merge of #31 as an "accepted tradeoff", and it
+rewrote #30, whose idea rests wholly on its false fact. The known answer
+for #31 is now a close, and the operator handles #31 and #727 by hand.
