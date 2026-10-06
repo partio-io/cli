@@ -37,7 +37,12 @@ jobs:
     # (internal/slices/slices.go, planMarkerRe). Two steps below read it, and
     # a build that reads a different pattern than the runtime is a build that
     # researches a planned issue, or builds an unplanned one.
+    #
+    # The review session writes its verdict to MINION_REVIEW_DIR. It runs in
+    # an isolated minions worktree, so the path is absolute, in this
+    # workspace, where the gate step finds it.
     env:
+      MINION_REVIEW_DIR: ${{ github.workspace }}/.minion-review
       SLICE_PLAN_MARKER: '^[[:space:]]*<!--[[:space:]]*minion:research-slices([[:space:]][^>]*)?-->[[:space:]]*$'
 
     steps:
@@ -65,33 +70,39 @@ jobs:
           go install github.com/partio-io/minions/cmd/minions@v0.0.14
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
-      # The premise is checked before the build starts, not inside it. The
-      # runtime creates the branch before the agent session runs and pushes
-      # unconditionally, so a build that stops partway still leaves a branch
-      # and a pull request behind. Stopping here leaves neither.
-      - name: Run premise gate
-        id: gate
+      # The issue is reviewed before the build starts, not inside it, with
+      # the program and gate the sweep uses. The runtime creates the branch
+      # before the agent session runs and pushes unconditionally, so a build
+      # that stops partway still leaves a branch and a pull request behind.
+      # Stopping here leaves neither.
+      #
+      # The verdict decides, not the session: a crashed session must not end
+      # the job before the gate fails it closed.
+      - name: Review the issue
         if: steps.program.outputs.issue_num != ''
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
           MINION_ISSUE_NUMBER: ${{ steps.program.outputs.issue_num }}
         run: |
-          ISSUE_NUM="${{ steps.program.outputs.issue_num }}"
-          REPO="${{ github.repository }}"
+          rm -rf "$MINION_REVIEW_DIR"
+          mkdir -p "$MINION_REVIEW_DIR"
+          minions run .minions/programs/review.md --issue "${{ steps.program.outputs.issue_num }}"
 
-          minions run .minions/programs/premise-gate.md --issue "$ISSUE_NUM"
-
-          # The gate reports its verdict by labelling the issue — the same
-          # signal the approval program already treats as a skip condition.
-          # Read the label back rather than the run's exit code: the gate
-          # succeeds whether the premise held or not.
-          if gh issue view "$ISSUE_NUM" --repo "$REPO" --json labels \
-              --jq '.labels[].name' | grep -qx 'do-not-build'; then
-            echo "::notice::Premise does not hold for #${ISSUE_NUM}; skipping the build."
-            echo "blocked=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "blocked=false" >> "$GITHUB_OUTPUT"
-          fi
+      # The gate acts on the verdict and writes two outputs. blocked is true
+      # after a close: the gate's comment explains it, and nothing below
+      # runs. changed is true after a rewrite: the old slice plan describes
+      # the old text, so research runs again. No verdict exits 1 and fails
+      # the job, and the failure step marks the issue.
+      - name: Review gate
+        id: gate
+        if: steps.program.outputs.issue_num != ''
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          go run ./cmd/minion-review gate --mode build \
+            --issue "${{ steps.program.outputs.issue_num }}" \
+            --verdict "$MINION_REVIEW_DIR/verdict.json"
 
       # A slice plan is the contract between research and the build. The
       # runtime reads the latest comment that carries the marker and builds
@@ -99,6 +110,10 @@ jobs:
       # back to a single unplanned session without a word on the issue
       # (internal/executor/slice.go, resolveSlicePlan). Detect the plan with
       # the pattern the runtime itself uses, so the two never disagree.
+      #
+      # A rewrite voids the plan the issue carries. The step then records
+      # the time, after the rewrite, so the confirmation below accepts only a
+      # plan that research publishes from now on.
       - name: Look for a slice plan
         id: slices
         if: steps.program.outputs.issue_num != '' && steps.gate.outputs.blocked != 'true'
@@ -108,7 +123,11 @@ jobs:
           ISSUE_NUM="${{ steps.program.outputs.issue_num }}"
           REPO="${{ github.repository }}"
 
-          if gh issue view "$ISSUE_NUM" --repo "$REPO" --json comments \
+          if [ "${{ steps.gate.outputs.changed }}" = "true" ]; then
+            echo "::notice::The review rewrote #${ISSUE_NUM}; its old slice plan no longer counts, so research runs again."
+            echo "since=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          elif gh issue view "$ISSUE_NUM" --repo "$REPO" --json comments \
               --jq '.comments[].body' | grep -qE "$SLICE_PLAN_MARKER"; then
             echo "::notice::#${ISSUE_NUM} carries a slice plan; research is not needed."
             echo "present=true" >> "$GITHUB_OUTPUT"
@@ -117,11 +136,11 @@ jobs:
             echo "present=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # An approved issue with no slice plan has never been researched.
-      # Research it here, in this run, so the build works from a PRD and a
-      # slice plan instead of one unplanned session. research.md runs its own
-      # premise check and posts the PRD comment, the slice comment and the
-      # minion-research-completed label.
+      # An approved issue with no slice plan has never been researched, and a
+      # rewritten one has lost its plan. Research it here, in this run, so the
+      # build works from a PRD and a slice plan instead of one unplanned
+      # session. research.md runs its own premise check and posts the PRD
+      # comment, the slice comment and the minion-research-completed label.
       - name: Run research
         if: steps.slices.outputs.present == 'false'
         env:
@@ -134,17 +153,24 @@ jobs:
       # the run. Without this step the build would fall back to the single
       # unplanned session that this chain exists to remove, so the plan is
       # confirmed before the build is allowed to start.
+      #
+      # After a rewrite only a plan published since then counts: PLAN_SINCE
+      # holds the time of the rewrite, and it is empty otherwise, so every
+      # comment counts. GitHub writes createdAt in the same UTC form, so the
+      # strings compare in time order.
       - name: Confirm research produced a slice plan
         id: researched
         if: steps.slices.outputs.present == 'false'
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
+          PLAN_SINCE: ${{ steps.slices.outputs.since }}
         run: |
           ISSUE_NUM="${{ steps.program.outputs.issue_num }}"
           REPO="${{ github.repository }}"
 
           if gh issue view "$ISSUE_NUM" --repo "$REPO" --json comments \
-              --jq '.comments[].body' | grep -qE "$SLICE_PLAN_MARKER"; then
+              --jq '.comments[] | select(.createdAt >= env.PLAN_SINCE) | .body' \
+              | grep -qE "$SLICE_PLAN_MARKER"; then
             echo "blocked=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -177,10 +203,10 @@ jobs:
           minions $ARGS
 
       # A blocked run is not a completion and not a failure. Either gate can
-      # block it: the premise gate above, or research's own premise-checker.
-      # Both of the steps below are skipped so the blocking gate's comment
-      # stays the only account of what happened, and the issue is neither
-      # closed nor marked failed.
+      # block it: the review gate above, with a close, or research's own
+      # premise-checker. Both of the steps below are skipped so the blocking
+      # gate's comment stays the only account of what happened, and the
+      # issue is neither closed nor marked failed.
       - name: Mark done
         if: success() && steps.program.outputs.issue_num != '' && steps.gate.outputs.blocked != 'true' && steps.researched.outputs.blocked != 'true'
         env:

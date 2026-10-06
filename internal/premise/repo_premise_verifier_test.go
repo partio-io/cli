@@ -234,21 +234,29 @@ func TestAFailedExtractedClaimStopsTheStageTheSameWay(t *testing.T) {
 	}
 }
 
-// TestAnOldProposalIsNotRewritten checks the promise that makes this gate cheap
-// enough to apply at all: extraction happens at check time and leaves nothing
-// behind. Backfilling a block would rewrite the operator's words in hundreds of
-// issues, one stage run at a time, and the gate would start editing the backlog
-// it was only meant to check. The gate's passing path is where the risk sits —
-// it refreshes the block it just verified, and on an old proposal there is no
-// block to refresh.
-func TestAnOldProposalIsNotRewritten(t *testing.T) {
+// TestTheVerifierChecksAndTheCallerWrites pins the split between checking and
+// writing. In August the verifier itself forbade a rewrite and a backfilled
+// block, because only the gates applied it. The proposal review applies it too,
+// and a review may rewrite an issue, so the verifier now writes nothing and
+// leaves what is written with the result to its caller. The stage gate did
+// not change: it still forbids a backfill, so an old proposal that passes
+// research keeps the operator's words. The premise-gate program that also
+// forbade one is gone; a build now runs the review, whose rewrite is its own
+// gated outcome.
+func TestTheVerifierChecksAndTheCallerWrites(t *testing.T) {
 	body, ok := section(readRepoFile(t, verifierDoc), noBlockHeading)
 	if !ok {
 		t.Fatalf("the premise verifier has no %q section", noBlockHeading)
 	}
-	for _, want := range []string{"rewrite", "backfill"} {
-		if !strings.Contains(flat(body), want) {
-			t.Errorf("the %q section never rules out a %s of the issue body", noBlockHeading, want)
+	lower := flat(body)
+	for _, want := range []string{"writes nothing", "belongs to the caller"} {
+		if !strings.Contains(lower, want) {
+			t.Errorf("the %q section never says %q, so it does not split checking from writing", noBlockHeading, want)
+		}
+	}
+	for _, gone := range []string{"do not rewrite the issue body", "do not backfill"} {
+		if strings.Contains(lower, gone) {
+			t.Errorf("the %q section still says %q, which forbids the review's rewrite", noBlockHeading, gone)
 		}
 	}
 
@@ -256,31 +264,36 @@ func TestAnOldProposalIsNotRewritten(t *testing.T) {
 	if !ok {
 		t.Fatal("the stage gate does not say what happens when the premise holds")
 	}
-	if !strings.Contains(flat(holds), "no block") {
-		t.Error("the stage gate refreshes the premise block unconditionally, so a proposal that carries none gets one written into it")
+	for _, want := range []string{"no block gets none", "not written back"} {
+		if !strings.Contains(flat(holds), want) {
+			t.Errorf("the stage gate no longer says %q, so a proposal that carries no block gets one written into it", want)
+		}
 	}
 }
 
-// TestTheBacklogIsNotSwept checks that applying the gate to old proposals stays
-// a per-run cost and never becomes a pass over the 534 open ones. The operator
-// chose that explicitly: not swept ahead of time, not pruned. A sweep would
-// relabel or close issues nobody asked about, in bulk, from a stage that was
-// only meant to check the one in front of it — so the checking is lazy, and the
-// only issue a run may edit is the one it was handed.
-func TestTheBacklogIsNotSwept(t *testing.T) {
+// TestTheVerifierChecksOnlyTheIssueItIsHanded checks that the verifier and the
+// stage gate never reach past the issue in front of them. In August this test
+// also pinned "the backlog is not swept". The proposal review now sweeps it, by
+// a list the operator dispatches, so the verifier no longer says so: whatever
+// picks the issues, each check covers one issue, and only the issue it was
+// handed.
+func TestTheVerifierChecksOnlyTheIssueItIsHanded(t *testing.T) {
 	body, ok := section(readRepoFile(t, verifierDoc), noBlockHeading)
 	if !ok {
 		t.Fatalf("the premise verifier has no %q section", noBlockHeading)
 	}
 	lower := flat(body)
-	for _, want := range []string{"check time", "touches"} {
+	for _, want := range []string{"check time", "and no other"} {
 		if !strings.Contains(lower, want) {
-			t.Errorf("the %q section never says %q, so it does not say when an old proposal is checked", noBlockHeading, want)
+			t.Errorf("the %q section never says %q, so it does not say which proposal it checks, or when", noBlockHeading, want)
 		}
 	}
+	if strings.Contains(lower, "not swept") {
+		t.Errorf("the %q section still says the backlog is not swept, but the proposal review sweeps it", noBlockHeading)
+	}
 
-	// Neither description may reach for the backlog. A stage is handed one
-	// issue; listing the others is the sweep this slice must not introduce.
+	// Neither description may reach for the backlog. A check is handed one
+	// issue; a list of issues is the caller's to assemble.
 	for _, doc := range []string{verifierDoc, gateDoc} {
 		src := readRepoFile(t, doc)
 		for _, banned := range []string{"gh issue list", "gh issue close"} {
@@ -338,4 +351,94 @@ func section(src, heading string) (string, bool) {
 		return "", false
 	}
 	return strings.Join(lines[start:], "\n"), true
+}
+
+// TestAnAssumedFactIsExtracted guards the gap that let #31 through. #31 asked
+// for "a merge strategy appropriate for append-only checkpoint data". The
+// phrase sits in a request, so a checker that extracts only statements about
+// today's code skipped it — but it asserts that nothing deletes checkpoint
+// data, and `partio prune` and `partio reset` both do. A fact a request takes
+// for granted is still a fact about today's tree.
+func TestAnAssumedFactIsExtracted(t *testing.T) {
+	body, ok := section(readRepoFile(t, verifierDoc), noBlockHeading)
+	if !ok {
+		t.Fatalf("the premise verifier has no %q section", noBlockHeading)
+	}
+	lower := flat(body)
+	for _, want := range []string{
+		"takes for granted",
+		"requested behaviour",
+		"design instruction",
+		"acceptance criterion",
+	} {
+		if !strings.Contains(lower, want) {
+			t.Errorf("the %q section never names %q, so an assumed fact is not extracted", noBlockHeading, want)
+		}
+	}
+}
+
+// TestAnAssumedFactIsRestatedAsACheckableClaim checks that the checker does not
+// verify the request's wording, which no tree settles. It quotes the phrase that
+// carries the fact and states the fact again as a claim the tree can decide.
+// #31 is the worked example, because it is the proposal the old rule let pass.
+func TestAnAssumedFactIsRestatedAsACheckableClaim(t *testing.T) {
+	body, ok := section(readRepoFile(t, verifierDoc), noBlockHeading)
+	if !ok {
+		t.Fatalf("the premise verifier has no %q section", noBlockHeading)
+	}
+	lower := flat(body)
+	for _, want := range []string{
+		"quote the phrase",
+		"checkable claim",
+		"evidence",
+		"appropriate for append-only checkpoint data",
+		"nothing in partio deletes or rewrites checkpoint data",
+	} {
+		if !strings.Contains(lower, want) {
+			t.Errorf("the %q section never says %q", noBlockHeading, want)
+		}
+	}
+}
+
+// TestASweepingClaimIsSettledByEveryPath checks how a claim like "append-only"
+// is decided. Reading the one path that appends proves nothing about the paths
+// that delete; #31's claim survived because nobody listed them. A sweeping
+// claim is settled by a command that lists every path that changes the data,
+// and one counterexample on that list fails it. The rule sits in the procedure,
+// not in the no-block section: the ingest prompt now puts an assumed fact into
+// the premise block, so a block claim needs the same rule as a prose claim.
+func TestASweepingClaimIsSettledByEveryPath(t *testing.T) {
+	body, ok := section(readRepoFile(t, verifierDoc), "## Procedure")
+	if !ok {
+		t.Fatal("the premise verifier describes no procedure")
+	}
+	lower := flat(body)
+	for _, want := range []string{
+		"sweeping claim",
+		"lists every path that changes the data",
+		"one counterexample fails it",
+		"applies to a claim from a block and to a claim from the prose",
+	} {
+		if !strings.Contains(lower, want) {
+			t.Errorf("the procedure never says %q", want)
+		}
+	}
+}
+
+// TestTheLeaveRuleSkipsOnlyTheRequestedBehaviour checks the other half of #31's
+// gap. The old rule left "what the proposal wants to build, and its acceptance
+// criteria" whole, and the assumed fact went out with them. The rule now skips
+// the behaviour a proposal asks for, and keeps the facts that behaviour rests on.
+func TestTheLeaveRuleSkipsOnlyTheRequestedBehaviour(t *testing.T) {
+	body, ok := section(readRepoFile(t, verifierDoc), noBlockHeading)
+	if !ok {
+		t.Fatalf("the premise verifier has no %q section", noBlockHeading)
+	}
+	lower := flat(body)
+	if strings.Contains(lower, "wants to build, and its acceptance criteria") {
+		t.Error("the leave rule still skips a proposal's acceptance criteria whole, with the facts they rest on")
+	}
+	if !strings.Contains(lower, "not the facts that behaviour rests on") {
+		t.Errorf("the %q section never says the leave rule keeps the facts the requested behaviour rests on", noBlockHeading)
+	}
 }

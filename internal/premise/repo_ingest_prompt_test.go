@@ -70,3 +70,25 @@ func TestIngestPromptSchemaCarriesPremise(t *testing.T) {
 		}
 	}
 }
+
+// TestIngestPromptTreatsAnAssumptionInAShouldAsAPremise checks the ingest side
+// of #31's gap. "A statement about what Partio should do next is not a premise"
+// is true of the behaviour asked for, and false of the facts it takes for
+// granted: "a merge strategy appropriate for append-only checkpoint data" is a
+// should statement that assumes nothing deletes checkpoint data. That
+// assumption goes into premise, where it gets evidence, not into description.
+func TestIngestPromptTreatsAnAssumptionInAShouldAsAPremise(t *testing.T) {
+	instructions, ok := section(readRepoFile(t, ingestPrompt), "## Instructions")
+	if !ok {
+		t.Fatal("ingest prompt has no instructions section")
+	}
+	lower := flat(instructions)
+	for _, want := range []string{
+		`an assumption about today's code or data inside a "should" statement is still a premise`,
+		"goes into `premise`",
+	} {
+		if !strings.Contains(lower, want) {
+			t.Errorf("the ingest prompt never says %q", want)
+		}
+	}
+}

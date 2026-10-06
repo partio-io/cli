@@ -55,7 +55,12 @@ create feature proposals. Work through the steps below in order.
 
 4. **For each source with new content**, use the ingest prompt to analyze what's relevant to this project. For each relevant feature idea:
    - Generate a kebab-case ID
-   - Check if a proposal already exists: `gh issue list --repo <this-repo> --label minion-proposal --search "<feature-id>" --limit 1`
+   - **Check for an earlier proposal of the same idea.** Run the duplicate search in your working directory, with the idea's source item and its title: `go run ./cmd/minion-review dupes --source "<owner/repo#N>" --title "<title>"`
+
+     Pass the source item as `owner/repo#N` (for example `entireio/cli#2075`), and repeat `--source` when the idea comes from more than one item. A changelog entry has no item number: leave `--source` out, and the title carries the search. The command prints a JSON list of candidates: `minion-proposal` issues, open and closed, that cite the same source item (`"match": "source"`) or have a strongly overlapping title (`"match": "title"`). Each candidate carries its `number`, `state`, `state_reason` and `labels`. The list is the whole check: do not search the issues in another way.
+
+     A shared source item or title does not make the same idea. Read each candidate with `gh issue view <n>`, and decide whether it asks for the same change. A closed candidate counts as much as an open one when the review closed it with a verdict. A candidate closed as `completed` counts only when this tree shows the work: a build can close an issue while its pull request never merges (#31 is such a case), so the closed state alone proves nothing.
+   - **If a candidate is the same idea, file no issue for it.** Keep the idea and the number of the issue it matched for the summary. A duplicate is not a rejection: the matched issue is its record, so it gets no entry in `.minions/rejections.md`. Go on to the next idea.
    - Build the premise section from the idea's `premise` field. Use this format exactly:
 
      ```markdown
@@ -97,13 +102,17 @@ create feature proposals. Work through the steps below in order.
      ```
 
      Keep the two kinds apart. A dropped idea was checked and this repository contradicted it; a skipped item was never about this project. A reader who cannot tell them apart cannot tell a bar set too high from a source that has gone quiet, which is the one question this log answers.
-   - If the block holds, create a GitHub issue: `gh issue create --repo <this-repo> --label minion-proposal --title "<title>" --body "<description + what to build + acceptance criteria + premise section + gathered evidence + proposal id line>"`
+   - If the block holds, create a GitHub issue: `gh issue create --repo <this-repo> --label minion-proposal --label minion-reviewed --title "<title>" --body "<description + what to build + acceptance criteria + premise section + gathered evidence + source line + proposal id line>"`
 
      The issue is the whole proposal. A build reads the issue and nothing else, so the body carries everything a fresh session needs to build from: what to build, in full, and the acceptance criteria as a `- [ ]` checklist under `## Acceptance Criteria`. Write no file for the proposal. `.minions/programs/` holds the programs the workflows run, and a proposal is not one of them.
 
+     The `minion-reviewed` label tells the review sweep that this issue already passed today's bar: the duplicate check and the premise check above. The sweep does not review it again.
+
      The gathered evidence is the verifier's output: each claim, the evidence it named, the verdict, and the excerpt that produced it. A proposal that passed the check carries the evidence that passed it.
 
-     End the body with the id on a line of its own: `Proposal id: <id>`. The duplicate check above searches for that id. An issue without it can be filed a second time on the next run.
+     Cite the source item on a line of its own: `Source: <owner/repo#N>`, one reference for each item the idea came from. For a changelog entry, name the repo and the version (`Source: <owner/repo> v<version>`). The duplicate check above finds an earlier proposal by this line, so an issue without it can be filed a second time on a later run.
+
+     End the body with the id on a line of its own: `Proposal id: <id>`.
 
 5. **Update `last_version`** in `.minions/sources.yaml` for each processed source (latest version string for changelogs, highest item number for issues/pulls).
 
@@ -116,9 +125,10 @@ create feature proposals. Work through the steps below in order.
 
    The log and the cursor travel together. The cursor advances past a rejected idea whether or not the log survives, so a commit that carries one without the other loses the idea silently. If this run rejected nothing, the log is unchanged and `git add` stages nothing from it; commit the cursor as usual.
 
-7. **Print summary** of what the run did. Report these three outcomes separately, with a count for each:
+7. **Print summary** of what the run did. Report these four outcomes separately, with a count for each:
    - **filed** — ideas whose premise held. One issue each.
    - **dropped** — ideas the ingest prompt produced whose premise did not hold. Name the claim, the evidence it named, and the verdict for each one.
    - **skipped** — source items the ingest prompt found irrelevant to this project. These never became ideas.
+   - **duplicate** — ideas an earlier proposal, open or closed, already holds. Name the idea and the issue it matched for each one, for example `#710`.
 
-   A dropped idea and a skipped item are not the same event. An idea was dropped because this repository contradicted it; an item was skipped because it was never about this project. Do not merge the two counts. The cursor advances past both, so this summary is the only place the difference survives the run.
+   A duplicate is not a dropped idea: nothing contradicted it, and the issue it matched is its record. A dropped idea and a skipped item are not the same event either. An idea was dropped because this repository contradicted it; an item was skipped because it was never about this project. Do not merge the two counts. The cursor advances past both, so this summary is the only place the difference survives the run.

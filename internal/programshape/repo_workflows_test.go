@@ -112,3 +112,26 @@ func runByAWorkflow(t *testing.T) map[string]bool {
 	}
 	return run
 }
+
+// TestRepoReviewProgramIsKnown names the review program, so that a rename or a
+// lost workflow reference fails here and not as a silent gap in the scans above.
+func TestRepoReviewProgramIsKnown(t *testing.T) {
+	const review = "review.md"
+
+	scan, err := ScanDir(programsDir)
+	if err != nil {
+		t.Fatalf("scan the repository programs: %v", err)
+	}
+	if !slices.Contains(scan.Programs, review) {
+		t.Fatalf("%s is not in %s", review, programsDir)
+	}
+	if findings := scan.Unreachable[review]; len(findings) > 0 {
+		t.Errorf("%s", Report(filepath.Join(programsDir, review), findings))
+	}
+	if !runByAWorkflow(t)[review] {
+		t.Errorf("no workflow runs %s; the proposal review sweep must", review)
+	}
+	if _, manual := manualPrograms[review]; manual {
+		t.Errorf("manualPrograms lists %s, but the sweep workflow runs it", review)
+	}
+}

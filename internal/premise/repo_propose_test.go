@@ -59,8 +59,7 @@ func TestProposeProgramFilesPremiseWithEveryProposal(t *testing.T) {
 
 // TestProposeProgramKeepsItsExistingProposalBehaviour guards the parts of the
 // proposal this slice must not disturb. The premise section is an addition to
-// the issue body; the title, the labels and the duplicate check stay as they
-// were.
+// the issue body; the title and the labels stay as they were.
 func TestProposeProgramKeepsItsExistingProposalBehaviour(t *testing.T) {
 	raw, err := os.ReadFile(proposeProgram)
 	if err != nil {
@@ -82,9 +81,156 @@ func TestProposeProgramKeepsItsExistingProposalBehaviour(t *testing.T) {
 			t.Errorf("the gh issue create instruction lost %q:\n%s", want, create)
 		}
 	}
+}
 
-	if want := `gh issue list --repo <this-repo> --label minion-proposal --search "<feature-id>" --limit 1`; !strings.Contains(src, want) {
-		t.Errorf("propose program lost %q", want)
+// TestProposeProgramChecksDuplicatesBySourceAndTitle checks that the proposer
+// looks for an earlier proposal of the same idea with the duplicate search, by
+// the idea's source item and title, across open and closed proposals. The old
+// check searched open issues only, for a kebab-case id the model invents on
+// each run, so it missed #710 and #736, #714 and #720, #681 and #688 — and it
+// would let the proposer file again every idea the sweep closes.
+func TestProposeProgramChecksDuplicatesBySourceAndTitle(t *testing.T) {
+	raw, err := os.ReadFile(proposeProgram)
+	if err != nil {
+		t.Fatalf("read propose program: %v", err)
+	}
+	agents, ok := section(string(raw), "## Agents")
+	if !ok {
+		t.Fatal("propose program has no agents section")
+	}
+
+	dupes, ok := lineContaining(agents, "minion-review dupes")
+	if !ok {
+		t.Fatal("the proposer is never told to run the duplicate search")
+	}
+	for _, want := range []string{"go run ./cmd/minion-review dupes", "--source", "--title"} {
+		if !strings.Contains(dupes, want) {
+			t.Errorf("the duplicate search instruction lost %q:\n%s", want, dupes)
+		}
+	}
+	if !strings.Contains(agents, "open and closed") {
+		t.Error("the proposer is never told that the duplicate search covers closed proposals, so it may look for open ones only")
+	}
+
+	for _, gone := range []string{`--search "<feature-id>"`, "gh issue list --repo <this-repo>"} {
+		if strings.Contains(agents, gone) {
+			t.Errorf("the proposer still searches open issues by its invented id: %q", gone)
+		}
+	}
+
+	// The check is cheaper than the premise check and decides whether there is
+	// anything to verify, so it comes first, and the issue comes last.
+	check := strings.Index(agents, "minion-review dupes")
+	verify := strings.Index(agents, VerifierPath+"` to the premise")
+	create := strings.Index(agents, "gh issue create")
+	if verify < 0 || create < 0 {
+		t.Fatal("the proposer is never told to verify the premise or to create the issue")
+	}
+	if check > verify || verify > create {
+		t.Error("the proposer is told to check for duplicates after it verifies the premise or files the issue")
+	}
+
+	// A later run finds this issue by its source item only when the body cites
+	// it in a form the search reads.
+	issue, _ := lineContaining(agents, "gh issue create")
+	if !strings.Contains(issue, "source line") {
+		t.Errorf("the issue body does not cite its source item, so a later duplicate search cannot match it by source:\n%s", issue)
+	}
+	if !strings.Contains(agents, "`Source: <owner/repo#N>`") {
+		t.Error("the proposer is never told the form of the source line")
+	}
+}
+
+// TestProposeProgramMarksItsIssuesReviewed checks that each issue the proposer
+// files carries minion-reviewed. The proposer applied today's bar before it
+// filed, so the sweep must not review the issue again.
+func TestProposeProgramMarksItsIssuesReviewed(t *testing.T) {
+	raw, err := os.ReadFile(proposeProgram)
+	if err != nil {
+		t.Fatalf("read propose program: %v", err)
+	}
+
+	create, ok := lineContaining(string(raw), "gh issue create")
+	if !ok {
+		t.Fatal("propose program gives no gh issue create instruction")
+	}
+	if !strings.Contains(create, "--label minion-reviewed") {
+		t.Errorf("the proposer files issues without minion-reviewed, so the sweep reviews them again:\n%s", create)
+	}
+}
+
+// proposeWorkflow is the workflow that runs the propose program, relative to
+// the package directory that go test runs in.
+const proposeWorkflow = "../../.github/workflows/propose.yml"
+
+// TestProposeWorkflowCreatesTheReviewedLabel checks that the label the
+// proposer files with exists before the program runs. The proposer can run
+// before any review creates the label, and gh issue create --label fails on a
+// missing label, so every proposal of that run would fail to file.
+func TestProposeWorkflowCreatesTheReviewedLabel(t *testing.T) {
+	raw, err := os.ReadFile(proposeWorkflow)
+	if err != nil {
+		t.Fatalf("read propose workflow: %v", err)
+	}
+	src := string(raw)
+
+	create, ok := lineContaining(src, "gh label create minion-reviewed")
+	if !ok {
+		t.Fatal("the propose workflow never creates the minion-reviewed label")
+	}
+	if !strings.Contains(create, "--force") {
+		t.Errorf("the label step fails when the label already exists:\n%s", create)
+	}
+
+	label := strings.Index(src, "gh label create minion-reviewed")
+	run := strings.Index(src, "run .minions/programs/propose.md")
+	if run < 0 {
+		t.Fatal("the propose workflow does not run the propose program")
+	}
+	if label > run {
+		t.Error("the propose workflow creates the label after the program runs")
+	}
+
+	name := strings.LastIndex(src[:label], "- name:")
+	if name < 0 {
+		t.Fatal("the label command is not inside a named step")
+	}
+	step, _, _ := strings.Cut(src[name:], "run:")
+	if !strings.Contains(step, "GH_TOKEN") {
+		t.Errorf("the label step gives gh no token:\n%s", step)
+	}
+}
+
+// TestProposeProgramFilesNoDuplicate checks that an idea already on record
+// leaves no second issue behind, and no rejection either: the matched issue is
+// its record, and the rejection log is for ideas this repository contradicted.
+func TestProposeProgramFilesNoDuplicate(t *testing.T) {
+	raw, err := os.ReadFile(proposeProgram)
+	if err != nil {
+		t.Fatalf("read propose program: %v", err)
+	}
+	agents, ok := section(string(raw), "## Agents")
+	if !ok {
+		t.Fatal("propose program has no agents section")
+	}
+
+	at := strings.Index(agents, "is the same idea, file no issue")
+	if at < 0 {
+		t.Fatal("the proposer is never told to file no issue for an idea a candidate already covers")
+	}
+	if create := strings.Index(agents, "gh issue create"); create < at {
+		t.Error("the proposer is told to create the issue before it is told to skip a duplicate")
+	}
+
+	rule, _, _ := strings.Cut(agents[at:], "\n   - ")
+	for want, why := range map[string]string{
+		"the number of the issue it matched":   "the summary cannot name the issue that holds the idea",
+		"not a rejection":                      "a duplicate reads as an idea this repository contradicted",
+		"no entry in `.minions/rejections.md`": "the rejection log counts duplicates as rejections",
+	} {
+		if !strings.Contains(rule, want) {
+			t.Errorf("the duplicate rule leaves %q unsaid, so %s:\n%s", want, why, rule)
+		}
 	}
 }
 
@@ -182,12 +328,22 @@ func TestProposeProgramSeparatesSkippedFromDropped(t *testing.T) {
 	summary := agents[at:]
 
 	for outcome, meaning := range map[string]string{
-		"filed":   "an idea whose premise held",
-		"dropped": "an idea whose premise did not hold",
-		"skipped": "a source item that was never relevant",
+		"**filed**":     "an idea whose premise held",
+		"**dropped**":   "an idea whose premise did not hold",
+		"**skipped**":   "a source item that was never relevant",
+		"**duplicate**": "an idea an earlier proposal already holds",
 	} {
 		if !strings.Contains(summary, outcome) {
-			t.Errorf("the run summary does not report %q — %s", outcome, meaning)
+			t.Errorf("the run summary does not report %s — %s", outcome, meaning)
+		}
+	}
+	if !strings.Contains(summary, "four outcomes separately") {
+		t.Error("the run summary may fold duplicates into another count")
+	}
+	if at := strings.Index(summary, "**duplicate**"); at >= 0 {
+		duplicate, _, _ := strings.Cut(summary[at:], "\n   - ")
+		if !strings.Contains(duplicate, "issue it matched") {
+			t.Errorf("the run summary does not name the issue each duplicate matched:\n%s", duplicate)
 		}
 	}
 
@@ -246,10 +402,10 @@ func TestProposeProgramKeepsTheWholeProposalInTheIssue(t *testing.T) {
 		}
 	}
 
-	// The duplicate check searches the issues for the id. With no program
-	// marker to carry it, the id line is what the search finds.
+	// With no program marker to carry it, the id line is the only place the
+	// proposal id survives.
 	if !strings.Contains(agents, "`Proposal id: <id>`") {
-		t.Error("the proposer is never told to end the issue with its id, so the duplicate check has nothing to find")
+		t.Error("the proposer is never told to end the issue with its id")
 	}
 
 	for _, gone := range []string{"write a program file", "<!-- program:"} {

@@ -1,3 +1,4 @@
 .partio/settings.local.json
 /partio
 .minion-audit/
+.minion-review/

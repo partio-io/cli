@@ -1,6 +1,9 @@
 package premise
 
 import (
+	"errors"
+	"io/fs"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -8,9 +11,17 @@ import (
 
 const (
 	implementProgram = "../../.minions/programs/implement.md"
-	gateProgram      = "../../.minions/programs/premise-gate.md"
 	buildWorkflow    = "../../.github/workflows/minion.yml"
+
+	// removedGateProgram is the premise-gate program the review replaced.
+	removedGateProgram = "../../.minions/programs/premise-gate.md"
+
+	// buildGateCall runs the review gate in the mode a build uses.
+	buildGateCall = "minion-review gate --mode build"
 )
+
+// reviewProgramRef is reviewProgram as a workflow file spells it.
+var reviewProgramRef = strings.TrimPrefix(reviewProgram, "../../")
 
 // workflowStep starts a step in the build workflow's step list. The runtime
 // order of the steps is what the gate depends on, so the tests below compare
@@ -37,42 +48,90 @@ func stepContaining(steps []string, want string) int {
 	return -1
 }
 
-// TestBuildStageVerifiesBeforeItWritesCode is the tracer bullet: the premise is
-// checked by its own program, that program runs before the one that writes
-// code, and the verification it applies is the shared description rather than a
-// second idea of what verification means.
-func TestBuildStageVerifiesBeforeItWritesCode(t *testing.T) {
-	gate := readRepoFile(t, gateProgram)
-
-	context, ok := section(gate, "## Context")
+// TestBuildStageReviewsBeforeItWritesCode is the tracer bullet: the build
+// reviews its issue with the program and gate the sweep uses, as its first
+// steps after the install, and before any step that writes code. The premise
+// gate it replaced is gone, from the workflow and from the repository.
+func TestBuildStageReviewsBeforeItWritesCode(t *testing.T) {
+	context, ok := section(readRepoFile(t, reviewProgram), "## Context")
 	if !ok {
-		t.Fatalf("%s has no ## Context section, so the shared descriptions are never read", gateProgram)
+		t.Fatalf("%s has no ## Context section, so the shared verifier is never read", reviewProgram)
 	}
-	for _, want := range []string{VerifierPath, GatePath} {
-		if !strings.Contains(context, want) {
-			t.Errorf("%s ## Context does not carry %s", gateProgram, want)
-		}
+	if !strings.Contains(context, VerifierPath) {
+		t.Errorf("%s ## Context does not carry %s", reviewProgram, VerifierPath)
 	}
 
 	steps := buildSteps(t)
-
-	gateAt := stepContaining(steps, "premise-gate.md")
-	if gateAt < 0 {
-		t.Fatalf("%s never runs the premise gate", buildWorkflow)
-	}
-
+	installAt := stepContaining(steps, "name: Install minions")
+	reviewAt := stepContaining(steps, "minions run "+reviewProgramRef)
+	gateAt := stepContaining(steps, buildGateCall)
 	buildAt := stepContaining(steps, "minions $ARGS")
-	if buildAt < 0 {
-		t.Fatalf("%s never runs the implement program", buildWorkflow)
+	switch {
+	case installAt < 0 || buildAt < 0:
+		t.Fatalf("%s lost its install or build step", buildWorkflow)
+	case reviewAt != installAt+1:
+		t.Errorf("the review session is step %d, want the first step after the install (%d)", reviewAt, installAt+1)
+	case gateAt != reviewAt+1:
+		t.Errorf("the build gate is step %d, want the step after the review session (%d)", gateAt, reviewAt+1)
+	case gateAt > buildAt:
+		t.Errorf("the build gate runs after the build: gate is step %d, build is step %d", gateAt, buildAt)
+	}
+	if gateAt >= 0 && !strings.Contains(steps[gateAt], "id: gate") {
+		t.Errorf("the build gate step is not id gate, so steps.gate.outputs.blocked reads nothing")
 	}
 
-	if gateAt > buildAt {
-		t.Errorf("the premise gate runs after the build: gate is step %d, build is step %d", gateAt, buildAt)
+	if at := stepContaining(steps, "premise-gate.md"); at >= 0 {
+		t.Errorf("step %d still runs the premise-gate program", at)
+	}
+	if _, err := os.Stat(removedGateProgram); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("%s still exists (stat: %v); the review replaced it", removedGateProgram, err)
 	}
 }
 
-// gateGuard is the condition that keeps a step from running once the premise
-// has been found not to hold.
+// TestReviewSessionCannotEndTheJobBeforeTheGate pins the fail-closed half of
+// the review: a crashed session leaves no verdict, and the gate must still run
+// to turn that into a failed job. So the session step continues on error, and
+// the gate does not.
+func TestReviewSessionCannotEndTheJobBeforeTheGate(t *testing.T) {
+	steps := buildSteps(t)
+	reviewAt := stepContaining(steps, "minions run "+reviewProgramRef)
+	gateAt := stepContaining(steps, buildGateCall)
+	if reviewAt < 0 || gateAt < 0 {
+		t.Fatalf("%s does not run both the review session and the build gate", buildWorkflow)
+	}
+
+	if !strings.Contains(steps[reviewAt], "continue-on-error: true") {
+		t.Error("the review session step does not continue on error, so a crash ends the job before the gate")
+	}
+	if strings.Contains(steps[gateAt], "continue-on-error") {
+		t.Error("the build gate continues on error, so no verdict lets the build run")
+	}
+	if !strings.Contains(readRepoFile(t, buildWorkflow), "MINION_REVIEW_DIR: ${{ github.workspace }}/") {
+		t.Error("MINION_REVIEW_DIR is not an absolute path in the workspace, so the gate cannot find the verdict")
+	}
+	if !strings.Contains(steps[gateAt], `--verdict "$MINION_REVIEW_DIR/verdict.json"`) {
+		t.Error("the build gate does not read the verdict the review program writes")
+	}
+}
+
+// TestGateReadsThisRunsVerdict pins that the verdict acted on is this run's,
+// not one an earlier run left behind: the session step clears the verdict
+// directory before the review runs.
+func TestGateReadsThisRunsVerdict(t *testing.T) {
+	steps := buildSteps(t)
+	at := stepContaining(steps, "minions run "+reviewProgramRef)
+	if at < 0 {
+		t.Fatalf("%s never runs the review program", buildWorkflow)
+	}
+	clearAt := strings.Index(steps[at], `rm -rf "$MINION_REVIEW_DIR"`)
+	runAt := strings.Index(steps[at], "minions run "+reviewProgramRef)
+	if clearAt < 0 || clearAt > runAt {
+		t.Error("the review step does not clear MINION_REVIEW_DIR before the session, so a stale verdict decides the build")
+	}
+}
+
+// gateGuard is the condition that keeps a step from running once the review
+// has closed the issue, or has blocked a facts-only issue on its premise.
 const gateGuard = "steps.gate.outputs.blocked != 'true'"
 
 // researchGuard is the condition that keeps a step from running once research
@@ -81,53 +140,50 @@ const gateGuard = "steps.gate.outputs.blocked != 'true'"
 // here would silently become the unplanned build the chain exists to remove.
 const researchGuard = "steps.researched.outputs.blocked != 'true'"
 
-// TestBuildRestatesNeitherVerificationNorGating pins that the build stage
-// applies the two shared descriptions rather than carrying its own copies. A
-// pasted copy is what a stray marker looks like.
-func TestBuildRestatesNeitherVerificationNorGating(t *testing.T) {
-	src := readRepoFile(t, gateProgram)
+// TestReviewRestatesNoVerification pins that the review applies the shared
+// verifier rather than carrying its own copy. A pasted copy is what a stray
+// marker looks like.
+func TestReviewRestatesNoVerification(t *testing.T) {
+	src := readRepoFile(t, reviewProgram)
 
 	for _, marker := range []string{VerifierMarker, GateMarker} {
 		if strings.Contains(src, marker) {
-			t.Errorf("%s carries %s, so it is a copy rather than a reference", gateProgram, marker)
+			t.Errorf("%s carries %s, so it is a copy rather than a reference", reviewProgram, marker)
 		}
 	}
 
-	checker, ok := section(src, "### premise-checker")
+	reviewer, ok := section(src, "### reviewer")
 	if !ok {
-		t.Fatalf("%s has no ### premise-checker agent", gateProgram)
+		t.Fatalf("%s has no ### reviewer agent", reviewProgram)
 	}
-	for _, want := range []string{VerifierPath, GatePath, "as written"} {
-		if !containsPhrase(checker, want) {
-			t.Errorf("### premise-checker does not name %q, so it does not reuse the shared behaviour", want)
+	for _, want := range []string{VerifierPath, "as written"} {
+		if !containsPhrase(reviewer, want) {
+			t.Errorf("### reviewer does not name %q, so it does not reuse the shared behaviour", want)
 		}
 	}
 }
 
-// TestBuildStopBehaviourIsTheSameAsResearch pins criterion 3: the build stops
-// the way research stops. Both stages point at the one description of stopping,
-// and neither holds its own idea of the label or the comment shape.
-func TestBuildStopBehaviourIsTheSameAsResearch(t *testing.T) {
-	restated := []struct {
+// TestResearchStopsAsTheGateDescribes pins that research stops the one way the
+// stage gate describes, and holds no idea of its own of the label or the
+// comment shape. The build no longer stops that way: its review gate closes
+// the issue and explains the close.
+func TestResearchStopsAsTheGateDescribes(t *testing.T) {
+	src := readRepoFile(t, researchProgram)
+
+	if !strings.Contains(src, GatePath) {
+		t.Errorf("%s does not apply %s", researchProgram, GatePath)
+	}
+	for _, r := range []struct {
 		what  string
 		token string
 	}{
 		{"the gate description", GateMarker},
 		{"the blocking label", BlockingLabel},
 		{"the gate comment shape", GateCommentMarker},
-	}
-
-	for _, path := range []string{gateProgram, researchProgram} {
-		src := readRepoFile(t, path)
-
-		if !strings.Contains(src, GatePath) {
-			t.Errorf("%s does not apply %s", path, GatePath)
-		}
-		for _, r := range restated {
-			if strings.Contains(src, r.token) {
-				t.Errorf("%s carries %s (%s); stopping is described once, in %s",
-					path, r.token, r.what, GatePath)
-			}
+	} {
+		if strings.Contains(src, r.token) {
+			t.Errorf("%s carries %s (%s); stopping is described once, in %s",
+				researchProgram, r.token, r.what, GatePath)
 		}
 	}
 }
@@ -144,46 +200,46 @@ func TestBlockedBuildOpensNoPullRequestAndCreatesNoBranch(t *testing.T) {
 		t.Fatalf("%s never runs the implement program", buildWorkflow)
 	}
 	if !strings.Contains(steps[buildAt], gateGuard) {
-		t.Errorf("the step that runs the build is not guarded by %q, so a blocked premise still opens a pull request", gateGuard)
+		t.Errorf("the step that runs the build is not guarded by %q, so a closed issue still opens a pull request", gateGuard)
 	}
 
-	gate := readRepoFile(t, gateProgram)
+	review := readRepoFile(t, reviewProgram)
 
-	// The gate must not be a slice-aware program: the slice path commits an
-	// empty marker and pushes whatever the agent did or did not do, so a
+	// The review must not be a slice-aware program: the slice path commits
+	// an empty marker and pushes whatever the agent did or did not do, so a
 	// checking program declared that way opens a pull request of its own.
-	if strings.Contains(gate, "slices: true") {
-		t.Errorf("%s declares slices: true, so the runtime pushes and opens a PR even when it writes nothing", gateProgram)
+	if strings.Contains(review, "slices: true") {
+		t.Errorf("%s declares slices: true, so the runtime pushes and opens a PR even when it writes nothing", reviewProgram)
 	}
 
-	// On the path the gate does take, the runtime opens a pull request for any
-	// worktree that is not clean, and it reads that with `git status
-	// --porcelain`, which counts a file nobody tracked yet. So the instruction
-	// to keep the working directory alone is what makes the check free of
-	// artefacts, not a detail of style.
+	// The runtime opens a pull request for any worktree that is not clean,
+	// and it reads that with `git status --porcelain`, which counts a file
+	// nobody tracked yet. So the instruction to keep the working directory
+	// alone is what makes the review free of artefacts.
 	for _, want := range []string{
-		"Do not create or modify any file in the working directory",
-		"/tmp",
+		"Write nothing in your working directory",
+		"do not open a pull request",
 	} {
-		if !containsPhrase(gate, want) {
-			t.Errorf("%s does not say %q, so a file left behind turns the check into a pull request", gateProgram, want)
+		if !containsPhrase(review, want) {
+			t.Errorf("%s does not say %q, so a file left behind turns the review into a pull request", reviewProgram, want)
 		}
 	}
 }
 
-// TestBlockedBuildNeverClosesTheIssue pins criterion 6 across both halves of
-// the stage: the program does not close the issue, and neither does the
-// workflow once the gate has blocked the run.
-func TestBlockedBuildNeverClosesTheIssue(t *testing.T) {
-	src := readRepoFile(t, gateProgram)
-	for _, token := range []string{"gh issue close", "minion-done"} {
+// TestBlockedBuildIsNeitherDoneNorFailed pins that a block is not a completion
+// and not a failure: the gate's comment explains it, and no workflow step marks
+// the issue done or failed after it. A block is a close, or, on an issue the
+// review checks facts only on, a premise that fails or is unresolved. The gate
+// half of the facts-only case is TestBlockedBuildNeverClosesTheIssue and
+// TestOperatorOverrulesTheBuildByRemovingTheLabel in the review package.
+func TestBlockedBuildIsNeitherDoneNorFailed(t *testing.T) {
+	src := readRepoFile(t, reviewProgram)
+	for _, token := range []string{"gh issue close", "minion-done", BlockingLabel} {
 		if strings.Contains(src, token) {
-			t.Errorf("%s carries %q; the stage reports, the operator decides", gateProgram, token)
+			t.Errorf("%s carries %q; the session judges, the gate acts", reviewProgram, token)
 		}
 	}
 
-	// The workflow does close the issue on a normal run. Every step that ends
-	// the issue's life must stand down when the premise did not hold.
 	steps := buildSteps(t)
 	for _, token := range []string{"gh issue close", "minion-done", "minion-failed"} {
 		at := stepContaining(steps, token)
@@ -191,62 +247,35 @@ func TestBlockedBuildNeverClosesTheIssue(t *testing.T) {
 			continue
 		}
 		if !strings.Contains(steps[at], gateGuard) {
-			t.Errorf("the step carrying %q is not guarded by %q, so a blocked run still changes the issue's state",
-				token, gateGuard)
+			t.Errorf("the step carrying %q is not guarded by %q, so a closed issue is still marked", token, gateGuard)
 		}
 	}
 }
 
-// TestOperatorOverrulesTheBuildByRemovingTheLabel pins that the verdict acted
-// on is this run's, not a label left over from an earlier one. The gate runs
-// first and the label is read afterwards, so an operator who removes the label
-// gets a fresh verdict rather than a remembered one.
-func TestOperatorOverrulesTheBuildByRemovingTheLabel(t *testing.T) {
-	if src := readRepoFile(t, gateProgram); strings.Contains(src, BlockingLabel) {
-		t.Errorf("%s names %s; a program that reads the label can skip on it instead of verifying again",
-			gateProgram, BlockingLabel)
-	}
-
+// TestNoVerdictFailsTheBuildAndMarksTheIssue pins the other half of failing
+// closed. The gate exits non-zero on no verdict and writes no blocked output,
+// so the job fails, and the failure step, which only a block skips, marks the
+// issue.
+func TestNoVerdictFailsTheBuildAndMarksTheIssue(t *testing.T) {
 	steps := buildSteps(t)
-	at := stepContaining(steps, "premise-gate.md")
-	if at < 0 {
-		t.Fatalf("%s never runs the premise gate", buildWorkflow)
+	gateAt := stepContaining(steps, buildGateCall)
+	failAt := stepContaining(steps, "minion-failed")
+	if gateAt < 0 || failAt < 0 {
+		t.Fatalf("%s lost its build gate or its failure step", buildWorkflow)
 	}
-
-	runAt := strings.Index(steps[at], "minions run .minions/programs/premise-gate.md")
-	readAt := strings.Index(steps[at], "--json labels")
-	switch {
-	case readAt < 0:
-		t.Fatal("the gate step never reads the issue's labels, so it has no verdict to act on")
-	case runAt > readAt:
-		t.Error("the gate step reads the labels before it verifies, so a stale label decides the build")
+	if strings.Contains(steps[gateAt], "|| true") || strings.Contains(steps[gateAt], "if !") {
+		t.Error("the build gate step swallows the gate's exit code, so no verdict lets the build run")
+	}
+	if failAt < gateAt || !strings.Contains(steps[failAt], "if: failure()") {
+		t.Error("the failure step does not run on a failed gate, so no verdict leaves the issue unmarked")
 	}
 }
 
-// TestHoldingPremiseLetsTheBuildProceedUnchanged pins criterion 8: a premise
-// that holds records its evidence, and changes nothing about the build.
-func TestHoldingPremiseLetsTheBuildProceedUnchanged(t *testing.T) {
-	checker, ok := section(readRepoFile(t, gateProgram), "### premise-checker")
-	if !ok {
-		t.Fatalf("%s has no ### premise-checker agent", gateProgram)
-	}
-	for _, want := range []string{
-		"record every claim",
-		"the excerpt that produced it",
-		// "premise", not "block": the gate also verifies claims extracted
-		// from the prose of a proposal filed before the block format, and
-		// those record their evidence on the holding path too.
-		"for a premise that holds",
-	} {
-		if !containsPhrase(checker, want) {
-			t.Errorf("### premise-checker does not record %q, so a build that proceeds carries no evidence", want)
-		}
-	}
-
-	// Only a blocking verdict stops the build, and exactly two can block: the
-	// premise gate, and research when it ends with no slice plan. Any further
-	// condition on that step would make a holding premise change how the build
-	// runs, which is what this test exists to stop.
+// TestKeptIssueBuildsUnchanged pins that only a blocking verdict stops the
+// build. Exactly two can block: the review gate's close, and research when it
+// ends with no slice plan. Any further condition on the build step would make
+// a keep or a rewrite change how the build runs.
+func TestKeptIssueBuildsUnchanged(t *testing.T) {
 	wantGuard := "if: " + gateGuard + " && " + researchGuard
 
 	steps := buildSteps(t)
@@ -315,34 +344,30 @@ func TestImplementProgramInstructionsReachTheModel(t *testing.T) {
 }
 
 // TestBuildVerifiesAProposalThatCarriesNoBlock pins the case that covers the
-// whole backlog. No open proposal carried a premise block when the gate
-// shipped, so a gate that treats a blockless issue as out of scope labels
-// nothing. The workflow reads a missing label as "not blocked" and builds, and
-// the gate passes every issue it was added to stop. The verifier already
-// describes where those claims come from, so the gate routes to it and does
-// not stop.
+// whole backlog. Most open proposals carry no premise block, so a review that
+// treats a blockless issue as out of scope checks nothing, and the build runs
+// on an unchecked premise. The verifier already describes where those claims
+// come from, so the review routes to it and does not stop.
 func TestBuildVerifiesAProposalThatCarriesNoBlock(t *testing.T) {
 	if !containsPhrase(readRepoFile(t, verifierDoc), NoBlockSection) {
 		t.Fatalf("%s no longer carries %q, so no stage has a described route for a blockless proposal",
 			VerifierPath, NoBlockSection)
 	}
 
-	checker, ok := section(readRepoFile(t, gateProgram), "### premise-checker")
+	reviewer, ok := section(readRepoFile(t, reviewProgram), "### reviewer")
 	if !ok {
-		t.Fatalf("%s has no ### premise-checker agent", gateProgram)
+		t.Fatalf("%s has no ### reviewer agent", reviewProgram)
 	}
 
-	if !containsPhrase(checker, NoBlockSection) {
-		t.Errorf("### premise-checker never routes to %q in %s, so a proposal with no block is never verified",
+	if !containsPhrase(reviewer, NoBlockSection) {
+		t.Errorf("### reviewer never routes to %q in %s, so a proposal with no block is never verified",
 			NoBlockSection, VerifierPath)
 	}
 
-	// The exact wording that shipped the bug. A gate that tells the checker to
-	// stop on a blockless issue reaches no verdict, and a build with no verdict
-	// runs.
+	// The exact wording that once shipped the bug in the premise gate.
 	for _, escape := range []string{"out of scope", "Leave the issue alone"} {
-		if containsPhrase(checker, escape) {
-			t.Errorf("### premise-checker says %q of a blockless issue; that is every open proposal, so every build goes through ungated",
+		if containsPhrase(reviewer, escape) {
+			t.Errorf("### reviewer says %q of a blockless issue; that is every open proposal, so every build goes through unchecked",
 				escape)
 		}
 	}

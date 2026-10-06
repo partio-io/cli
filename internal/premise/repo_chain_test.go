@@ -6,11 +6,12 @@ import (
 	"testing"
 )
 
-// The research chain sits between the premise gate and the build: an approved
-// issue that carries no slice plan is researched in the same run, and the
-// build starts only once a plan exists. These tests live beside the gate tests
-// because they share the workflow step parser, and because one of the chain's
-// two blocking outcomes is a premise block raised inside research.
+// The research chain sits between the review and the build: an approved issue
+// that carries no slice plan, or whose review rewrote it, is researched in the
+// same run, and the build starts only once a plan exists. These tests live
+// beside the build tests because they share the workflow step parser, and
+// because one of the chain's two blocking outcomes is a premise block raised
+// inside research.
 
 // researchProgramRef is researchProgram as a workflow file spells it. It is
 // derived so the two cannot drift apart.
@@ -38,7 +39,8 @@ func TestApprovedIssueIsResearchedBeforeItIsBuilt(t *testing.T) {
 		token string
 		what  string
 	}{
-		{"premise-gate.md", "the premise gate"},
+		{"minions run " + reviewProgramRef, "the review session"},
+		{buildGateCall, "the build gate"},
 		{"present=true", "the slice-plan check"},
 		{researchProgramRef, "the research run"},
 		{"refusing to build unplanned", "the confirmation that research produced a plan"},
@@ -73,6 +75,64 @@ func TestResearchRunsOnlyWhenTheIssueCarriesNoPlan(t *testing.T) {
 	const want = "if: steps.slices.outputs.present == 'false'"
 	if !strings.Contains(steps[at], want) {
 		t.Errorf("the research step is not guarded by %q, so an issue that already carries a plan is researched again", want)
+	}
+}
+
+// TestRewriteVoidsTheOldPlan pins that a rewrite sends the issue back to
+// research. The old plan describes the old text, so when the gate reports a
+// change the plan check reads "no plan" whatever the comments hold.
+func TestRewriteVoidsTheOldPlan(t *testing.T) {
+	steps := buildSteps(t)
+	at := stepContaining(steps, "present=true")
+	if at < 0 {
+		t.Fatalf("%s never looks for a slice plan", buildWorkflow)
+	}
+	step := steps[at]
+
+	changedAt := strings.Index(step, "steps.gate.outputs.changed")
+	grepAt := strings.Index(step, `grep -qE "$SLICE_PLAN_MARKER"`)
+	switch {
+	case changedAt < 0:
+		t.Fatal("the plan check never reads steps.gate.outputs.changed, so a rewritten issue builds from its old plan")
+	case grepAt >= 0 && changedAt > grepAt:
+		t.Error("the plan check reads the comments before it reads the rewrite, so an old plan still counts")
+	}
+	branch := step[changedAt:]
+	if end := strings.Index(branch, "\n          elif"); end >= 0 {
+		branch = branch[:end]
+	}
+	if !strings.Contains(branch, "present=false") {
+		t.Error("a rewrite does not set present=false, so research does not run again")
+	}
+}
+
+// TestAfterARewriteOnlyANewerPlanCounts pins that the confirmation after
+// research accepts only a plan published after the rewrite. The plan check
+// records the time once the gate has rewritten the issue, and the
+// confirmation reads only the comments created at or after it. Without a
+// rewrite the time is empty, and every comment counts.
+func TestAfterARewriteOnlyANewerPlanCounts(t *testing.T) {
+	steps := buildSteps(t)
+	slicesAt := stepContaining(steps, "present=true")
+	confirmAt := stepContaining(steps, "refusing to build unplanned")
+	if slicesAt < 0 || confirmAt < 0 {
+		t.Fatalf("%s lost its plan check or its confirmation", buildWorkflow)
+	}
+
+	if !strings.Contains(steps[slicesAt], `echo "since=`) {
+		t.Error("the plan check records no rewrite time, so the confirmation cannot tell an old plan from a new one")
+	}
+	confirm := steps[confirmAt]
+	for _, want := range []string{
+		"PLAN_SINCE: ${{ steps.slices.outputs.since }}",
+		"select(.createdAt >= env.PLAN_SINCE)",
+	} {
+		if !strings.Contains(confirm, want) {
+			t.Errorf("the confirmation does not carry %q, so a plan from before the rewrite still counts", want)
+		}
+	}
+	if strings.Contains(confirm, "'.comments[].body'") {
+		t.Error("the confirmation still reads every comment, so a plan from before the rewrite still counts")
 	}
 }
 

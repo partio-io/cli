@@ -1,0 +1,152 @@
+name: Proposal Review
+
+# Reviews proposal issues one at a time. Each issue gets a fresh review
+# session, and the review gate records its verdict in the tracking
+# issue. Without dry run the gate also acts on the issue: a keep gets
+# its evidence comment and the minion-reviewed label, a close gets the
+# comment, the label and the close. A dry run changes nothing on the
+# reviewed issues, so a closed issue is a valid input: use one with a
+# known answer to test the review.
+#
+# The nightly sweep starts at 23:00 UTC and picks its own batch with
+# minion-review next. It acts only when the repository variable
+# PROPOSAL_REVIEW_SWEEP is "on": the operator switches it on after
+# reading the dry run, and off to stop it. It takes no new issue after
+# 05:00 UTC, so it stays inside 00:00-07:00 local time in summer (UTC+2)
+# and in winter (UTC+1).
+
+on:
+  schedule:
+    - cron: "0 23 * * *"
+  workflow_dispatch:
+    inputs:
+      issues:
+        description: "Issue numbers to review, separated by spaces or commas (e.g., 30 31). Empty: the sweep picks its own batch"
+        required: false
+        default: ""
+        type: string
+      sample:
+        description: "With no issue list: review this many issues, spread across the filing months (e.g., 20 for the dry run)"
+        required: false
+        default: ""
+        type: string
+      dry_run:
+        description: "Record each verdict in the tracking issue only; false also acts on each issue"
+        required: false
+        default: true
+        type: boolean
+
+# Two runs at once would both edit the night comment of the tracking
+# issue, and one would overwrite the rows of the other. A run that
+# starts during another waits for it; GitHub keeps one waiting run
+# only, so a newer one cancels the run that waited before it.
+concurrency:
+  group: proposal-review
+  cancel-in-progress: false
+
+jobs:
+  review:
+    # A scheduled run is skipped, and so ends at once, unless the
+    # operator switched the sweep on.
+    if: github.event_name != 'schedule' || vars.PROPOSAL_REVIEW_SWEEP == 'on'
+    runs-on: github-runner-partio-minion-ai-01
+    # The window, 23:00 to 05:00 UTC, plus two hours for the last issue
+    # it takes. The sweep loops inside this one job, so the 24-hour
+    # limit on a queued job never applies.
+    timeout-minutes: 480
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install minions
+        run: |
+          go install github.com/partio-io/minions/cmd/minions@v0.0.14
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      # One session per issue, in sequence. A crashed session or a "no
+      # verdict" exit from the gate does not stop the loop: the gate
+      # records a "no verdict" row for that issue, and the next issue
+      # gets its own review. The job fails at the end if any gate
+      # failed, so the run shows it.
+      - name: Review issues
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          ISSUES: ${{ inputs.issues }}
+          SAMPLE: ${{ inputs.sample }}
+          # A scheduled run has no inputs: it acts on each issue.
+          DRY_RUN: ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run }}
+          EVENT: ${{ github.event_name }}
+          # The review session runs in an isolated minions worktree, so
+          # the verdict must be written to an absolute path in this
+          # workspace for the gate to find it.
+          MINION_REVIEW_DIR: ${{ github.workspace }}/.minion-review
+        run: |
+          LIST=$(printf '%s' "$ISSUES" | tr ',#' '  ')
+          case "$LIST" in *[![:space:]]*) ;; *) LIST="" ;; esac
+          if [ -n "$LIST" ] && [ -n "$SAMPLE" ]; then
+            echo "::error::Give an issue list or a sample size, not both."
+            exit 2
+          fi
+          # Without an issue list the sweep picks its own batch: the
+          # open proposals not yet reviewed, approved ones first.
+          if [ -z "$LIST" ]; then
+            case "$SAMPLE" in
+              '')
+                LIST=$(go run ./cmd/minion-review next) || exit 1
+                ;;
+              0*|*[!0-9]*)
+                echo "::error::Not a sample size: $SAMPLE"
+                exit 2
+                ;;
+              *)
+                LIST=$(go run ./cmd/minion-review next --sample "$SAMPLE") || exit 1
+                ;;
+            esac
+          fi
+          # A leading zero is refused: the gate parses "010" as octal 8,
+          # so it would check the verdict of #10 against #8.
+          for ISSUE in $LIST; do
+            case "$ISSUE" in
+              ''|0*|*[!0-9]*)
+                echo "::error::Not an issue number: $ISSUE"
+                exit 2
+                ;;
+            esac
+          done
+          if [ -z "$LIST" ]; then
+            echo "No issue to review."
+            exit 0
+          fi
+
+          # One night per run, so every row of this run lands in one
+          # tracking comment even if the run crosses midnight UTC.
+          NIGHT=$(date -u +%F)
+          FAILED=""
+          for ISSUE in $LIST; do
+            # A scheduled run takes no new issue after 05:00 UTC; the
+            # next night takes the rest. A dispatch has no window.
+            HOUR=$(date -u +%H)
+            if [ "$EVENT" = schedule ] && [ "$HOUR" -ge 5 ] && [ "$HOUR" -lt 23 ]; then
+              echo "::notice::05:00 UTC has passed; the sweep stops before #$ISSUE."
+              break
+            fi
+            echo "::group::Review #$ISSUE"
+            rm -rf "$MINION_REVIEW_DIR"
+            mkdir -p "$MINION_REVIEW_DIR"
+            if ! minions run .minions/programs/review.md --issue "$ISSUE"; then
+              echo "::warning::The review session for #$ISSUE failed. The gate records what it left."
+            fi
+            if ! go run ./cmd/minion-review gate \
+              --issue "$ISSUE" \
+              --verdict "$MINION_REVIEW_DIR/verdict.json" \
+              --dry-run="$DRY_RUN" \
+              --night "$NIGHT"; then
+              FAILED="$FAILED #$ISSUE"
+            fi
+            echo "::endgroup::"
+          done
+
+          if [ -n "$FAILED" ]; then
+            echo "::error::The gate failed for:$FAILED"
+            exit 1
+          fi
