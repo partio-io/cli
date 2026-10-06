@@ -324,6 +324,41 @@ func TestGateRewriteCommentListsTheChanges(t *testing.T) {
 	}
 }
 
+// A rewrite may carry a failing claim when it corrects that claim. The
+// gate acts on it as on any rewrite, and the evidence comment says that
+// the issue as filed rests on a false fact, with the correction under the
+// claim.
+func TestGateRewriteWithACorrectedPremise(t *testing.T) {
+	gh := newFakeGitHub()
+	gh.trackingIssue(77)
+	noClaims := `"premise": {"verdict": "no-claims", "claims": []}`
+	if !strings.Contains(rewriteVerdict, noClaims) {
+		t.Fatalf("rewriteVerdict no longer carries %s", noClaims)
+	}
+	verdict := strings.Replace(rewriteVerdict, noClaims,
+		`"premise": {"verdict": "fails", "claims": [{"claim": "'for append-only data': nothing deletes a checkpoint", `+
+			`"evidence": "internal/checkpoint/prune.go", "verdict": "fails", "excerpt": "update-ref -d", `+
+			`"correction": "partio prune and partio reset delete checkpoints"}]}`, 1)
+
+	res := runAct(t, gh, 12, writeVerdict(t, verdict))
+
+	if !res.Valid || res.Outcome != OutcomeRewrite {
+		t.Fatalf("Result = %+v, want a valid rewrite", res)
+	}
+	if gh.issues[12]["title"] != "Retry the pre-push once on a network error" {
+		t.Errorf("title = %q, want the rewrite title", gh.issues[12]["title"])
+	}
+	body := gh.comments[12][0]["body"].(string)
+	for _, want := range []string{
+		"### Premise: fails\n\nThe issue as filed rests on a false fact.",
+		"- **fails** · 'for append-only data': nothing deletes a checkpoint\n  - Correction: partio prune and partio reset delete checkpoints\n",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("comment does not carry %q:\n%s", want, body)
+		}
+	}
+}
+
 // Every acted outcome writes its row, without the dry-run mark, to the
 // night comment of the tracking issue.
 func TestGateEveryActionWritesItsRow(t *testing.T) {

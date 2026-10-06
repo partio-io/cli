@@ -184,6 +184,47 @@ func TestReviewWritesOnlyItsVerdict(t *testing.T) {
 	}
 }
 
+// TestReviewExtractsTheAssumedFacts guards the miss of the second dry run on
+// #31: the review listed six claims that hold and skipped the fact that the
+// issue takes for granted, "append-only checkpoint data". The claims in the
+// verdict are those of the issue as filed, not those of its rewrite.
+func TestReviewExtractsTheAssumedFacts(t *testing.T) {
+	agent := reviewer(t)
+
+	for _, want := range []string{
+		"Do not skip the assumed facts",
+		"Start the claim with the quoted phrase",
+		"the claims of the issue as it is filed",
+		"The claims of a rewrite go into its new body, not into `premise`.",
+	} {
+		if !containsPhrase(agent, want) {
+			t.Errorf("%s does not carry %q", reviewAgentH3, want)
+		}
+	}
+}
+
+// TestReviewCorrectsAFalseFactTheIdeaDoesNotRestOn pins the decision of
+// 2026-10-06: a failing claim closes the issue only when the idea rests on
+// it. When the problem survives the correction, the review rewrites the issue
+// on the correct fact, and the verdict carries the correction that the gate
+// requires.
+func TestReviewCorrectsAFalseFactTheIdeaDoesNotRestOn(t *testing.T) {
+	agent := reviewer(t)
+
+	for _, want := range []string{
+		"`false-premise` when a claim fails and the idea rests on it",
+		"`rewrite` with a corrected premise",
+		"decide whether the idea rests on it",
+		"the fact that holds instead",
+		`"correction": "…"`,
+		"Name each failing claim and its correction in `rewrite.changes`.",
+	} {
+		if !containsPhrase(agent, want) {
+			t.Errorf("%s does not carry %q", reviewAgentH3, want)
+		}
+	}
+}
+
 // TestReviewRewriteKeepsTheIdea checks that a rewrite changes the issue's shape
 // and not its idea. It keeps the idea and the link to its source item, and it
 // drops the pointer to a proposal file: proposal files no longer exist, so the

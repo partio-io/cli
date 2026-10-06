@@ -12,9 +12,10 @@ const ReviewMarker = "<!-- partio:review:v1 -->"
 
 // evidenceComment is the comment the gate posts on the reviewed issue:
 // the outcome and its reason, for a rewrite what changed, every claim
-// with its evidence, verdict and excerpt, the fit, built and duplicate
-// decisions, and any open pull request from an older build. kept is the issue that stays for a
-// duplicate close, and nil otherwise.
+// with its evidence, verdict, excerpt and any correction, the fit, built
+// and duplicate decisions, and any open pull request from an older
+// build. kept is the issue that stays for a duplicate close, and nil
+// otherwise.
 // When the excerpts push the comment past GitHub's size limit, the
 // comment leaves them out and says so.
 func evidenceComment(v Verdict, kept *github.Issue, pulls []github.PullRequest) string {
@@ -44,6 +45,10 @@ func renderEvidence(v Verdict, kept *github.Issue, pulls []github.PullRequest, e
 	}
 
 	fmt.Fprintf(&b, "### Premise: %s\n\n", v.Premise.Verdict)
+	if v.Outcome == OutcomeRewrite && v.Premise.hasClaim(Fails) {
+		b.WriteString("The issue as filed rests on a false fact. The rewrite keeps the idea " +
+			"and builds it on the correction under each failing claim.\n\n")
+	}
 	writeClaims(&b, v.Premise.Claims, excerpts)
 	b.WriteString("\n### Decisions\n\n")
 	fmt.Fprintf(&b, "- **Fit:** %s · %s\n", yesNo(v.Fit.Applies, "applies", "does not apply"), oneLine(v.Fit.Reason))
@@ -69,8 +74,8 @@ func renderEvidence(v Verdict, kept *github.Issue, pulls []github.PullRequest, e
 	return b.String()
 }
 
-// writeClaims writes every claim with its verdict, evidence and, when
-// excerpts is true, its excerpt.
+// writeClaims writes every claim with its verdict, its correction when it
+// has one, its evidence and, when excerpts is true, its excerpt.
 func writeClaims(b *strings.Builder, claims []Claim, excerpts bool) {
 	if len(claims) == 0 {
 		b.WriteString("No checkable claims.\n\n")
@@ -80,6 +85,9 @@ func writeClaims(b *strings.Builder, claims []Claim, excerpts bool) {
 	}
 	for _, c := range claims {
 		fmt.Fprintf(b, "- **%s** · %s\n", c.Verdict, oneLine(c.Claim))
+		if c.Correction != "" {
+			fmt.Fprintf(b, "  - Correction: %s\n", oneLine(c.Correction))
+		}
 		fmt.Fprintf(b, "  - Evidence: %s\n", oneLine(c.Evidence))
 		if excerpts && c.Excerpt != "" {
 			fence := fenceFor(c.Excerpt)
