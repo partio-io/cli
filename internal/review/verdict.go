@@ -48,11 +48,16 @@ type Premise struct {
 }
 
 // Claim is one factual claim, checked against the repository.
+//
+// Correction is the fact that holds where a failing claim does not. A
+// rewrite whose idea survives the false fact states the correction as a
+// claim of its new premise block, and builds the issue on it.
 type Claim struct {
-	Claim    string `json:"claim"`
-	Evidence string `json:"evidence"`
-	Verdict  string `json:"verdict"`
-	Excerpt  string `json:"excerpt"`
+	Claim      string `json:"claim"`
+	Evidence   string `json:"evidence"`
+	Verdict    string `json:"verdict"`
+	Excerpt    string `json:"excerpt"`
+	Correction string `json:"correction,omitempty"`
 }
 
 // Fit says whether the issue applies to this project.

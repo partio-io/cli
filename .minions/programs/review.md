@@ -51,15 +51,26 @@ and do not decide it from memory of how similar projects work.
    before anyone wrote it up for this project.
 
 2. **Check the premise.** Apply `.minions/premise-verifier.md` to the
-   issue against the checked-out tree. Follow it as written. When the
-   body carries a `## Premise` section with the
+   issue as it is filed, against the checked-out tree. Follow it as
+   written. When the body carries a `## Premise` section with the
    `<!-- partio:premise:v1 -->` marker, that block is what you verify.
    When it carries no marker, the claims come from the prose: the
    verifier's `## When there is no block` section describes the
    extraction, including the assumed fact that a requested behaviour or
    an acceptance criterion takes for granted about today's code or data.
+
+   Do not skip the assumed facts: a fact that a request takes for
+   granted is the claim most likely to be false. Read each request,
+   design instruction and acceptance criterion, and ask what it takes
+   for granted. Words such as "append-only", "never", "always", "only",
+   "every" and "already" often carry such a fact. Start the claim with
+   the quoted phrase, then state the fact it carries.
+
    Record every claim, the evidence it named, its verdict and the excerpt
-   that decided it.
+   that decided it. These are the claims of the issue as it is filed,
+   and they go into `premise` in your verdict even when you rewrite the
+   issue. The claims of a rewrite go into its new body, not into
+   `premise`.
 
 3. **Judge the fit.** Apply the relevance rule of
    `.minions/ingest-prompt.md`: a proposal fits only when it is
@@ -113,9 +124,11 @@ and do not decide it from memory of how similar projects work.
    - `close` when the issue must not reach a build. Give exactly one
      reason, in this order of precedence: `built` when step 4 found the
      behaviour; `duplicate` when a rule of step 5 closes the issue as a
-     duplicate; `false-premise` when a claim fails; `does-not-apply`
-     when step 3 found no fit; `could-not-verify` when a claim stays
-     unresolved.
+     duplicate; `false-premise` when a claim fails and the idea rests on
+     it; `does-not-apply` when step 3 found no fit; `could-not-verify`
+     when a claim stays unresolved.
+   - `rewrite` with a corrected premise when a claim fails but the idea
+     does not rest on it, the idea fits, and it is not built.
    - `keep` when nothing above applies and the body already has the
      issue shape below, with a premise block whose claims all hold.
    - `rewrite` when nothing above applies but the body lacks that shape,
@@ -123,6 +136,16 @@ and do not decide it from memory of how similar projects work.
      that breaks a rule of step 7 lacks that shape: for example, a claim
      whose evidence is not inside backticks, or claim lines with a
      backslash before each backtick.
+
+   **When a claim fails, decide whether the idea rests on it.** The idea
+   rests on the false fact when the problem it solves exists only
+   because of that fact: once the fact is corrected, nothing is left to
+   build. Close it as `false-premise`. The idea does not rest on the
+   false fact when the problem still exists and only the design takes
+   the fact for granted: a design that respects the correct fact still
+   solves the problem. Rewrite it. Give each failing claim a
+   `correction`, the fact that holds instead, and build the new body on
+   the corrections (step 7).
 
 7. **Compose the body for a keep or a rewrite.** Use the issue shape
    that the proposer files today, so that a build reads a reviewed issue
@@ -168,10 +191,18 @@ and do not decide it from memory of how similar projects work.
    - `Proposal id: <id>` is the last line. Keep the id the issue already
      carries. When it carries none, make a kebab-case id from its title.
 
-   A rewrite changes the shape of the issue, not its idea. Keep the
-   original idea, and keep the source link to the entireio/cli item it
-   came from. Drop any `<!-- program: … -->` pointer to a proposal
-   file: proposal files no longer exist, so the pointer leads nowhere.
+   A rewrite with a corrected premise rests on the correct facts. Its
+   premise block states each correction as a claim, with the evidence
+   that settles it. "What to build" and the acceptance criteria respect
+   the corrections: change each part that took a false fact for granted,
+   and keep the problem that the idea solves. Name each failing claim
+   and its correction in `rewrite.changes`.
+
+   A rewrite changes the shape of the issue, and for a corrected premise
+   its design, but not its idea. Keep the original idea, and keep the
+   source link to the entireio/cli item it came from. Drop any
+   `<!-- program: … -->` pointer to a proposal file: proposal files no
+   longer exist, so the pointer leads nowhere.
 
 8. **Write the verdict.** Write one JSON object to
    `$MINION_REVIEW_DIR/verdict.json`, in this form:
@@ -185,7 +216,7 @@ and do not decide it from memory of how similar projects work.
      "premise": {
        "verdict": "holds | fails | unresolved | no-claims",
        "claims": [
-         {"claim": "…", "evidence": "…", "verdict": "holds | fails | unresolved", "excerpt": "…"}
+         {"claim": "…", "evidence": "…", "verdict": "holds | fails | unresolved", "excerpt": "…", "correction": "…"}
        ]
      },
      "fit": {"applies": true, "reason": "…"},
@@ -209,6 +240,10 @@ and do not decide it from memory of how similar projects work.
    - Every claim carries its evidence and its excerpt. The premise
      verdict is `no-claims` only when the body states no checkable fact,
      in a block or in its prose.
+   - Set `correction` on each failing claim of a rewrite with a
+     corrected premise, and leave it out otherwise. A keep with a failing
+     claim, and a rewrite with a failing claim that has no correction,
+     contradict themselves.
    - A close carries the evidence for its reason: a failing claim for
      `false-premise`, an unresolved claim for `could-not-verify`,
      `built: true` with evidence for `built`, and `applies: false` with a

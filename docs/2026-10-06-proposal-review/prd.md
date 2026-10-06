@@ -497,3 +497,16 @@ summer.
 
 The 500-byte log limit stays. The verdict file and the evidence comment
 are now the full record of every review.
+
+## Decision Log
+
+**2026-10-06, after the first dry run.** A failing claim closes an issue
+only when the idea rests on it. When the problem that the idea solves
+survives the correction, the review rewrites the issue on the correct
+fact. Each failing claim in the verdict then carries a `correction`, and
+the gate accepts a rewrite with a failing claim only when every failing
+claim has one. A keep never carries a failing claim. #31 is this case:
+its branches can still diverge, and only its merge rule took append-only
+data for granted. This makes the known answer in Further Notes agree
+with the verdict rules, which had closed every issue with a failing
+claim.
