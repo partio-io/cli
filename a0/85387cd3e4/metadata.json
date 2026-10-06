@@ -1,0 +1,33 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "a085387cd3e4",
+  "strategy": "manual-commit",
+  "branch": "proposal-review",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".github/workflows/proposal-review.yml",
+    ".gitignore",
+    ".minions/premise-verifier.md",
+    ".minions/programs/review.md",
+    "docs/2026-10-06-proposal-review/issues.md",
+    "docs/2026-10-06-proposal-review/issues/04-review-program-and-dry-run-dispatch.md",
+    "internal/premise/repo_premise_verifier_test.go",
+    "internal/premise/repo_review_test.go",
+    "internal/programshape/repo_workflows_test.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/a0/85387cd3e4/0/metadata.json",
+      "transcript": "/a0/85387cd3e4/0/full.jsonl",
+      "content_hash": "/a0/85387cd3e4/0/content_hash.txt",
+      "prompt": "/a0/85387cd3e4/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 88,
+    "cache_creation_tokens": 103325,
+    "cache_read_tokens": 3365548,
+    "output_tokens": 31965,
+    "api_call_count": 44
+  }
+}
