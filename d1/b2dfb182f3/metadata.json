@@ -1,0 +1,39 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "d1b2dfb182f3",
+  "strategy": "manual-commit",
+  "branch": "proposal-review",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".github/workflows/minion.yml",
+    ".minions/programs/premise-gate.md",
+    "cmd/minion-review/main.go",
+    "cmd/minion-review/main_test.go",
+    "docs/2026-10-06-proposal-review/issues.md",
+    "docs/2026-10-06-proposal-review/issues/09-review-before-each-build.md",
+    "internal/premise/repo_build_test.go",
+    "internal/premise/repo_chain_test.go",
+    "internal/premise/repo_premise_verifier_test.go",
+    "internal/review/build_outputs.go",
+    "internal/review/build_outputs_test.go",
+    "internal/review/gate.go",
+    "internal/review/log_summary.go",
+    "internal/review/log_summary_test.go",
+    "internal/review/row.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/d1/b2dfb182f3/0/metadata.json",
+      "transcript": "/d1/b2dfb182f3/0/full.jsonl",
+      "content_hash": "/d1/b2dfb182f3/0/content_hash.txt",
+      "prompt": "/d1/b2dfb182f3/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 82,
+    "cache_creation_tokens": 120394,
+    "cache_read_tokens": 3682021,
+    "output_tokens": 40145,
+    "api_call_count": 41
+  }
+}
