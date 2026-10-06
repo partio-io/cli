@@ -1,0 +1,37 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "689c982b3c91",
+  "session_id": "67da36d8-a404-42f3-92fa-32032a2c6fc1",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-06T06:43:53.02686879Z",
+  "branch": "proposal-review",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "internal/github/issue.go"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "6f67fde6efc1",
+  "token_usage": {
+    "input_tokens": 112,
+    "cache_creation_tokens": 128152,
+    "cache_read_tokens": 4825149,
+    "output_tokens": 55762,
+    "api_call_count": 56
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-06T06:43:53.012269101Z",
+    "agent_lines": 21,
+    "agent_removed": 4,
+    "human_added": 901,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 922,
+    "total_lines_changed": 986,
+    "agent_percentage": 2.535496957403651,
+    "metric_version": 2
+  }
+}
