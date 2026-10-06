@@ -52,16 +52,16 @@ case.
 
 ## Acceptance criteria
 
-- [ ] An issue without `minion-proposal` gets facts-only mode.
-- [ ] An issue with a `reopened` event after the review's close comment gets facts-only mode, and an issue that the review never closed does not.
-- [ ] The gate reads the issue timeline through the shared GitHub client.
-- [ ] In facts-only mode, a keep, rewrite or close verdict causes no close, no title or body edit, and no label change other than `do-not-build`.
-- [ ] A premise that holds, or has no checkable claim, proceeds with `blocked=false` and an evidence comment.
-- [ ] A premise that fails or is unresolved removes and then adds `do-not-build`, posts the marked comment, and sets `blocked=true`.
-- [ ] The mode rule also applies in the sweep: an operator issue in a dispatch list is never closed or rewritten.
-- [ ] The August tests for "never closes" and "overrule by removing the label" now state and test the facts-only case, and they pass.
-- [ ] Tests run against a fake GitHub server for each mode trigger and each premise result.
-- [ ] `make test` and `make lint` pass.
+- [x] An issue without `minion-proposal` gets facts-only mode.
+- [x] An issue with a `reopened` event after the review's close comment gets facts-only mode, and an issue that the review never closed does not.
+- [x] The gate reads the issue timeline through the shared GitHub client.
+- [x] In facts-only mode, a keep, rewrite or close verdict causes no close, no title or body edit, and no label change other than `do-not-build`.
+- [x] A premise that holds, or has no checkable claim, proceeds with `blocked=false` and an evidence comment.
+- [x] A premise that fails or is unresolved removes and then adds `do-not-build`, posts the marked comment, and sets `blocked=true`.
+- [x] The mode rule also applies in the sweep: an operator issue in a dispatch list is never closed or rewritten.
+- [x] The August tests for "never closes" and "overrule by removing the label" now state and test the facts-only case, and they pass.
+- [x] Tests run against a fake GitHub server for each mode trigger and each premise result.
+- [x] `make test` and `make lint` pass.
 
 ## Modules touched
 

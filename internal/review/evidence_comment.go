@@ -44,22 +44,7 @@ func renderEvidence(v Verdict, kept *github.Issue, pulls []github.PullRequest, e
 	}
 
 	fmt.Fprintf(&b, "### Premise: %s\n\n", v.Premise.Verdict)
-	if len(v.Premise.Claims) == 0 {
-		b.WriteString("No checkable claims.\n\n")
-	}
-	if !excerpts {
-		b.WriteString("Excerpts left out: with them the comment passes GitHub's size limit.\n\n")
-	}
-	for _, c := range v.Premise.Claims {
-		fmt.Fprintf(&b, "- **%s** · %s\n", c.Verdict, oneLine(c.Claim))
-		fmt.Fprintf(&b, "  - Evidence: %s\n", oneLine(c.Evidence))
-		if excerpts && c.Excerpt != "" {
-			fence := fenceFor(c.Excerpt)
-			b.WriteString("  - Excerpt:\n\n")
-			b.WriteString(indent(indent(fence + "\n" + strings.TrimRight(c.Excerpt, "\n") + "\n" + fence)))
-			b.WriteString("\n")
-		}
-	}
+	writeClaims(&b, v.Premise.Claims, excerpts)
 	b.WriteString("\n### Decisions\n\n")
 	fmt.Fprintf(&b, "- **Fit:** %s · %s\n", yesNo(v.Fit.Applies, "applies", "does not apply"), oneLine(v.Fit.Reason))
 	fmt.Fprintf(&b, "- **Built:** %s", yesNo(v.Built.Built, "yes", "no"))
@@ -82,6 +67,27 @@ func renderEvidence(v Verdict, kept *github.Issue, pulls []github.PullRequest, e
 		}
 	}
 	return b.String()
+}
+
+// writeClaims writes every claim with its verdict, evidence and, when
+// excerpts is true, its excerpt.
+func writeClaims(b *strings.Builder, claims []Claim, excerpts bool) {
+	if len(claims) == 0 {
+		b.WriteString("No checkable claims.\n\n")
+	}
+	if !excerpts {
+		b.WriteString("Excerpts left out: with them the comment passes GitHub's size limit.\n\n")
+	}
+	for _, c := range claims {
+		fmt.Fprintf(b, "- **%s** · %s\n", c.Verdict, oneLine(c.Claim))
+		fmt.Fprintf(b, "  - Evidence: %s\n", oneLine(c.Evidence))
+		if excerpts && c.Excerpt != "" {
+			fence := fenceFor(c.Excerpt)
+			b.WriteString("  - Excerpt:\n\n")
+			b.WriteString(indent(indent(fence + "\n" + strings.TrimRight(c.Excerpt, "\n") + "\n" + fence)))
+			b.WriteString("\n")
+		}
+	}
 }
 
 func yesNo(ok bool, yes, no string) string {

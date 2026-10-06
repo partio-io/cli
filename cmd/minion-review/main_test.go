@@ -88,7 +88,8 @@ func fakeGateGitHub(t *testing.T) *[]string {
 				"labels": [{"name": "minion-proposal"}]}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/repos/partio-io/cli/issues":
 			_, _ = w.Write([]byte(`[{"number": 77, "title": "Minion review log", "body": "<!-- minion-review-log -->\nlog"}]`))
-		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/comments"), r.URL.Path == "/repos/partio-io/cli/pulls":
+		case r.Method == http.MethodGet && (strings.HasSuffix(r.URL.Path, "/comments") || strings.HasSuffix(r.URL.Path, "/timeline")),
+			r.URL.Path == "/repos/partio-io/cli/pulls":
 			_, _ = w.Write([]byte(`[]`))
 		case r.Method == http.MethodGet:
 			_, _ = w.Write([]byte(`{}`))

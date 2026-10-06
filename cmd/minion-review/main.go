@@ -157,7 +157,15 @@ func gate(args []string) int {
 	case build:
 		suffix = " (build)"
 	}
-	fmt.Println("minion-review:", res.Outcome+suffix)
+	// A facts-only check ignored the outcome: only the premise acted.
+	outcome := res.Outcome
+	switch {
+	case res.FactsOnly && res.Blocked:
+		outcome = "facts only, blocked"
+	case res.FactsOnly:
+		outcome = "facts only, proceeds"
+	}
+	fmt.Println("minion-review:", outcome+suffix)
 	return 0
 }
 

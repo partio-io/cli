@@ -131,7 +131,7 @@ func TestGateReadsThisRunsVerdict(t *testing.T) {
 }
 
 // gateGuard is the condition that keeps a step from running once the review
-// has closed the issue.
+// has closed the issue, or has blocked a facts-only issue on its premise.
 const gateGuard = "steps.gate.outputs.blocked != 'true'"
 
 // researchGuard is the condition that keeps a step from running once research
@@ -226,9 +226,12 @@ func TestBlockedBuildOpensNoPullRequestAndCreatesNoBranch(t *testing.T) {
 	}
 }
 
-// TestBlockedBuildIsNeitherDoneNorFailed pins that a close is a block, not a
-// completion and not a failure: the gate's comment explains the close, and no
-// workflow step marks the issue done or failed after it.
+// TestBlockedBuildIsNeitherDoneNorFailed pins that a block is not a completion
+// and not a failure: the gate's comment explains it, and no workflow step marks
+// the issue done or failed after it. A block is a close, or, on an issue the
+// review checks facts only on, a premise that fails or is unresolved. The gate
+// half of the facts-only case is TestBlockedBuildNeverClosesTheIssue and
+// TestOperatorOverrulesTheBuildByRemovingTheLabel in the review package.
 func TestBlockedBuildIsNeitherDoneNorFailed(t *testing.T) {
 	src := readRepoFile(t, reviewProgram)
 	for _, token := range []string{"gh issue close", "minion-done", BlockingLabel} {

@@ -31,6 +31,7 @@ func TestGateKeepActsOnTheIssue(t *testing.T) {
 	}
 	want := []string{
 		"GET /repos/partio-io/cli/issues/12",
+		"GET /repos/partio-io/cli/issues/12/timeline",
 		"GET /repos/partio-io/cli/pulls",
 		"GET /repos/partio-io/cli/labels/minion-reviewed",
 		"GET /repos/partio-io/cli/issues/12/comments",
@@ -114,7 +115,7 @@ func TestGateCloseActsOnTheIssue(t *testing.T) {
 			if !res.Valid || res.Outcome != OutcomeClose {
 				t.Fatalf("Result = %+v, want a valid close", res)
 			}
-			want := []string{"GET /repos/partio-io/cli/issues/12"}
+			want := []string{"GET /repos/partio-io/cli/issues/12", "GET /repos/partio-io/cli/issues/12/timeline"}
 			if tt.reason == ReasonDuplicate {
 				want = append(want, "GET /repos/partio-io/cli/issues/13")
 			}
@@ -274,6 +275,7 @@ func TestGateRewriteActsOnTheIssue(t *testing.T) {
 	}
 	want := []string{
 		"GET /repos/partio-io/cli/issues/12",
+		"GET /repos/partio-io/cli/issues/12/timeline",
 		"GET /repos/partio-io/cli/pulls",
 		"GET /repos/partio-io/cli/labels/minion-reviewed",
 		"GET /repos/partio-io/cli/issues/12/comments",

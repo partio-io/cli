@@ -23,19 +23,23 @@ type fakeGitHub struct {
 	issues   map[int]map[string]any
 	labels   []string
 	comments map[int][]map[string]any
-	pulls    []map[string]any // each with "number", "state" and "head" (owner:branch)
+	timeline map[int][]map[string]any // each with "event", "created_at" and, for a comment, "body" and "updated_at"
+	pulls    []map[string]any         // each with "number", "state" and "head" (owner:branch)
 	nextID   int64
 	requests []string
 	srv      *httptest.Server
 }
 
+// newFakeGitHub seeds issues 12 and 13 as proposals, so the gate gives
+// them the full check.
 func newFakeGitHub() *fakeGitHub {
 	return &fakeGitHub{
 		issues: map[int]map[string]any{
-			12: issueJSON(12, "Add a retry to the pre-push hook", "body", nil),
-			13: issueJSON(13, "Cache the session index", "body", nil),
+			12: issueJSON(12, "Add a retry to the pre-push hook", "body", []string{proposalLabel}),
+			13: issueJSON(13, "Cache the session index", "body", []string{proposalLabel}),
 		},
 		comments: map[int][]map[string]any{},
+		timeline: map[int][]map[string]any{},
 		nextID:   500,
 	}
 }
@@ -137,6 +141,14 @@ func (f *fakeGitHub) server(t *testing.T) *httptest.Server {
 			cs = []map[string]any{}
 		}
 		write(w, http.StatusOK, cs)
+	})
+	mux.HandleFunc("GET "+base+"/issues/{n}/timeline", func(w http.ResponseWriter, r *http.Request) {
+		n, _ := strconv.Atoi(r.PathValue("n"))
+		events := f.timeline[n]
+		if events == nil {
+			events = []map[string]any{}
+		}
+		write(w, http.StatusOK, events)
 	})
 	mux.HandleFunc("POST "+base+"/issues/{n}/comments", func(w http.ResponseWriter, r *http.Request) {
 		n, _ := strconv.Atoi(r.PathValue("n"))

@@ -23,9 +23,11 @@ type Config struct {
 
 // Result is what the gate found in the verdict file.
 type Result struct {
-	Valid   bool
-	Outcome string // the verdict outcome when Valid
-	Cause   string // why there is no verdict when not Valid
+	Valid     bool
+	Outcome   string // the verdict outcome when Valid
+	Cause     string // why there is no verdict when not Valid
+	FactsOnly bool   // the gate applied only the premise, outside dry-run
+	Blocked   bool   // the build stops: a close, or a facts-only premise that blocks
 }
 
 // mark is the suffix of the verdict column: what kind of run wrote the
@@ -56,7 +58,9 @@ func (c Config) client() github.Client {
 // proposed text. Outside dry-run a
 // verdict the gate cannot act on is no verdict: a closed issue, a pull
 // request, or a duplicate close whose kept issue is not open. A build
-// run acts as a real run does, and its row carries the build mark.
+// run acts as a real run does, and its row carries the build mark. On
+// an issue the operator wrote, the gate checks facts only: it applies
+// the premise of the verdict and ignores its outcome.
 func Run(cfg Config) (Result, error) {
 	gh := cfg.client()
 	issue, err := gh.GetIssue(cfg.Repo, cfg.Issue)
@@ -65,15 +69,22 @@ func Run(cfg Config) (Result, error) {
 	}
 
 	res := Result{}
+	if !cfg.DryRun {
+		if res.FactsOnly, err = checksFactsOnly(gh, cfg.Repo, issue); err != nil {
+			return Result{}, err
+		}
+	}
 	v, err := LoadVerdict(cfg.VerdictPath, cfg.Issue)
 	badShape := false
-	if err == nil && v.Outcome == OutcomeRewrite {
+	// A facts-only check never uses the rewrite text, so its shape
+	// does not matter.
+	if err == nil && v.Outcome == OutcomeRewrite && !res.FactsOnly {
 		err = checkShape(issue.Body, *v.Rewrite)
 		badShape = err != nil
 	}
 	var kept *github.Issue
 	if err == nil && !cfg.DryRun {
-		kept, err = actable(gh, cfg.Repo, issue, v)
+		kept, err = actable(gh, cfg.Repo, issue, v, res.FactsOnly)
 		var no refusal
 		if err != nil && !errors.As(err, &no) {
 			return Result{}, err
@@ -94,9 +105,19 @@ func Run(cfg Config) (Result, error) {
 		}
 	} else {
 		res.Valid, res.Outcome = true, v.Outcome
+		res.Blocked = v.Outcome == OutcomeClose
+		if res.FactsOnly {
+			res.Blocked = premiseBlocks(v)
+		}
 		r = row(issue, v, cfg.mark())
 	}
-	if res.Valid && !cfg.DryRun {
+	switch {
+	case !res.Valid || cfg.DryRun:
+	case res.FactsOnly:
+		if err := actFactsOnly(gh, cfg.Repo, issue, v); err != nil {
+			return Result{}, err
+		}
+	default:
 		if err := act(gh, cfg.Repo, issue, v, kept); err != nil {
 			return Result{}, err
 		}

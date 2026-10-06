@@ -30,14 +30,15 @@ func (r refusal) Error() string { return string(r) }
 
 // actable checks, outside dry-run, that the gate can act on v for
 // issue: an open issue and not a pull request, and for a duplicate
-// close an open kept issue, which it returns.
-func actable(gh github.Client, repo string, issue github.Issue, v Verdict) (*github.Issue, error) {
+// close an open kept issue, which it returns. A facts-only check never
+// closes, so it needs no kept issue.
+func actable(gh github.Client, repo string, issue github.Issue, v Verdict, factsOnly bool) (*github.Issue, error) {
 	switch {
 	case issue.PullRequest != nil:
 		return nil, refusal(fmt.Sprintf("#%d is a pull request: the gate never changes one", issue.Number))
 	case issue.State != "open":
 		return nil, refusal(fmt.Sprintf("#%d is %s: the gate acts on open issues only", issue.Number, issue.State))
-	case v.Outcome != OutcomeClose || v.CloseReason != ReasonDuplicate:
+	case factsOnly || v.Outcome != OutcomeClose || v.CloseReason != ReasonDuplicate:
 		return nil, nil
 	}
 	kept, err := gh.GetIssue(repo, v.DuplicateOf)
