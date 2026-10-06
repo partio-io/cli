@@ -1,0 +1,23 @@
+/code-execute-issue docs/2026-10-06-proposal-review/issues/08-nightly-sweep.md
+
+---
+
+<task-notification>
+<task-id>a5b386b2fa6b86e0c</task-id>
+<tool-use-id>toolu_01TxzTqAdPd2CJRKu4WFTdpR</tool-use-id>
+<output-file>/tmp/claude-1000/-home-arvos-Code-workspaces-workspace-minion-reboot-cli/c17e6c85-2a06-4370-9226-1f4e4e69c266/tasks/a5b386b2fa6b86e0c.output</output-file>
+<status>completed</status>
+<summary>Agent "Spec check slice 08" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>```text
+(a) Missing or partly done
+- "Tests for `next` and the totals run against a fake GitHub server, and repo tests pin the schedule, the variable check and the window." — internal/review/log_summary_test.go is the only test of the row parser of the totals, but it is untracked and not marked with `git add -N`, so the slice leaves it out.
+(b) Not asked for
+- internal/review/log_summary.go: "case !dryRun:\n\tdelete(failed, issue)" and "needsYou []int // issues with noVerdictLimit \"no verdict\" rows since their last acted verdict" — the issue says to skip an issue that has two "no verdict" rows, and nothing in it says an acted verdict resets the count.
+- internal/review/log_summary.go: "| Verdict | Rows | Dry run |" and "type tally map[string]struct{ rows, dryRun int }" — the issue asks for totals per verdict and per close reason, not for a separate dry-run count in each total.
+(c) Looks done, but wrong
+none
+Total: (a) 1, (b) 2, (c) 0.
+```</result>
+<usage><subagent_tokens>47984</subagent_tokens><tool_uses>4</tool_uses><duration_ms>48599</duration_ms></usage>
+</task-notification>
