@@ -1,0 +1,39 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "a21c55604bf7",
+  "strategy": "manual-commit",
+  "branch": "proposal-review",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "cmd/minion-review/main.go",
+    "cmd/minion-review/main_test.go",
+    "docs/2026-10-06-proposal-review/issues.md",
+    "docs/2026-10-06-proposal-review/issues/10-facts-only-for-operator-issues.md",
+    "internal/github/timeline.go",
+    "internal/github/timeline_test.go",
+    "internal/premise/repo_build_test.go",
+    "internal/review/act.go",
+    "internal/review/act_test.go",
+    "internal/review/build_outputs.go",
+    "internal/review/evidence_comment.go",
+    "internal/review/facts_only.go",
+    "internal/review/facts_only_test.go",
+    "internal/review/gate.go",
+    "internal/review/gate_test.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/a2/1c55604bf7/0/metadata.json",
+      "transcript": "/a2/1c55604bf7/0/full.jsonl",
+      "content_hash": "/a2/1c55604bf7/0/content_hash.txt",
+      "prompt": "/a2/1c55604bf7/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 90,
+    "cache_creation_tokens": 131888,
+    "cache_read_tokens": 4160584,
+    "output_tokens": 43439,
+    "api_call_count": 45
+  }
+}
