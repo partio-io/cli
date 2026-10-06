@@ -11,7 +11,7 @@ Source: [prd.md](./prd.md)
 | [x]  | 5 | [Duplicate search](./issues/05-duplicate-search.md) | [#4](./issues/04-review-program-and-dry-run-dispatch.md) |
 | [x]  | 6 | [Sweep acts on keep and close](./issues/06-sweep-acts-on-keep-and-close.md) | [#4](./issues/04-review-program-and-dry-run-dispatch.md) |
 | [x]  | 7 | [Sweep acts on rewrites](./issues/07-sweep-acts-on-rewrites.md) | [#6](./issues/06-sweep-acts-on-keep-and-close.md) |
-| [ ]  | 8 | [Nightly sweep](./issues/08-nightly-sweep.md) | [#6](./issues/06-sweep-acts-on-keep-and-close.md) |
+| [x]  | 8 | [Nightly sweep](./issues/08-nightly-sweep.md) | [#6](./issues/06-sweep-acts-on-keep-and-close.md) |
 | [ ]  | 9 | [Review before each build](./issues/09-review-before-each-build.md) | [#7](./issues/07-sweep-acts-on-rewrites.md) |
 | [ ]  | 10 | [Facts-only check for the operator's issues](./issues/10-facts-only-for-operator-issues.md) | [#9](./issues/09-review-before-each-build.md) |
 | [ ]  | 11 | [Proposer duplicate fix](./issues/11-proposer-duplicate-fix.md) | [#5](./issues/05-duplicate-search.md), [#6](./issues/06-sweep-acts-on-keep-and-close.md) |

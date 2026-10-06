@@ -41,6 +41,7 @@ func TestGateKeepActsOnTheIssue(t *testing.T) {
 		"GET /repos/partio-io/cli/issues",
 		"GET /repos/partio-io/cli/issues/77/comments",
 		"POST /repos/partio-io/cli/issues/77/comments",
+		"PATCH /repos/partio-io/cli/issues/77",
 	}
 	if !slices.Equal(gh.requests, want) {
 		t.Fatalf("requests:\n%s\nwant:\n%s", strings.Join(gh.requests, "\n"), strings.Join(want, "\n"))
@@ -127,6 +128,7 @@ func TestGateCloseActsOnTheIssue(t *testing.T) {
 				"GET /repos/partio-io/cli/issues",
 				"GET /repos/partio-io/cli/issues/77/comments",
 				"POST /repos/partio-io/cli/issues/77/comments",
+				"PATCH /repos/partio-io/cli/issues/77",
 			)
 			if !slices.Equal(gh.requests, want) {
 				t.Fatalf("requests:\n%s\nwant:\n%s", strings.Join(gh.requests, "\n"), strings.Join(want, "\n"))
@@ -223,7 +225,7 @@ func TestGateNamesTheOlderBuildPullRequest(t *testing.T) {
 				// A pull request is also an issue: only #12 and the
 				// tracking issue may take a write.
 				if !strings.HasPrefix(path, "/repos/partio-io/cli/issues/12/") && path != "/repos/partio-io/cli/issues/12" &&
-					!strings.HasPrefix(path, "/repos/partio-io/cli/issues/77/") {
+					!strings.HasPrefix(path, "/repos/partio-io/cli/issues/77/") && path != "/repos/partio-io/cli/issues/77" {
 					t.Errorf("gate wrote outside the reviewed and tracking issues: %s", r)
 				}
 			}
@@ -282,6 +284,7 @@ func TestGateRewriteActsOnTheIssue(t *testing.T) {
 		"GET /repos/partio-io/cli/issues",
 		"GET /repos/partio-io/cli/issues/77/comments",
 		"POST /repos/partio-io/cli/issues/77/comments",
+		"PATCH /repos/partio-io/cli/issues/77",
 	}
 	if !slices.Equal(gh.requests, want) {
 		t.Fatalf("requests:\n%s\nwant:\n%s", strings.Join(gh.requests, "\n"), strings.Join(want, "\n"))
@@ -375,7 +378,7 @@ func TestGateRefusesWhatItCannotActOn(t *testing.T) {
 			}
 			for _, r := range gh.requests {
 				method, path, _ := strings.Cut(r, " ")
-				if method != "GET" && !strings.HasPrefix(path, "/repos/partio-io/cli/issues/77/") {
+				if method != "GET" && !strings.HasPrefix(path, "/repos/partio-io/cli/issues/77/") && path != "/repos/partio-io/cli/issues/77" {
 					t.Errorf("gate changed something it refused: %s", r)
 				}
 			}

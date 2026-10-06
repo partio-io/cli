@@ -305,6 +305,7 @@ func TestGateDryRunValidVerdictWritesOneRow(t *testing.T) {
 		"POST /repos/partio-io/cli/issues",
 		"GET /repos/partio-io/cli/issues/902/comments",
 		"POST /repos/partio-io/cli/issues/902/comments",
+		"PATCH /repos/partio-io/cli/issues/902",
 	}
 	if !slices.Equal(gh.requests, want) {
 		t.Fatalf("requests:\n%s\nwant:\n%s", strings.Join(gh.requests, "\n"), strings.Join(want, "\n"))

@@ -2,8 +2,10 @@ package premise
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -201,24 +203,25 @@ func TestReviewRewriteKeepsTheIdea(t *testing.T) {
 	}
 }
 
-// TestSweepIsDispatchedByHand checks the sweep's only trigger in this version:
-// a manual dispatch with a list of issues and a dry-run flag that defaults to
-// true. Every issue runs in one job, so the issues run in sequence.
-func TestSweepIsDispatchedByHand(t *testing.T) {
+// TestSweepRunsByHandAndAtNight pins the two triggers: a schedule at 23:00 UTC
+// and a dispatch with an issue list, a sample size and the dry-run flag.
+func TestSweepRunsByHandAndAtNight(t *testing.T) {
 	src := readRepoFile(t, sweepWorkflow)
-	jobs := strings.Index(src, "\njobs:")
-	if jobs < 0 {
-		t.Fatalf("%s has no jobs: section", sweepWorkflow)
-	}
-	on := src[:jobs]
-	for _, want := range []string{"workflow_dispatch:", "issues:", "dry_run:", "default: true", "type: boolean"} {
+	on := sweepTriggers(t, src)
+	for _, want := range []string{
+		"workflow_dispatch:", "issues:", "sample:", "dry_run:", "default: true", "type: boolean",
+		"schedule:", `- cron: "0 23 * * *"`,
+	} {
 		if !strings.Contains(on, want) {
-			t.Errorf("%s dispatch does not carry %q", sweepWorkflow, want)
+			t.Errorf("%s triggers do not carry %q", sweepWorkflow, want)
 		}
 	}
-	for _, trigger := range []string{"schedule:", "pull_request:", "issues:\n    types"} {
+	if n := strings.Count(on, "cron:"); n != 1 {
+		t.Errorf("%s has %d schedules, want the one at 23:00 UTC", sweepWorkflow, n)
+	}
+	for _, trigger := range []string{"pull_request:", "issues:\n    types"} {
 		if strings.Contains(on, trigger) {
-			t.Errorf("%s carries the trigger %q; this version is dispatched by hand only", sweepWorkflow, trigger)
+			t.Errorf("%s carries the trigger %q", sweepWorkflow, trigger)
 		}
 	}
 
@@ -243,11 +246,39 @@ func TestSweepIsDispatchedByHand(t *testing.T) {
 	}
 }
 
-// TestSweepPassesTheDryRunInput checks that the dispatch's dry_run input
-// reaches the gate, so a dispatch with dry_run false acts on the issues.
+// sweepTriggers returns the text of the sweep workflow before its jobs.
+func sweepTriggers(t *testing.T, src string) string {
+	t.Helper()
+	jobs := strings.Index(src, "\njobs:")
+	if jobs < 0 {
+		t.Fatalf("%s has no jobs: section", sweepWorkflow)
+	}
+	return src[:jobs]
+}
+
+// TestSweepActsAtNightOnlyWhenSwitchedOn pins the operator's switch: the job
+// of a scheduled run is skipped unless PROPOSAL_REVIEW_SWEEP is on, so the run
+// ends at once. A scheduled run has no inputs, so it is not a dry run.
+func TestSweepActsAtNightOnlyWhenSwitchedOn(t *testing.T) {
+	src := readRepoFile(t, sweepWorkflow)
+	job := src[strings.Index(src, "\njobs:"):]
+	steps := strings.Index(job, "\n    steps:")
+	if steps < 0 {
+		t.Fatalf("%s job has no steps", sweepWorkflow)
+	}
+	const gate = "if: github.event_name != 'schedule' || vars.PROPOSAL_REVIEW_SWEEP == 'on'"
+	if !strings.Contains(job[:steps], "\n    "+gate+"\n") {
+		t.Errorf("%s job does not carry %q", sweepWorkflow, gate)
+	}
+	const dryRun = "DRY_RUN: ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run }}"
+	if !strings.Contains(src, dryRun) {
+		t.Errorf("%s does not carry %q", sweepWorkflow, dryRun)
+	}
+}
+
 func TestSweepPassesTheDryRunInput(t *testing.T) {
 	src := readRepoFile(t, sweepWorkflow)
-	if !strings.Contains(src, "DRY_RUN: ${{ inputs.dry_run }}") {
+	if !strings.Contains(src, "|| inputs.dry_run }}") {
 		t.Errorf("%s does not hand the dry_run input to the step", sweepWorkflow)
 	}
 	if strings.Contains(src, "Only a dry run") {
@@ -257,6 +288,93 @@ func TestSweepPassesTheDryRunInput(t *testing.T) {
 	gate := loop[strings.Index(loop, reviewGateRun):]
 	if !strings.Contains(gate, `--dry-run="$DRY_RUN"`) {
 		t.Errorf("the gate call does not pass the dry_run input:\n%s", gate)
+	}
+}
+
+// TestSweepTakesNoIssueAfterTheWindow runs the window check of the loop with a
+// fake clock: a scheduled run takes an issue from 23:00 to 04:59 UTC and none
+// after, and a dispatch takes one at any hour.
+func TestSweepTakesNoIssueAfterTheWindow(t *testing.T) {
+	src := readRepoFile(t, sweepWorkflow)
+	if !strings.Contains(src, "EVENT: ${{ github.event_name }}") {
+		t.Fatalf("%s does not hand the event name to the step", sweepWorkflow)
+	}
+	loop := sweepLoop(t)
+	start := strings.Index(loop, "HOUR=$(date -u +%H)")
+	if start < 0 || start > strings.Index(loop, reviewRun) {
+		t.Fatalf("the loop reads no UTC hour before the review:\n%s", loop)
+	}
+	end := strings.Index(loop[start:], "\n            fi")
+	if end < 0 {
+		t.Fatalf("the window check has no fi:\n%s", loop[start:])
+	}
+	check := loop[start : start+end+len("\n            fi")]
+
+	bin := t.TempDir()
+	clock := "#!/bin/sh\necho \"$FAKE_HOUR\"\n"
+	if err := os.WriteFile(filepath.Join(bin, "date"), []byte(clock), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		event, hour string
+		take        bool
+	}{
+		{"schedule", "23", true},
+		{"schedule", "00", true},
+		{"schedule", "04", true},
+		{"schedule", "05", false},
+		{"schedule", "08", false},
+		{"schedule", "12", false},
+		{"schedule", "22", false},
+		{"workflow_dispatch", "12", true},
+		{"workflow_dispatch", "05", true},
+	}
+	for _, tt := range tests {
+		script := "for ISSUE in 30; do\n" + check + "\necho took\ndone\n"
+		cmd := exec.Command("bash", "-e", "-c", script)
+		cmd.Env = append(os.Environ(), "PATH="+bin+":"+os.Getenv("PATH"), "EVENT="+tt.event, "FAKE_HOUR="+tt.hour)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("%s at %s: the window check failed: %v\n%s", tt.event, tt.hour, err, out)
+		}
+		if took := strings.Contains(string(out), "took"); took != tt.take {
+			t.Errorf("%s at %s:00 UTC: took an issue = %v, want %v\n%s", tt.event, tt.hour, took, tt.take, out)
+		}
+	}
+}
+
+// TestSweepPicksItsOwnBatch pins the batch: without an issue list the sweep
+// asks minion-review next, with the sample size when the dispatch gives one.
+func TestSweepPicksItsOwnBatch(t *testing.T) {
+	src := readRepoFile(t, sweepWorkflow)
+	for _, want := range []string{
+		"SAMPLE: ${{ inputs.sample }}",
+		"go run ./cmd/minion-review next)",
+		`go run ./cmd/minion-review next --sample "$SAMPLE")`,
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("%s does not carry %q", sweepWorkflow, want)
+		}
+	}
+}
+
+// TestSweepRunsAlone pins the concurrency group, so two sweep runs never edit
+// the tracking issue at once, and a job timeout that covers the window, 23:00
+// to 05:00 UTC, plus the last issue.
+func TestSweepRunsAlone(t *testing.T) {
+	src := readRepoFile(t, sweepWorkflow)
+	on := sweepTriggers(t, src)
+	for _, want := range []string{"\nconcurrency:\n  group: proposal-review\n  cancel-in-progress: false\n"} {
+		if !strings.Contains(on, want) {
+			t.Errorf("%s does not carry the top-level %q", sweepWorkflow, want)
+		}
+	}
+	m := regexp.MustCompile(`(?m)^    timeout-minutes: (\d+)$`).FindStringSubmatch(src)
+	if m == nil {
+		t.Fatalf("%s job has no timeout-minutes", sweepWorkflow)
+	}
+	if minutes, _ := strconv.Atoi(m[1]); minutes < 6*60+60 {
+		t.Errorf("job timeout is %d minutes, want the 6-hour window plus an hour for the last issue", minutes)
 	}
 }
 

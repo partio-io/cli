@@ -132,3 +132,41 @@ func TestGatePassesTheDryRunValue(t *testing.T) {
 		})
 	}
 }
+
+func TestNextPrintsOneIssuePerLine(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/partio-io/cli/issues" || r.URL.Query().Get("labels") != "minion-proposal" {
+			_, _ = w.Write([]byte(`[]`))
+			return
+		}
+		_, _ = w.Write([]byte(`[
+			{"number": 40, "title": "b", "state": "open", "created_at": "2026-09-02T10:00:00Z",
+			 "labels": [{"name": "minion-proposal"}]},
+			{"number": 31, "title": "a", "state": "open", "created_at": "2026-08-01T10:00:00Z",
+			 "labels": [{"name": "minion-proposal"}]}
+		]`))
+	}))
+	defer srv.Close()
+	t.Setenv("GITHUB_REPOSITORY", "partio-io/cli")
+	t.Setenv("GH_TOKEN", "tok")
+	t.Setenv("GITHUB_API_URL", srv.URL)
+
+	var out bytes.Buffer
+	if code := next(nil, &out); code != 0 {
+		t.Fatalf("next exit %d, output %q", code, out.String())
+	}
+	if out.String() != "31\n40\n" {
+		t.Errorf("next printed %q, want %q", out.String(), "31\n40\n")
+	}
+}
+
+func TestNextRefusesABadSample(t *testing.T) {
+	t.Setenv("GITHUB_REPOSITORY", "partio-io/cli")
+	t.Setenv("GH_TOKEN", "tok")
+	for _, args := range [][]string{{"--sample", "0"}, {"--sample=-3"}, {"--sample", "x"}} {
+		var out bytes.Buffer
+		if code := next(args, &out); code != 2 {
+			t.Errorf("next %q exit %d, want 2", args, code)
+		}
+	}
+}

@@ -26,72 +26,100 @@ func NightMarker(night string) string {
 	return "<!-- minion-review-night " + night + " -->"
 }
 
-// findOrCreateTracking returns the number of the tracking issue. When
-// there is none it creates the label, if absent, and the issue.
-func findOrCreateTracking(gh github.Client, repo string) (int, error) {
+// findTracking returns the tracking issue, or nil when there is none.
+func findTracking(gh github.Client, repo string) (*github.Issue, error) {
 	issues, err := gh.OpenIssuesWithLabel(repo, TrackingLabel)
 	if err != nil {
-		return 0, fmt.Errorf("find tracking issue: %w", err)
+		return nil, fmt.Errorf("find tracking issue: %w", err)
 	}
 	for _, is := range issues {
 		first, _, _ := strings.Cut(is.Body, "\n")
 		if strings.TrimSpace(first) == TrackingMarker {
-			return is.Number, nil
+			return &is, nil
 		}
 	}
+	return nil, nil
+}
+
+// findOrCreateTracking returns the tracking issue. When there is none
+// it creates the label, if absent, and the issue.
+func findOrCreateTracking(gh github.Client, repo string) (github.Issue, error) {
+	found, err := findTracking(gh, repo)
+	if err != nil {
+		return github.Issue{}, err
+	}
+	if found != nil {
+		return *found, nil
+	}
 	if err := gh.EnsureLabel(repo, TrackingLabel, "5319e7", "Tracking issue of the minion proposal review"); err != nil {
-		return 0, fmt.Errorf("create tracking label: %w", err)
+		return github.Issue{}, fmt.Errorf("create tracking label: %w", err)
 	}
 	created, err := gh.CreateIssue(repo, trackingTitle, trackingBody, []string{TrackingLabel})
 	if err != nil {
-		return 0, fmt.Errorf("create tracking issue: %w", err)
+		return github.Issue{}, fmt.Errorf("create tracking issue: %w", err)
 	}
-	return created.Number, nil
+	return created, nil
 }
 
 // maxCommentBody is GitHub's limit on a comment body. GitHub counts
 // characters; the gate counts bytes, which is never fewer.
 const maxCommentBody = 65536
 
+// nightPrefix starts the marker of every night comment.
+var nightPrefix, _, _ = strings.Cut(NightMarker(""), " -->")
+
 // appendRow adds r to the last night comment on the tracking issue. It
 // creates that comment for the first row of the night, and a
 // continuation comment when r would push the last one past GitHub's
 // size limit: rewrite rows carry full bodies, so a busy night outgrows
-// one comment.
-func appendRow(gh github.Client, repo string, tracking int, night, r string) error {
+// one comment. It returns the bodies of every night comment, oldest
+// first, with r in place.
+func appendRow(gh github.Client, repo string, tracking int, night, r string) ([]string, error) {
 	marker := NightMarker(night)
-	last, err := lastComment(gh, repo, tracking, marker)
+	nights, err := nightComments(gh, repo, tracking)
 	if err != nil {
-		return fmt.Errorf("find night comment: %w", err)
+		return nil, fmt.Errorf("find night comment: %w", err)
 	}
-	if last != nil {
-		body := strings.TrimRight(last.Body, "\n") + "\n" + r
+	last := -1
+	for i, cm := range nights {
+		if strings.HasPrefix(cm.Body, marker) {
+			last = i
+		}
+	}
+	bodies := make([]string, len(nights))
+	for i, cm := range nights {
+		bodies[i] = cm.Body
+	}
+	if last >= 0 {
+		body := strings.TrimRight(nights[last].Body, "\n") + "\n" + r
 		if len(body) <= maxCommentBody {
-			if err := gh.UpdateComment(repo, last.ID, body); err != nil {
-				return fmt.Errorf("update night comment: %w", err)
+			if err := gh.UpdateComment(repo, nights[last].ID, body); err != nil {
+				return nil, fmt.Errorf("update night comment: %w", err)
 			}
-			return nil
+			bodies[last] = body
+			return bodies, nil
 		}
 	}
 	heading := "### Review night " + night
-	if last != nil {
+	if last >= 0 {
 		heading += " (continued)"
 	}
-	if err := gh.CreateComment(repo, tracking, marker+"\n"+heading+"\n\n"+r); err != nil {
-		return fmt.Errorf("create night comment: %w", err)
+	body := marker + "\n" + heading + "\n\n" + r
+	if err := gh.CreateComment(repo, tracking, body); err != nil {
+		return nil, fmt.Errorf("create night comment: %w", err)
 	}
-	return nil
+	return append(bodies, body), nil
 }
 
-// lastComment returns the last comment on issue number whose body
-// starts with prefix, or nil when none does.
-func lastComment(gh github.Client, repo string, number int, prefix string) (*github.Comment, error) {
-	var last *github.Comment
-	path := fmt.Sprintf("/repos/%s/issues/%d/comments", repo, number)
+// nightComments returns the night comments on the tracking issue,
+// oldest first.
+func nightComments(gh github.Client, repo string, tracking int) ([]github.Comment, error) {
+	var out []github.Comment
+	path := fmt.Sprintf("/repos/%s/issues/%d/comments", repo, tracking)
 	err := github.GetPages(gh, path, 0, func(comments []github.Comment) bool {
 		for _, cm := range comments {
-			if strings.HasPrefix(cm.Body, prefix) {
-				last = &cm
+			if strings.HasPrefix(cm.Body, nightPrefix) {
+				out = append(out, cm)
 			}
 		}
 		return true
@@ -99,5 +127,15 @@ func lastComment(gh github.Client, repo string, number int, prefix string) (*git
 	if err != nil {
 		return nil, fmt.Errorf("list comments: %w", err)
 	}
-	return last, nil
+	return out, nil
+}
+
+// writeSummary replaces the tracking issue body with the summary of
+// the night comments, so the body cannot drift from the rows.
+func writeSummary(gh github.Client, repo string, tracking github.Issue, nights []string) error {
+	body := trackingBody + "\n" + summarize(nights).markdown()
+	if err := gh.EditIssue(repo, tracking.Number, tracking.Title, body); err != nil {
+		return fmt.Errorf("write tracking summary: %w", err)
+	}
+	return nil
 }

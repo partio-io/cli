@@ -13,9 +13,16 @@
 // the same idea as one issue, by source item or by title, and prints
 // them as JSON. The review program calls it; it changes nothing.
 //
-// Exit codes: 0 for a valid verdict or a dupes list; 1 for no verdict,
-// after its row is written, or for a GitHub failure; 2 for a usage or
-// environment error.
+// Its next subcommand prints the issues the sweep reviews next, one
+// number per line: the open minion-proposal issues without
+// minion-reviewed, approved ones first, then oldest first. It skips an
+// issue the tracking issue lists under "needs you". With --sample N it
+// prints N of them, spread across the filing months, for a dry run. It
+// changes nothing.
+//
+// Exit codes: 0 for a valid verdict, a dupes list or a batch; 1 for
+// no verdict, after its row is written, or for a GitHub failure; 2 for
+// a usage or environment error.
 package main
 
 import (
@@ -34,7 +41,8 @@ import (
 const (
 	gateUsage  = "usage: minion-review gate --issue <number> --verdict <path> [--dry-run] [--night YYYY-MM-DD]"
 	dupesUsage = "usage: minion-review dupes --title <title> [--source <ref>]... [--exclude <number>]"
-	usage      = gateUsage + "\n" + dupesUsage
+	nextUsage  = "usage: minion-review next [--sample <n>]"
+	usage      = gateUsage + "\n" + dupesUsage + "\n" + nextUsage
 )
 
 func main() {
@@ -47,6 +55,8 @@ func main() {
 		os.Exit(gate(os.Args[2:]))
 	case "dupes":
 		os.Exit(dupes(os.Args[2:], os.Stdout))
+	case "next":
+		os.Exit(next(os.Args[2:], os.Stdout))
 	default:
 		fmt.Fprintln(os.Stderr, usage)
 		os.Exit(2)
@@ -166,6 +176,39 @@ func dupes(args []string, stdout io.Writer) int {
 	if err := enc.Encode(found); err != nil {
 		fmt.Fprintf(os.Stderr, "minion-review: %v\n", err)
 		return 1
+	}
+	return 0
+}
+
+func next(args []string, stdout io.Writer) int {
+	fs := flag.NewFlagSet("next", flag.ContinueOnError)
+	sample := fs.Int("sample", 0, "pick n issues spread across the filing months, for a dry run")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	sampled := false
+	fs.Visit(func(f *flag.Flag) { sampled = sampled || f.Name == "sample" })
+	if fs.NArg() > 0 || *sample < 0 || (sampled && *sample == 0) {
+		fmt.Fprintln(os.Stderr, nextUsage)
+		return 2
+	}
+	repo, token, api, ok := githubEnv()
+	if !ok {
+		return 2
+	}
+
+	numbers, err := review.Next(github.Client{BaseURL: api, Token: token}, review.NextQuery{
+		Repo: repo, Sample: *sample,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "minion-review: %v\n", err)
+		return 1
+	}
+	for _, n := range numbers {
+		if _, err := fmt.Fprintln(stdout, n); err != nil {
+			fmt.Fprintf(os.Stderr, "minion-review: %v\n", err)
+			return 1
+		}
 	}
 	return 0
 }

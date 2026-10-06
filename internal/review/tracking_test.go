@@ -60,6 +60,7 @@ func TestGateDryRunChangesNothingOnTheReviewedIssue(t *testing.T) {
 				"GET /repos/partio-io/cli/issues",
 				"GET /repos/partio-io/cli/issues/77/comments",
 				"POST /repos/partio-io/cli/issues/77/comments",
+				"PATCH /repos/partio-io/cli/issues/77",
 			}
 			if !slices.Equal(gh.requests, want) {
 				t.Fatalf("requests:\n%s\nwant:\n%s", strings.Join(gh.requests, "\n"), strings.Join(want, "\n"))
@@ -294,5 +295,45 @@ func TestGateRewriteBodyStaysInsideItsSection(t *testing.T) {
 	body := gh.comments[tracking][0]["body"].(string)
 	if !strings.Contains(body, "  ````markdown\n") || !strings.Contains(body, "  unclosed\n") || !strings.Contains(body, "  Proposal id: retry-pre-push\n  ````\n") {
 		t.Errorf("rewrite body is not fenced past its own fences:\n%s", body)
+	}
+}
+
+// The tracking issue body carries totals per verdict and per close
+// reason, recomputed from every night comment after each row.
+func TestGateRecomputesTheTotalsAfterEachRow(t *testing.T) {
+	gh := newFakeGitHub()
+	tracking := gh.trackingIssue(77)
+	body := func() string { return gh.issues[tracking]["body"].(string) }
+
+	runGate(t, gh, 12, writeVerdict(t, keepVerdict), "2026-10-05")
+	if !strings.Contains(body(), "| keep | 1 | 1 |") {
+		t.Fatalf("totals after the first row:\n%s", body())
+	}
+
+	runGate(t, gh, 12, writeVerdict(t, closeVerdictFor(ReasonBuilt)), "2026-10-05")
+	runGate(t, gh, 12, writeVerdict(t, closeVerdictFor(ReasonDuplicate)), "2026-10-06")
+	runGate(t, gh, 12, writeVerdict(t, closeVerdictFor(ReasonDuplicate)), "2026-10-06")
+	runGate(t, gh, 12, t.TempDir()+"/absent.json", "2026-10-06")
+	runAct(t, gh, 12, writeVerdict(t, keepVerdict))
+
+	for _, want := range []string{
+		"## Totals",
+		"| keep | 2 | 1 |",
+		"| rewrite | 0 | 0 |",
+		"| close | 3 | 3 |",
+		"| no verdict | 1 | - |",
+		"| built | 1 | 1 |",
+		"| false-premise | 0 | 0 |",
+		"| does-not-apply | 0 | 0 |",
+		"| duplicate | 2 | 2 |",
+		"| could-not-verify | 0 | 0 |",
+		"## Needs you",
+	} {
+		if !strings.Contains(body(), want) {
+			t.Errorf("tracking body lacks %q:\n%s", want, body())
+		}
+	}
+	if !strings.HasPrefix(body(), TrackingMarker+"\n") {
+		t.Errorf("tracking body lost its marker:\n%s", body())
 	}
 }

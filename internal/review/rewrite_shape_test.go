@@ -83,7 +83,7 @@ func TestGateInvalidRewriteIsNoVerdict(t *testing.T) {
 				}
 				for _, r := range gh.requests {
 					method, path, _ := strings.Cut(r, " ")
-					if method != "GET" && !strings.HasPrefix(path, "/repos/partio-io/cli/issues/77/") {
+					if method != "GET" && !strings.HasPrefix(path, "/repos/partio-io/cli/issues/77/") && path != "/repos/partio-io/cli/issues/77" {
 						t.Errorf("gate changed the issue on an invalid rewrite: %s", r)
 					}
 				}

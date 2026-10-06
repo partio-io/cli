@@ -84,7 +84,11 @@ func Run(cfg Config) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if err := appendRow(gh, cfg.Repo, tracking, cfg.Night, r); err != nil {
+	nights, err := appendRow(gh, cfg.Repo, tracking.Number, cfg.Night, r)
+	if err != nil {
+		return Result{}, err
+	}
+	if err := writeSummary(gh, cfg.Repo, tracking, nights); err != nil {
 		return Result{}, err
 	}
 	return res, nil

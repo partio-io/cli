@@ -53,17 +53,17 @@ applies.
 
 ## Acceptance criteria
 
-- [ ] `next` returns open proposals without `minion-reviewed`, approved ones first, then by filing date, oldest first.
-- [ ] `next` skips an issue with two "no verdict" rows and lists it under "needs you" in the tracking issue body.
-- [ ] `next --sample N` returns N issues spread across filing months, and the same input gives the same sample.
-- [ ] The tracking issue body shows totals per verdict and per close reason, recomputed after each row.
-- [ ] The sweep workflow runs on a schedule at 23:00 UTC.
-- [ ] A scheduled run acts only when the repository variable `PROPOSAL_REVIEW_SWEEP` is `on`, and otherwise ends at once.
-- [ ] A scheduled run takes no new issue after 05:00 UTC, and a manual dispatch has no window.
-- [ ] A manual dispatch accepts a sample size as well as an issue list and the dry-run flag.
-- [ ] Two sweep runs never run at the same time.
-- [ ] Tests for `next` and the totals run against a fake GitHub server, and repo tests pin the schedule, the variable check and the window.
-- [ ] `make test` and `make lint` pass.
+- [x] `next` returns open proposals without `minion-reviewed`, approved ones first, then by filing date, oldest first.
+- [x] `next` skips an issue with two "no verdict" rows and lists it under "needs you" in the tracking issue body.
+- [x] `next --sample N` returns N issues spread across filing months, and the same input gives the same sample.
+- [x] The tracking issue body shows totals per verdict and per close reason, recomputed after each row.
+- [x] The sweep workflow runs on a schedule at 23:00 UTC.
+- [x] A scheduled run acts only when the repository variable `PROPOSAL_REVIEW_SWEEP` is `on`, and otherwise ends at once.
+- [x] A scheduled run takes no new issue after 05:00 UTC, and a manual dispatch has no window.
+- [x] A manual dispatch accepts a sample size as well as an issue list and the dry-run flag.
+- [x] Two sweep runs never run at the same time.
+- [x] Tests for `next` and the totals run against a fake GitHub server, and repo tests pin the schedule, the variable check and the window.
+- [x] `make test` and `make lint` pass.
 
 ## Modules touched
 
