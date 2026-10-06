@@ -1,0 +1,42 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "689c982b3c91",
+  "strategy": "manual-commit",
+  "branch": "proposal-review",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".github/workflows/proposal-review.yml",
+    "cmd/minion-review/main.go",
+    "cmd/minion-review/main_test.go",
+    "docs/2026-10-06-proposal-review/issues.md",
+    "docs/2026-10-06-proposal-review/issues/06-sweep-acts-on-keep-and-close.md",
+    "internal/github/close_issue.go",
+    "internal/github/issue.go",
+    "internal/github/issue_labels.go",
+    "internal/github/label_test.go",
+    "internal/github/pulls.go",
+    "internal/premise/repo_review_test.go",
+    "internal/review/act.go",
+    "internal/review/act_test.go",
+    "internal/review/evidence_comment.go",
+    "internal/review/gate.go",
+    "internal/review/gate_test.go",
+    "internal/review/list_proposals.go",
+    "internal/review/tracking_test.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/68/9c982b3c91/0/metadata.json",
+      "transcript": "/68/9c982b3c91/0/full.jsonl",
+      "content_hash": "/68/9c982b3c91/0/content_hash.txt",
+      "prompt": "/68/9c982b3c91/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 70,
+    "cache_creation_tokens": 107778,
+    "cache_read_tokens": 2724466,
+    "output_tokens": 32736,
+    "api_call_count": 35
+  }
+}
