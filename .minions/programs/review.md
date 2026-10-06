@@ -144,8 +144,8 @@ and do not decide it from memory of how similar projects work.
    false fact when the problem still exists and only the design takes
    the fact for granted: a design that respects the correct fact still
    solves the problem. Rewrite it. Give each failing claim a
-   `correction`, the fact that holds instead, and build the new body on
-   the corrections (step 7).
+   `correction`, the fact that holds instead, and turn each correction
+   into a criterion (step 7).
 
 7. **Compose the body for a keep or a rewrite.** Use the issue shape
    that the proposer files today, so that a build reads a reviewed issue
@@ -191,18 +191,25 @@ and do not decide it from memory of how similar projects work.
    - `Proposal id: <id>` is the last line. Keep the id the issue already
      carries. When it carries none, make a kebab-case id from its title.
 
-   A rewrite with a corrected premise rests on the correct facts. Its
-   premise block states each correction as a claim, with the evidence
-   that settles it. "What to build" and the acceptance criteria respect
-   the corrections: change each part that took a false fact for granted,
-   and keep the problem that the idea solves. Name each failing claim
-   and its correction in `rewrite.changes`.
+   A rewrite with a corrected premise designs nothing new. Its premise
+   block states each correction as a claim, with the evidence that
+   settles it. For each correction, add an acceptance criterion that a
+   build can test: what must stay true when the correct fact occurs.
+   For example, when the claim "the hook runs once per commit" fails, a
+   criterion states what must hold when the hook runs twice for one
+   commit. Then check each step, rule and reason in "What to build"
+   against each new criterion. Remove each one that breaks a criterion
+   or takes the false fact for granted. Add nothing in its place:
+   research designs the rest from the corrected issue. Name each failing
+   claim, its correction, each criterion you added and each part you
+   removed in `rewrite.changes`.
 
-   A rewrite changes the shape of the issue, and for a corrected premise
-   its design, but not its idea. Keep the original idea, and keep the
-   source link to the entireio/cli item it came from. Drop any
-   `<!-- program: … -->` pointer to a proposal file: proposal files no
-   longer exist, so the pointer leads nowhere.
+   A rewrite changes the shape of the issue, not its idea. For a
+   corrected premise, it also removes the design that rests on a false
+   fact. Keep the original idea, and keep the source link to the
+   entireio/cli item it came from. Drop any `<!-- program: … -->`
+   pointer to a proposal file: proposal files no longer exist, so the
+   pointer leads nowhere.
 
 8. **Write the verdict.** Write one JSON object to
    `$MINION_REVIEW_DIR/verdict.json`, in this form:

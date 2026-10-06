@@ -510,3 +510,10 @@ its branches can still diverge, and only its merge rule took append-only
 data for granted. This makes the known answer in Further Notes agree
 with the verdict rules, which had closed every issue with a failing
 claim.
+
+**2026-10-06, after the third dry run.** A rewrite with a corrected
+premise designs nothing new. It adds an acceptance criterion for each
+correction, and it removes each step of "What to build" that breaks a
+criterion or takes the false fact for granted. Research designs the
+rest. On #31 the review found the false fact, but its own design kept
+the union merge, which brings pruned checkpoints back.
