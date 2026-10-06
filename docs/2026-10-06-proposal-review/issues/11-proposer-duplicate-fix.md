@@ -45,15 +45,15 @@ headings.
 
 ## Acceptance criteria
 
-- [ ] The propose program checks for duplicates with `minion-review dupes`, by the idea's source item and title, across open and closed proposals.
-- [ ] It no longer searches open issues by the generated id.
-- [ ] It files no issue when a candidate is the same idea.
-- [ ] Its summary counts duplicates apart from filed, dropped and skipped items, and names the issue that each duplicate matched.
-- [ ] It adds `minion-reviewed` to each issue it files.
-- [ ] The propose workflow makes sure the `minion-reviewed` label exists before the program runs.
-- [ ] The propose program's instructions stay in its agents section, and the program-shape test passes.
-- [ ] The propose repo tests pin the duplicate command, the search of closed issues, the separate duplicate count and the label.
-- [ ] `make test` and `make lint` pass.
+- [x] The propose program checks for duplicates with `minion-review dupes`, by the idea's source item and title, across open and closed proposals.
+- [x] It no longer searches open issues by the generated id.
+- [x] It files no issue when a candidate is the same idea.
+- [x] Its summary counts duplicates apart from filed, dropped and skipped items, and names the issue that each duplicate matched.
+- [x] It adds `minion-reviewed` to each issue it files.
+- [x] The propose workflow makes sure the `minion-reviewed` label exists before the program runs.
+- [x] The propose program's instructions stay in its agents section, and the program-shape test passes.
+- [x] The propose repo tests pin the duplicate command, the search of closed issues, the separate duplicate count and the label.
+- [x] `make test` and `make lint` pass.
 
 ## Modules touched
 
