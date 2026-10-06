@@ -1,0 +1,37 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "2ba5512ade9c",
+  "strategy": "manual-commit",
+  "branch": "proposal-review",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "docs/2026-10-06-proposal-review/issues.md",
+    "docs/2026-10-06-proposal-review/issues/07-sweep-acts-on-rewrites.md",
+    "internal/github/close_issue.go",
+    "internal/github/edit_issue.go",
+    "internal/github/patch_issue.go",
+    "internal/review/act.go",
+    "internal/review/act_test.go",
+    "internal/review/check_verdict.go",
+    "internal/review/evidence_comment.go",
+    "internal/review/gate.go",
+    "internal/review/rewrite_shape.go",
+    "internal/review/rewrite_shape_test.go",
+    "internal/review/tracking_test.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/2b/a5512ade9c/0/metadata.json",
+      "transcript": "/2b/a5512ade9c/0/full.jsonl",
+      "content_hash": "/2b/a5512ade9c/0/content_hash.txt",
+      "prompt": "/2b/a5512ade9c/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 92,
+    "cache_creation_tokens": 108933,
+    "cache_read_tokens": 3627738,
+    "output_tokens": 30925,
+    "api_call_count": 46
+  }
+}
