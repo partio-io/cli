@@ -45,14 +45,14 @@ tested client, and the change stays in this repository).
 
 ## Acceptance criteria
 
-- [ ] The full suite is green before the first edit and after the last: `make test` passes and `make lint` reports 0 issues.
-- [ ] One shared package holds the GitHub request helper. It sets the Accept and Authorization headers, rejects a non-2xx response with method, path, status and up to 512 bytes of body, and decodes JSON.
-- [ ] The shared package has a paginated GET helper with `per_page=100` that stops on a short page.
-- [ ] The shared package has comment upsert by body prefix on an issue or pull request. It pages through comments, updates a match in place, creates a comment otherwise, and never matches by author.
-- [ ] The audit gate, patch-apply and repair-round packages use the shared client, and none of them keeps its own request helper.
-- [ ] The current tests of the three packages pass with no change to their assertions.
-- [ ] The shared package has table-driven tests against an `httptest` server: headers, the non-2xx error text, pagination, and upsert that creates and upsert that updates.
-- [ ] The commands that wrap these packages keep their flags and their environment variables (`GITHUB_REPOSITORY`, `GH_TOKEN`, `GITHUB_API_URL`).
+- [x] The full suite is green before the first edit and after the last: `make test` passes and `make lint` reports 0 issues.
+- [x] One shared package holds the GitHub request helper. It sets the Accept and Authorization headers, rejects a non-2xx response with method, path, status and up to 512 bytes of body, and decodes JSON.
+- [x] The shared package has a paginated GET helper with `per_page=100` that stops on a short page.
+- [x] The shared package has comment upsert by body prefix on an issue or pull request. It pages through comments, updates a match in place, creates a comment otherwise, and never matches by author.
+- [x] The audit gate, patch-apply and repair-round packages use the shared client, and none of them keeps its own request helper.
+- [x] The current tests of the three packages pass with no change to their assertions.
+- [x] The shared package has table-driven tests against an `httptest` server: headers, the non-2xx error text, pagination, and upsert that creates and upsert that updates.
+- [x] The commands that wrap these packages keep their flags and their environment variables (`GITHUB_REPOSITORY`, `GH_TOKEN`, `GITHUB_API_URL`).
 
 ## Modules touched
 

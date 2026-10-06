@@ -4,7 +4,7 @@ Source: [prd.md](./prd.md)
 
 | Done | # | Title | Blocked by |
 |------|---|-------|------------|
-| [ ]  | 1 | [Prefactor: one GitHub client for the minion tools](./issues/01-prefactor-one-github-client.md) | None |
+| [x]  | 1 | [Prefactor: one GitHub client for the minion tools](./issues/01-prefactor-one-github-client.md) | None |
 | [ ]  | 2 | [Catch assumed facts in premise checks](./issues/02-catch-assumed-facts.md) | None |
 | [ ]  | 3 | [Review verdict and dry-run gate](./issues/03-verdict-and-dry-run-gate.md) | [#1](./issues/01-prefactor-one-github-client.md) |
 | [ ]  | 4 | [Review program and dry-run dispatch](./issues/04-review-program-and-dry-run-dispatch.md) | [#2](./issues/02-catch-assumed-facts.md), [#3](./issues/03-verdict-and-dry-run-gate.md) |

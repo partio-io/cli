@@ -1,17 +1,12 @@
 package repairround
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
-	"log/slog"
 	"net/http"
 	"strings"
-)
 
-// perPage is GitHub's maximum page size for the pull-request commits
-// endpoint.
-const perPage = 100
+	"github.com/partio-io/cli/internal/github"
+)
 
 // maxPages bounds the walk. The endpoint serves at most 250 commits,
 // so three pages cover every branch it can describe. Undercounting
@@ -22,28 +17,21 @@ const maxPages = 3
 // prSubjects returns the subject line of every commit on the pull
 // request's branch.
 func prSubjects(cfg Config) ([]string, error) {
+	type prCommit struct {
+		Commit struct {
+			Message string `json:"message"`
+		} `json:"commit"`
+	}
 	var subjects []string
-	for page := 1; page <= maxPages; page++ {
-		url := fmt.Sprintf("%s/repos/%s/pulls/%d/commits?per_page=%d&page=%d",
-			cfg.APIBaseURL, cfg.Repo, cfg.PRNumber, perPage, page)
-		req, err := http.NewRequest(http.MethodGet, url, nil)
-		if err != nil {
-			return nil, fmt.Errorf("list pull request commits: %w", err)
-		}
-		var commits []struct {
-			Commit struct {
-				Message string `json:"message"`
-			} `json:"commit"`
-		}
-		if err := doGitHub(cfg, req, &commits); err != nil {
-			return nil, fmt.Errorf("list pull request commits: %w", err)
-		}
+	path := fmt.Sprintf("/repos/%s/pulls/%d/commits", cfg.Repo, cfg.PRNumber)
+	err := github.GetPages(cfg.client(), path, maxPages, func(commits []prCommit) bool {
 		for _, c := range commits {
 			subjects = append(subjects, subjectOf(c.Commit.Message))
 		}
-		if len(commits) < perPage {
-			break
-		}
+		return true
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list pull request commits: %w", err)
 	}
 	return subjects, nil
 }
@@ -70,7 +58,7 @@ func prMeta(cfg Config) (labels []string, headRepo string, err error) {
 			} `json:"repo"`
 		} `json:"head"`
 	}
-	if err := doGitHub(cfg, req, &pr); err != nil {
+	if err := cfg.client().Do(req, &pr); err != nil {
 		return nil, "", fmt.Errorf("read pull request: %w", err)
 	}
 	for _, l := range pr.Labels {
@@ -86,33 +74,7 @@ func subjectOf(message string) string {
 	return subject
 }
 
-// doGitHub executes one GitHub API request and decodes the response
-// into out when out is non-nil.
-func doGitHub(cfg Config, req *http.Request, out any) error {
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("Authorization", "Bearer "+cfg.Token)
-	client := cfg.HTTPClient
-	if client == nil {
-		client = http.DefaultClient
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			slog.Debug("closing response body", "url", req.URL.Path, "error", closeErr)
-		}
-	}()
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		detail, readErr := io.ReadAll(io.LimitReader(resp.Body, 512))
-		if readErr != nil {
-			detail = fmt.Appendf(nil, "(error body unreadable: %v)", readErr)
-		}
-		return fmt.Errorf("github: %s %s: %s: %s", req.Method, req.URL.Path, resp.Status, detail)
-	}
-	if out == nil {
-		return nil
-	}
-	return json.NewDecoder(resp.Body).Decode(out)
+// client is the GitHub client cfg describes.
+func (c Config) client() github.Client {
+	return github.Client{BaseURL: c.APIBaseURL, Token: c.Token, HTTPClient: c.HTTPClient}
 }
