@@ -1,0 +1,29 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "bfad48204113",
+  "strategy": "manual-commit",
+  "branch": "proposal-review",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".github/workflows/propose.yml",
+    ".minions/programs/propose.md",
+    "docs/2026-10-06-proposal-review/issues.md",
+    "docs/2026-10-06-proposal-review/issues/11-proposer-duplicate-fix.md",
+    "internal/premise/repo_propose_test.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/bf/ad48204113/0/metadata.json",
+      "transcript": "/bf/ad48204113/0/full.jsonl",
+      "content_hash": "/bf/ad48204113/0/content_hash.txt",
+      "prompt": "/bf/ad48204113/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 70,
+    "cache_creation_tokens": 66483,
+    "cache_read_tokens": 1977155,
+    "output_tokens": 18265,
+    "api_call_count": 35
+  }
+}
