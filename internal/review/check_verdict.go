@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 )
 
 // check rejects a verdict that is incomplete or that contradicts
@@ -107,7 +108,7 @@ func (v Verdict) checkNoContradiction() error {
 }
 
 func (v Verdict) checkRewrite() error {
-	if v.Rewrite == nil || v.Rewrite.Title == "" {
+	if v.Rewrite == nil || strings.TrimSpace(v.Rewrite.Title) == "" {
 		return errors.New("rewrite without a title")
 	}
 	if v.Rewrite.Body == "" {

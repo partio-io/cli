@@ -256,19 +256,29 @@ func TestGateCreatesTheReviewedLabelOnce(t *testing.T) {
 	}
 }
 
-// A rewrite is not acted on yet: outside dry-run it is no verdict. The
-// gate reads the issue, writes a no-verdict row, and changes nothing.
-func TestGateRewriteIsNoVerdictWhenActing(t *testing.T) {
+// A valid rewrite edits the title and the body in place with one
+// request, posts the evidence comment and applies the keep label rules.
+func TestGateRewriteActsOnTheIssue(t *testing.T) {
 	gh := newFakeGitHub()
+	gh.labels = append(gh.labels, ReviewedLabel)
+	gh.issues[12] = issueJSON(12, "Add a retry to the pre-push hook", "body",
+		[]string{"minion-proposal", "minion-failed"})
 	tracking := gh.trackingIssue(77)
 
 	res := runAct(t, gh, 12, writeVerdict(t, rewriteVerdict))
 
-	if res.Valid || !strings.Contains(res.Cause, "rewrite") {
-		t.Fatalf("Result = %+v, want no verdict for a rewrite", res)
+	if !res.Valid || res.Outcome != OutcomeRewrite {
+		t.Fatalf("Result = %+v, want a valid rewrite", res)
 	}
 	want := []string{
 		"GET /repos/partio-io/cli/issues/12",
+		"GET /repos/partio-io/cli/pulls",
+		"GET /repos/partio-io/cli/labels/minion-reviewed",
+		"GET /repos/partio-io/cli/issues/12/comments",
+		"POST /repos/partio-io/cli/issues/12/comments",
+		"PATCH /repos/partio-io/cli/issues/12",
+		"DELETE /repos/partio-io/cli/issues/12/labels/minion-failed",
+		"POST /repos/partio-io/cli/issues/12/labels",
 		"GET /repos/partio-io/cli/issues",
 		"GET /repos/partio-io/cli/issues/77/comments",
 		"POST /repos/partio-io/cli/issues/77/comments",
@@ -276,8 +286,36 @@ func TestGateRewriteIsNoVerdictWhenActing(t *testing.T) {
 	if !slices.Equal(gh.requests, want) {
 		t.Fatalf("requests:\n%s\nwant:\n%s", strings.Join(gh.requests, "\n"), strings.Join(want, "\n"))
 	}
-	if row := gh.comments[tracking][0]["body"].(string); !strings.Contains(row, "**no verdict**") {
-		t.Errorf("tracking row is not a no-verdict row:\n%s", row)
+	issue := gh.issues[12]
+	if issue["title"] != "Retry the pre-push once on a network error" {
+		t.Errorf("title = %q, want the rewrite title", issue["title"])
+	}
+	if body := issue["body"].(string); !strings.HasPrefix(body, "## What\n") || !strings.HasSuffix(body, "Proposal id: retry-pre-push") {
+		t.Errorf("body is not the rewrite body:\n%s", body)
+	}
+	if issue["state"] != "open" {
+		t.Errorf("a rewrite changed the state to %v", issue["state"])
+	}
+	if got, want := labelNames(issue), []string{"minion-proposal", ReviewedLabel}; !slices.Equal(got, want) {
+		t.Errorf("labels = %q, want %q", got, want)
+	}
+	if row := gh.comments[tracking][0]["body"].(string); !strings.Contains(row, "**rewrite** ·") || strings.Contains(row, "dry run") {
+		t.Errorf("tracking row is not an acted rewrite:\n%s", row)
+	}
+}
+
+// The evidence comment of a rewrite lists each change the review made,
+// one item per change.
+func TestGateRewriteCommentListsTheChanges(t *testing.T) {
+	gh := newFakeGitHub()
+	gh.trackingIssue(77)
+
+	runAct(t, gh, 12, writeVerdict(t, rewriteVerdict))
+
+	body := gh.comments[12][0]["body"].(string)
+	want := "### What changed\n\n- narrowed to network errors\n- dropped the config flag\n"
+	if !strings.Contains(body, want) {
+		t.Errorf("comment does not list the changes %q:\n%s", want, body)
 	}
 }
 

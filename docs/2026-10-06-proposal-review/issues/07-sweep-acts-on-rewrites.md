@@ -39,15 +39,15 @@ for an invalid rewrite, the failed check.
 
 ## Acceptance criteria
 
-- [ ] A rewrite whose body has no premise block that the premise package accepts is no verdict, and the issue does not change.
-- [ ] A rewrite without an acceptance-criteria checklist item, without a final proposal id line, or with an empty title is no verdict.
-- [ ] A rewrite that drops the source reference of the old body is no verdict, and an old body without a source needs none.
-- [ ] A rewrite that still carries a pointer to a proposal file is no verdict.
-- [ ] A valid rewrite edits the title and the body in place and applies the keep label rules.
-- [ ] The evidence comment of a rewrite lists what changed.
-- [ ] A tracking row for an invalid rewrite names the check that failed, in dry run and in a real run.
-- [ ] Tests run against a fake GitHub server and cover each failed check and the valid case.
-- [ ] `make test` and `make lint` pass.
+- [x] A rewrite whose body has no premise block that the premise package accepts is no verdict, and the issue does not change.
+- [x] A rewrite without an acceptance-criteria checklist item, without a final proposal id line, or with an empty title is no verdict.
+- [x] A rewrite that drops the source reference of the old body is no verdict, and an old body without a source needs none.
+- [x] A rewrite that still carries a pointer to a proposal file is no verdict.
+- [x] A valid rewrite edits the title and the body in place and applies the keep label rules.
+- [x] The evidence comment of a rewrite lists what changed.
+- [x] A tracking row for an invalid rewrite names the check that failed, in dry run and in a real run.
+- [x] Tests run against a fake GitHub server and cover each failed check and the valid case.
+- [x] `make test` and `make lint` pass.
 
 ## Modules touched
 

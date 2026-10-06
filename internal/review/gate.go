@@ -33,13 +33,14 @@ func (c Config) client() github.Client {
 
 // Run loads the verdict for cfg.Issue, acts on the reviewed issue, and
 // records the verdict as one row in the tracking issue. A missing or
-// invalid verdict is "no verdict": Run records that row with its cause
-// and returns a Result that is not Valid, with a nil error. A non-nil
-// error means the gate could not talk to GitHub. In dry-run mode Run
-// reads the reviewed issue and changes nothing on it. Outside dry-run a
-// verdict the gate cannot act on is no verdict: a rewrite, a closed
-// issue, a pull request, or a duplicate close whose kept issue is not
-// open.
+// invalid verdict, or a rewrite whose new text fails a shape check, is
+// "no verdict": Run records that row with its cause and returns a
+// Result that is not Valid, with a nil error. A non-nil error means the
+// gate could not talk to GitHub. In dry-run mode Run reads the reviewed
+// issue and changes nothing on it, and the row of a rewrite that fails
+// a shape check also carries the proposed text. Outside dry-run a
+// verdict the gate cannot act on is no verdict: a closed issue, a pull
+// request, or a duplicate close whose kept issue is not open.
 func Run(cfg Config) (Result, error) {
 	gh := cfg.client()
 	issue, err := gh.GetIssue(cfg.Repo, cfg.Issue)
@@ -49,6 +50,11 @@ func Run(cfg Config) (Result, error) {
 
 	res := Result{}
 	v, err := LoadVerdict(cfg.VerdictPath, cfg.Issue)
+	badShape := false
+	if err == nil && v.Outcome == OutcomeRewrite {
+		err = checkShape(issue.Body, *v.Rewrite)
+		badShape = err != nil
+	}
 	var kept *github.Issue
 	if err == nil && !cfg.DryRun {
 		kept, err = actable(gh, cfg.Repo, issue, v)
@@ -61,6 +67,9 @@ func Run(cfg Config) (Result, error) {
 	if err != nil {
 		res.Cause = err.Error()
 		r = noVerdictRow(issue, res.Cause)
+		if badShape && cfg.DryRun {
+			r += indent(rewriteDetails(*v.Rewrite))
+		}
 	} else {
 		res.Valid, res.Outcome = true, v.Outcome
 		r = row(issue, v, cfg.DryRun)

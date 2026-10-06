@@ -11,9 +11,9 @@ import (
 const ReviewMarker = "<!-- partio:review:v1 -->"
 
 // evidenceComment is the comment the gate posts on the reviewed issue:
-// the outcome and its reason, every claim with its evidence, verdict
-// and excerpt, the fit, built and duplicate decisions, and any open
-// pull request from an older build. kept is the issue that stays for a
+// the outcome and its reason, for a rewrite what changed, every claim
+// with its evidence, verdict and excerpt, the fit, built and duplicate
+// decisions, and any open pull request from an older build. kept is the issue that stays for a
 // duplicate close, and nil otherwise.
 // When the excerpts push the comment past GitHub's size limit, the
 // comment leaves them out and says so.
@@ -31,6 +31,16 @@ func renderEvidence(v Verdict, kept *github.Issue, pulls []github.PullRequest, e
 	fmt.Fprintf(&b, "**Outcome:** %s · **Reason:** %s\n\n", v.Outcome, reason(v))
 	if kept != nil {
 		fmt.Fprintf(&b, "Duplicate of #%d, which stays: [%s](%s)\n\n", kept.Number, oneLine(kept.Title), kept.HTMLURL)
+	}
+	if v.Outcome == OutcomeRewrite {
+		b.WriteString("### What changed\n\n")
+		if len(v.Rewrite.Changes) == 0 {
+			b.WriteString("The review lists no change.\n")
+		}
+		for _, c := range v.Rewrite.Changes {
+			fmt.Fprintf(&b, "- %s\n", oneLine(c))
+		}
+		b.WriteString("\n")
 	}
 
 	fmt.Fprintf(&b, "### Premise: %s\n\n", v.Premise.Verdict)

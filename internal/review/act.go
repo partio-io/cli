@@ -29,12 +29,10 @@ type refusal string
 func (r refusal) Error() string { return string(r) }
 
 // actable checks, outside dry-run, that the gate can act on v for
-// issue: not a rewrite, an open issue and not a pull request, and for a
-// duplicate close an open kept issue, which it returns.
+// issue: an open issue and not a pull request, and for a duplicate
+// close an open kept issue, which it returns.
 func actable(gh github.Client, repo string, issue github.Issue, v Verdict) (*github.Issue, error) {
 	switch {
-	case v.Outcome == OutcomeRewrite:
-		return nil, refusal(fmt.Sprintf("a %s verdict is not acted on yet", OutcomeRewrite))
 	case issue.PullRequest != nil:
 		return nil, refusal(fmt.Sprintf("#%d is a pull request: the gate never changes one", issue.Number))
 	case issue.State != "open":
@@ -56,9 +54,10 @@ func actable(gh github.Client, repo string, issue github.Issue, v Verdict) (*git
 	return &kept, nil
 }
 
-// act applies a keep or close verdict to the reviewed issue: one
-// evidence comment, the label changes and, for a close, the close with
-// its state reason. kept is the issue that stays for a duplicate close.
+// act applies a verdict to the reviewed issue: one evidence comment,
+// for a rewrite the new title and body, the label changes and, for a
+// close, the close with its state reason. A rewrite takes the label
+// changes of a keep. kept is the issue that stays for a duplicate close.
 // It never changes a pull request; it only names an open one from an
 // older build in the comment. The evidence comment is found by its
 // marker and updated in place, so a run that failed after the comment
@@ -74,7 +73,12 @@ func act(gh github.Client, repo string, issue github.Issue, v Verdict, kept *git
 	if err := gh.UpsertComment(repo, issue.Number, ReviewMarker, evidenceComment(v, kept, pulls)); err != nil {
 		return fmt.Errorf("comment on #%d: %w", issue.Number, err)
 	}
-	if v.Outcome == OutcomeKeep {
+	if v.Outcome == OutcomeRewrite {
+		if err := gh.EditIssue(repo, issue.Number, oneLine(v.Rewrite.Title), v.Rewrite.Body); err != nil {
+			return fmt.Errorf("rewrite #%d: %w", issue.Number, err)
+		}
+	}
+	if v.Outcome != OutcomeClose {
 		for _, l := range buildLabels {
 			if !issue.HasLabel(l) {
 				continue

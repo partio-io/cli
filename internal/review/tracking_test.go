@@ -25,7 +25,7 @@ const (
 	"duplicates": [],
 	"rewrite": {
 		"title": "Retry the pre-push once on a network error",
-		"body": "## What\n\n- retry once\n- log the retry\n\n## Why\n\nFlaky pushes fail the hook.",
+		"body": "## What\n\n- retry once\n- log the retry\n\n## Why\n\nFlaky pushes fail the hook.\n\n## Premise\n\n<!-- partio:premise:v1 -->\n\n- the pre-push hook has no retry [evidence: ` + "`internal/hooks/prepush.go`" + `]\n\n## Acceptance Criteria\n\n- [ ] a push that fails on a network error runs once more\n\nProposal id: retry-pre-push",
 		"changes": ["narrowed to network errors", "dropped the config flag"]
 	}
 }`
@@ -292,7 +292,7 @@ func TestGateRewriteBodyStaysInsideItsSection(t *testing.T) {
 	runGate(t, gh, 12, writeVerdict(t, hostile), "2026-10-06")
 
 	body := gh.comments[tracking][0]["body"].(string)
-	if !strings.Contains(body, "  ````markdown\n") || !strings.Contains(body, "  unclosed\n  ````\n") {
+	if !strings.Contains(body, "  ````markdown\n") || !strings.Contains(body, "  unclosed\n") || !strings.Contains(body, "  Proposal id: retry-pre-push\n  ````\n") {
 		t.Errorf("rewrite body is not fenced past its own fences:\n%s", body)
 	}
 }
