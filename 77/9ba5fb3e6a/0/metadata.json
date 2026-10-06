@@ -1,0 +1,65 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "779ba5fb3e6a",
+  "session_id": "6415eb12-eb26-41e6-bdf1-abf8174e0b68",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-06T05:57:31.703041607Z",
+  "branch": "proposal-review",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "docs/2026-10-06-proposal-review/issues.md",
+    "docs/2026-10-06-proposal-review/issues/01-prefactor-one-github-client.md",
+    "internal/auditgate/comment.go",
+    "internal/github/client.go",
+    "internal/github/client_test.go",
+    "internal/github/comment.go",
+    "internal/github/comment_test.go",
+    "internal/github/pages.go",
+    "internal/github/pages_test.go",
+    "internal/patchapply/head.go",
+    "internal/repairround/commits.go"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "0a4edcd9d42f",
+  "token_usage": {
+    "input_tokens": 30,
+    "cache_creation_tokens": 56987,
+    "cache_read_tokens": 708824,
+    "output_tokens": 14189,
+    "api_call_count": 15
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-06T05:57:31.696088114Z",
+    "agent_lines": 485,
+    "agent_removed": 188,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 485,
+    "total_lines_changed": 673,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 1625,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/2026-08-18-premise-gate-test-run/handoff.md": 372,
+        "docs/2026-09-24-minion-pipeline-state/handoff.md": 154,
+        "docs/2026-09-25-issue-31-chained-run-review/handoff.md": 227,
+        "docs/2026-09-25-issue-31-chained-run-review/issue-31.md": 59,
+        "docs/2026-09-25-issue-31-chained-run-review/prd.md": 136,
+        "docs/2026-09-25-issue-31-chained-run-review/run-36099180129.log": 574,
+        "docs/2026-09-25-issue-31-chained-run-review/slice-plan.md": 103
+      }
+    }
+  ]
+}
