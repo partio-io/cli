@@ -2,9 +2,11 @@ name: Proposal Review
 
 # Reviews proposal issues one at a time. Each issue gets a fresh review
 # session, and the review gate records its verdict in the tracking
-# issue. A dry run changes nothing on the reviewed issues, so a closed
-# issue is a valid input: use one with a known answer to test the
-# review.
+# issue. Without dry run the gate also acts on the issue: a keep gets
+# its evidence comment and the minion-reviewed label, a close gets the
+# comment, the label and the close. A dry run changes nothing on the
+# reviewed issues, so a closed issue is a valid input: use one with a
+# known answer to test the review.
 
 on:
   workflow_dispatch:
@@ -14,7 +16,7 @@ on:
         required: true
         type: string
       dry_run:
-        description: "Record each verdict in the tracking issue only (only true works in this version)"
+        description: "Record each verdict in the tracking issue only; false also acts on each issue"
         required: false
         default: true
         type: boolean
@@ -53,11 +55,6 @@ jobs:
           # workspace for the gate to find it.
           MINION_REVIEW_DIR: ${{ github.workspace }}/.minion-review
         run: |
-          if [ "$DRY_RUN" != "true" ]; then
-            echo "::error::Only a dry run is available in this version."
-            exit 2
-          fi
-
           LIST=$(printf '%s' "$ISSUES" | tr ',#' '  ')
           # A leading zero is refused: the gate parses "010" as octal 8,
           # so it would check the verdict of #10 against #8.
@@ -88,7 +85,7 @@ jobs:
             if ! go run ./cmd/minion-review gate \
               --issue "$ISSUE" \
               --verdict "$MINION_REVIEW_DIR/verdict.json" \
-              --dry-run \
+              --dry-run="$DRY_RUN" \
               --night "$NIGHT"; then
               FAILED="$FAILED #$ISSUE"
             fi

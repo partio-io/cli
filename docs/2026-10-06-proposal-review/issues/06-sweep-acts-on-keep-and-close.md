@@ -45,18 +45,18 @@ comment), 47.
 
 ## Acceptance criteria
 
-- [ ] Keep adds `minion-reviewed`, removes `minion-approved`, `minion-failed`, `minion-executing` and `do-not-build` where present, and posts one evidence comment.
-- [ ] Close posts the evidence comment, adds `minion-reviewed`, and closes the issue.
-- [ ] The close uses state reason `completed` for built and `not_planned` for every other reason.
-- [ ] A duplicate close names and links the issue that stays.
-- [ ] The evidence comment starts with the review marker and lists every claim with evidence, verdict and excerpt, plus the fit, built and duplicate decisions.
-- [ ] An open pull request from an older build of the issue is named in the comment, and the gate makes no request that changes a pull request.
-- [ ] The gate creates `minion-reviewed` once when the repository lacks it, and the removal of an absent label does not fail the run.
-- [ ] A rewrite verdict counts as no verdict in this slice.
-- [ ] Every action writes its row to the tracking issue.
-- [ ] The sweep workflow passes the dispatch's `dry_run` input to the gate.
-- [ ] Tests run against a fake GitHub server and assert the exact requests for keep, for each close reason, and for the label creation.
-- [ ] `make test` and `make lint` pass.
+- [x] Keep adds `minion-reviewed`, removes `minion-approved`, `minion-failed`, `minion-executing` and `do-not-build` where present, and posts one evidence comment.
+- [x] Close posts the evidence comment, adds `minion-reviewed`, and closes the issue.
+- [x] The close uses state reason `completed` for built and `not_planned` for every other reason.
+- [x] A duplicate close names and links the issue that stays.
+- [x] The evidence comment starts with the review marker and lists every claim with evidence, verdict and excerpt, plus the fit, built and duplicate decisions.
+- [x] An open pull request from an older build of the issue is named in the comment, and the gate makes no request that changes a pull request.
+- [x] The gate creates `minion-reviewed` once when the repository lacks it, and the removal of an absent label does not fail the run.
+- [x] A rewrite verdict counts as no verdict in this slice.
+- [x] Every action writes its row to the tracking issue.
+- [x] The sweep workflow passes the dispatch's `dry_run` input to the gate.
+- [x] Tests run against a fake GitHub server and assert the exact requests for keep, for each close reason, and for the label creation.
+- [x] `make test` and `make lint` pass.
 
 ## Modules touched
 

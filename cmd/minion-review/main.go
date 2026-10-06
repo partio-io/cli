@@ -1,11 +1,13 @@
 // Command minion-review is the deterministic half of the proposal
 // review. Its gate subcommand reads the verdict file the review program
-// wrote for one issue, checks it, and records it as one row in the
-// tracking issue. It fails closed: a missing or invalid verdict is "no
-// verdict", recorded with its cause.
+// wrote for one issue, checks it, acts on the issue, and records the
+// verdict as one row in the tracking issue. A keep gets an evidence
+// comment and the minion-reviewed label; a close gets the comment, the
+// label and the close. A rewrite is no verdict yet. It fails closed: a
+// missing or invalid verdict is "no verdict", recorded with its cause.
 //
-// Only --dry-run exists yet: the gate records the verdict and changes
-// nothing on the reviewed issue.
+// With --dry-run the gate records the verdict and changes nothing on
+// the reviewed issue.
 //
 // Its dupes subcommand lists the minion-proposal issues that may hold
 // the same idea as one issue, by source item or by title, and prints
@@ -30,7 +32,7 @@ import (
 )
 
 const (
-	gateUsage  = "usage: minion-review gate --issue <number> --verdict <path> --dry-run [--night YYYY-MM-DD]"
+	gateUsage  = "usage: minion-review gate --issue <number> --verdict <path> [--dry-run] [--night YYYY-MM-DD]"
 	dupesUsage = "usage: minion-review dupes --title <title> [--source <ref>]... [--exclude <number>]"
 	usage      = gateUsage + "\n" + dupesUsage
 )
@@ -72,7 +74,7 @@ func gate(args []string) int {
 	var (
 		issue   = fs.Int("issue", 0, "reviewed issue number (required)")
 		verdict = fs.String("verdict", "", "path to the verdict file (required)")
-		dryRun  = fs.Bool("dry-run", false, "record the verdict only; required in this version")
+		dryRun  = fs.Bool("dry-run", false, "record the verdict only; change nothing on the reviewed issue")
 		// The sweep passes one night per run, so a run that crosses
 		// midnight still writes one comment.
 		night = fs.String("night", time.Now().UTC().Format(time.DateOnly), "UTC date of the night comment")
@@ -80,7 +82,7 @@ func gate(args []string) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	if *issue <= 0 || *verdict == "" || !*dryRun {
+	if *issue <= 0 || *verdict == "" || fs.NArg() > 0 {
 		fmt.Fprintln(os.Stderr, gateUsage)
 		return 2
 	}
@@ -110,7 +112,11 @@ func gate(args []string) int {
 		fmt.Println("minion-review: no verdict:", res.Cause)
 		return 1
 	}
-	fmt.Println("minion-review:", res.Outcome, "(dry run)")
+	mode := ""
+	if *dryRun {
+		mode = " (dry run)"
+	}
+	fmt.Println("minion-review:", res.Outcome+mode)
 	return 0
 }
 

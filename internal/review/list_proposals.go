@@ -12,15 +12,13 @@ const proposalLabel = "minion-proposal"
 
 // proposal is one minion-proposal issue as the list endpoint sends it.
 type proposal struct {
-	Number      int    `json:"number"`
-	Title       string `json:"title"`
-	Body        string `json:"body"`
-	State       string `json:"state"`
-	StateReason string `json:"state_reason"`
-	Labels      []struct {
-		Name string `json:"name"`
-	} `json:"labels"`
-	PullRequest *struct{} `json:"pull_request,omitempty"`
+	Number      int            `json:"number"`
+	Title       string         `json:"title"`
+	Body        string         `json:"body"`
+	State       string         `json:"state"`
+	StateReason string         `json:"state_reason"`
+	Labels      []github.Label `json:"labels"`
+	PullRequest *struct{}      `json:"pull_request,omitempty"`
 }
 
 func (p proposal) labelNames() []string {

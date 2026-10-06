@@ -251,23 +251,6 @@ func TestGateNoVerdictWritesRowWithCause(t *testing.T) {
 	}
 }
 
-// The gate refuses to run outside dry-run until the sweep slices add
-// the real actions.
-func TestGateRefusesWithoutDryRun(t *testing.T) {
-	gh := newFakeGitHub()
-	srv := gh.server(t)
-	_, err := Run(Config{
-		VerdictPath: writeVerdict(t, keepVerdict), Repo: repo, Issue: 12, Night: "2026-10-06",
-		APIBaseURL: srv.URL, Token: "test-token", HTTPClient: srv.Client(),
-	})
-	if err == nil {
-		t.Fatal("Run without DryRun returned no error")
-	}
-	if len(gh.requests) != 0 {
-		t.Errorf("Run without DryRun made requests: %q", gh.requests)
-	}
-}
-
 // A night comment near GitHub's size limit is not grown past it: the
 // row goes to a continuation comment with the same marker, and the next
 // row of the night appends to that continuation.

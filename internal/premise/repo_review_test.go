@@ -60,7 +60,7 @@ func TestSweepReviewsEachIssueBeforeItsGate(t *testing.T) {
 		t.Errorf("the gate runs before the review program, so it reads the last issue's verdict:\n%s", loop)
 	}
 
-	for _, want := range []string{`--issue "$ISSUE"`, "--dry-run", `--night "$NIGHT"`, "--verdict"} {
+	for _, want := range []string{`--issue "$ISSUE"`, `--dry-run="$DRY_RUN"`, `--night "$NIGHT"`, "--verdict"} {
 		if !strings.Contains(loop[gateAt:], want) {
 			t.Errorf("the gate call does not carry %s:\n%s", want, loop[gateAt:])
 		}
@@ -240,6 +240,23 @@ func TestSweepIsDispatchedByHand(t *testing.T) {
 	}
 	if !strings.Contains(src, reviewDirEnv+": ${{ github.workspace }}/") {
 		t.Errorf("%s does not set %s to an absolute path in the workspace", sweepWorkflow, reviewDirEnv)
+	}
+}
+
+// TestSweepPassesTheDryRunInput checks that the dispatch's dry_run input
+// reaches the gate, so a dispatch with dry_run false acts on the issues.
+func TestSweepPassesTheDryRunInput(t *testing.T) {
+	src := readRepoFile(t, sweepWorkflow)
+	if !strings.Contains(src, "DRY_RUN: ${{ inputs.dry_run }}") {
+		t.Errorf("%s does not hand the dry_run input to the step", sweepWorkflow)
+	}
+	if strings.Contains(src, "Only a dry run") {
+		t.Errorf("%s still refuses a dispatch with dry_run false", sweepWorkflow)
+	}
+	loop := sweepLoop(t)
+	gate := loop[strings.Index(loop, reviewGateRun):]
+	if !strings.Contains(gate, `--dry-run="$DRY_RUN"`) {
+		t.Errorf("the gate call does not pass the dry_run input:\n%s", gate)
 	}
 }
 

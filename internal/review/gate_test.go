@@ -23,6 +23,7 @@ type fakeGitHub struct {
 	issues   map[int]map[string]any
 	labels   []string
 	comments map[int][]map[string]any
+	pulls    []map[string]any // each with "number", "state" and "head" (owner:branch)
 	nextID   int64
 	requests []string
 	srv      *httptest.Server
@@ -148,6 +149,52 @@ func (f *fakeGitHub) server(t *testing.T) *httptest.Server {
 		f.comments[n] = append(f.comments[n], c)
 		write(w, http.StatusCreated, c)
 	})
+	mux.HandleFunc("PATCH "+base+"/issues/{n}", func(w http.ResponseWriter, r *http.Request) {
+		n, _ := strconv.Atoi(r.PathValue("n"))
+		var p map[string]any
+		decode(r, &p)
+		issue, ok := f.issues[n]
+		if !ok {
+			write(w, http.StatusNotFound, map[string]string{"message": "Not Found"})
+			return
+		}
+		maps.Copy(issue, p)
+		write(w, http.StatusOK, issue)
+	})
+	mux.HandleFunc("POST "+base+"/issues/{n}/labels", func(w http.ResponseWriter, r *http.Request) {
+		n, _ := strconv.Atoi(r.PathValue("n"))
+		var p struct {
+			Labels []string `json:"labels"`
+		}
+		decode(r, &p)
+		issue := f.issues[n]
+		for _, l := range p.Labels {
+			issue["labels"] = append(issue["labels"].([]map[string]any), map[string]any{"name": l})
+		}
+		write(w, http.StatusOK, issue["labels"])
+	})
+	mux.HandleFunc("DELETE "+base+"/issues/{n}/labels/{name}", func(w http.ResponseWriter, r *http.Request) {
+		n, _ := strconv.Atoi(r.PathValue("n"))
+		issue := f.issues[n]
+		ls := issue["labels"].([]map[string]any)
+		i := slices.IndexFunc(ls, func(l map[string]any) bool { return l["name"] == r.PathValue("name") })
+		if i < 0 {
+			write(w, http.StatusNotFound, map[string]string{"message": "Label does not exist"})
+			return
+		}
+		issue["labels"] = slices.Delete(ls, i, i+1)
+		write(w, http.StatusOK, issue["labels"])
+	})
+	mux.HandleFunc("GET "+base+"/pulls", func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		out := []map[string]any{}
+		for _, pr := range f.pulls {
+			if pr["state"] == q.Get("state") && pr["head"] == q.Get("head") {
+				out = append(out, pr)
+			}
+		}
+		write(w, http.StatusOK, out)
+	})
 	mux.HandleFunc("PATCH "+base+"/issues/comments/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		var p struct {
@@ -192,6 +239,17 @@ func writeVerdict(t *testing.T, content string) string {
 
 func runGate(t *testing.T, gh *fakeGitHub, issue int, verdictPath, night string) Result {
 	t.Helper()
+	return runGateMode(t, gh, issue, verdictPath, night, true)
+}
+
+// runAct runs the gate without dry-run: it acts on the reviewed issue.
+func runAct(t *testing.T, gh *fakeGitHub, issue int, verdictPath string) Result {
+	t.Helper()
+	return runGateMode(t, gh, issue, verdictPath, "2026-10-06", false)
+}
+
+func runGateMode(t *testing.T, gh *fakeGitHub, issue int, verdictPath, night string, dryRun bool) Result {
+	t.Helper()
 	srv := gh.server(t)
 	res, err := Run(Config{
 		VerdictPath: verdictPath,
@@ -201,7 +259,7 @@ func runGate(t *testing.T, gh *fakeGitHub, issue int, verdictPath, night string)
 		APIBaseURL:  srv.URL,
 		Token:       "test-token",
 		HTTPClient:  srv.Client(),
-		DryRun:      true,
+		DryRun:      dryRun,
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)

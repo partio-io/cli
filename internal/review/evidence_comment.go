@@ -1,0 +1,82 @@
+package review
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/partio-io/cli/internal/github"
+)
+
+// ReviewMarker opens every evidence comment the gate posts.
+const ReviewMarker = "<!-- partio:review:v1 -->"
+
+// evidenceComment is the comment the gate posts on the reviewed issue:
+// the outcome and its reason, every claim with its evidence, verdict
+// and excerpt, the fit, built and duplicate decisions, and any open
+// pull request from an older build. kept is the issue that stays for a
+// duplicate close, and nil otherwise.
+// When the excerpts push the comment past GitHub's size limit, the
+// comment leaves them out and says so.
+func evidenceComment(v Verdict, kept *github.Issue, pulls []github.PullRequest) string {
+	if body := renderEvidence(v, kept, pulls, true); len(body) <= maxCommentBody {
+		return body
+	}
+	return renderEvidence(v, kept, pulls, false)
+}
+
+func renderEvidence(v Verdict, kept *github.Issue, pulls []github.PullRequest, excerpts bool) string {
+	var b strings.Builder
+	b.WriteString(ReviewMarker + "\n")
+	fmt.Fprintf(&b, "## Proposal review: %s\n\n", v.Outcome)
+	fmt.Fprintf(&b, "**Outcome:** %s · **Reason:** %s\n\n", v.Outcome, reason(v))
+	if kept != nil {
+		fmt.Fprintf(&b, "Duplicate of #%d, which stays: [%s](%s)\n\n", kept.Number, oneLine(kept.Title), kept.HTMLURL)
+	}
+
+	fmt.Fprintf(&b, "### Premise: %s\n\n", v.Premise.Verdict)
+	if len(v.Premise.Claims) == 0 {
+		b.WriteString("No checkable claims.\n\n")
+	}
+	if !excerpts {
+		b.WriteString("Excerpts left out: with them the comment passes GitHub's size limit.\n\n")
+	}
+	for _, c := range v.Premise.Claims {
+		fmt.Fprintf(&b, "- **%s** · %s\n", c.Verdict, oneLine(c.Claim))
+		fmt.Fprintf(&b, "  - Evidence: %s\n", oneLine(c.Evidence))
+		if excerpts && c.Excerpt != "" {
+			fence := fenceFor(c.Excerpt)
+			b.WriteString("  - Excerpt:\n\n")
+			b.WriteString(indent(indent(fence + "\n" + strings.TrimRight(c.Excerpt, "\n") + "\n" + fence)))
+			b.WriteString("\n")
+		}
+	}
+	b.WriteString("\n### Decisions\n\n")
+	fmt.Fprintf(&b, "- **Fit:** %s · %s\n", yesNo(v.Fit.Applies, "applies", "does not apply"), oneLine(v.Fit.Reason))
+	fmt.Fprintf(&b, "- **Built:** %s", yesNo(v.Built.Built, "yes", "no"))
+	if v.Built.Evidence != "" {
+		fmt.Fprintf(&b, " · %s", oneLine(v.Built.Evidence))
+	}
+	b.WriteString("\n- **Duplicates:**")
+	if len(v.Duplicates) == 0 {
+		b.WriteString(" none found\n")
+	} else {
+		b.WriteString("\n")
+		for _, d := range v.Duplicates {
+			fmt.Fprintf(&b, "  - #%d · %s · %s\n", d.Issue, yesNo(d.Same, "same idea", "different idea"), oneLine(d.Why))
+		}
+	}
+	if len(pulls) > 0 {
+		b.WriteString("\n### Open pull request from an older build\n\n")
+		for _, p := range pulls {
+			fmt.Fprintf(&b, "- #%d · [%s](%s) · the review does not change it\n", p.Number, oneLine(p.Title), p.HTMLURL)
+		}
+	}
+	return b.String()
+}
+
+func yesNo(ok bool, yes, no string) string {
+	if ok {
+		return yes
+	}
+	return no
+}

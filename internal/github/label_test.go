@@ -44,3 +44,36 @@ func TestEnsureLabel(t *testing.T) {
 		})
 	}
 }
+
+// RemoveLabel treats GitHub's 404 for a label the issue does not carry
+// as done. Any other failure is an error.
+func TestRemoveLabel(t *testing.T) {
+	tests := []struct {
+		name    string
+		status  int
+		wantErr bool
+	}{
+		{name: "present", status: http.StatusOK},
+		{name: "absent", status: http.StatusNotFound},
+		{name: "broken", status: http.StatusInternalServerError, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got []string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				got = append(got, r.Method+" "+r.URL.Path)
+				w.WriteHeader(tt.status)
+			}))
+			defer srv.Close()
+
+			err := Client{BaseURL: srv.URL}.RemoveLabel("o/r", 12, "do-not-build")
+
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
+			}
+			if want := []string{"DELETE /repos/o/r/issues/12/labels/do-not-build"}; !slices.Equal(got, want) {
+				t.Errorf("requests = %q, want %q", got, want)
+			}
+		})
+	}
+}

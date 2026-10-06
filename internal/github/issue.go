@@ -10,13 +10,30 @@ import (
 
 // Issue is the part of a GitHub issue the minion tools read.
 type Issue struct {
-	Number  int    `json:"number"`
-	Title   string `json:"title"`
-	Body    string `json:"body"`
-	HTMLURL string `json:"html_url"`
+	Number  int     `json:"number"`
+	Title   string  `json:"title"`
+	Body    string  `json:"body"`
+	HTMLURL string  `json:"html_url"`
+	State   string  `json:"state"` // "open" or "closed"
+	Labels  []Label `json:"labels"`
 	// PullRequest is set when the item is a pull request: the issues
 	// API lists pull requests as issues.
 	PullRequest *struct{} `json:"pull_request,omitempty"`
+}
+
+// Label is a label on an issue.
+type Label struct {
+	Name string `json:"name"`
+}
+
+// HasLabel reports whether the issue carries label name.
+func (i Issue) HasLabel(name string) bool {
+	for _, l := range i.Labels {
+		if l.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // GetIssue reads issue number in repo.

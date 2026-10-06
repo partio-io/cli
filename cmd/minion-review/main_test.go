@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -69,5 +72,63 @@ func TestDupesNeedsATitle(t *testing.T) {
 	var out bytes.Buffer
 	if code := dupes([]string{"--source", "entireio/cli#1"}, &out); code != 2 {
 		t.Errorf("dupes without --title exit %d, want 2", code)
+	}
+}
+
+// fakeGateGitHub serves what one gate run reads, with a tracking issue
+// in place, and records "METHOD /path" for every request.
+func fakeGateGitHub(t *testing.T) *[]string {
+	t.Helper()
+	var got []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = append(got, r.Method+" "+r.URL.Path)
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/partio-io/cli/issues/12":
+			_, _ = w.Write([]byte(`{"number": 12, "title": "Retry the push", "state": "open", "html_url": "https://github.com/partio-io/cli/issues/12",
+				"labels": [{"name": "minion-proposal"}]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/partio-io/cli/issues":
+			_, _ = w.Write([]byte(`[{"number": 77, "title": "Minion review log", "body": "<!-- minion-review-log -->\nlog"}]`))
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/comments"), r.URL.Path == "/repos/partio-io/cli/pulls":
+			_, _ = w.Write([]byte(`[]`))
+		case r.Method == http.MethodGet:
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{}`))
+		}
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("GITHUB_REPOSITORY", "partio-io/cli")
+	t.Setenv("GH_TOKEN", "tok")
+	t.Setenv("GITHUB_API_URL", srv.URL)
+	return &got
+}
+
+// The sweep passes --dry-run="$DRY_RUN": false acts on the reviewed
+// issue, true only writes the tracking row.
+func TestGatePassesTheDryRunValue(t *testing.T) {
+	verdict := filepath.Join(t.TempDir(), "verdict.json")
+	if err := os.WriteFile(verdict, []byte(`{"issue": 12, "outcome": "keep",
+		"premise": {"verdict": "no-claims", "claims": []},
+		"fit": {"applies": true, "reason": "in scope"},
+		"built": {"built": false, "evidence": ""}, "duplicates": []}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		dryRun string
+		acts   bool
+	}{{"false", true}, {"true", false}} {
+		t.Run("dry-run="+tt.dryRun, func(t *testing.T) {
+			got := fakeGateGitHub(t)
+
+			code := gate([]string{"--issue", "12", "--verdict", verdict, "--dry-run=" + tt.dryRun, "--night", "2026-10-06"})
+
+			if code != 0 {
+				t.Fatalf("gate exit %d, requests %q", code, *got)
+			}
+			if acted := slices.Contains(*got, "POST /repos/partio-io/cli/issues/12/labels"); acted != tt.acts {
+				t.Errorf("acted on #12 = %v, want %v; requests %q", acted, tt.acts, *got)
+			}
+		})
 	}
 }
