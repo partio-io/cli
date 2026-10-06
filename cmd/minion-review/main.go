@@ -3,8 +3,9 @@
 // wrote for one issue, checks it, acts on the issue, and records the
 // verdict as one row in the tracking issue. A keep gets an evidence
 // comment and the minion-reviewed label; a close gets the comment, the
-// label and the close. A rewrite is no verdict yet. It fails closed: a
-// missing or invalid verdict is "no verdict", recorded with its cause.
+// label and the close; a rewrite also replaces the title and the body.
+// It fails closed: a missing or invalid verdict is "no verdict",
+// recorded with its cause.
 //
 // With --dry-run the gate records the verdict and changes nothing on
 // the reviewed issue. With --mode build it runs as the first step of a
@@ -15,6 +16,11 @@
 // the same idea as one issue, by source item or by title, and prints
 // them as JSON. The review program calls it; it changes nothing.
 //
+// Its check subcommand runs the checks of the gate on one verdict file
+// and prints "no verdict" with the cause when the gate would refuse it.
+// The review program runs it on its own verdict before its session ends.
+// It only reads the issue; it changes nothing.
+//
 // Its next subcommand prints the issues the sweep reviews next, one
 // number per line: the open minion-proposal issues without
 // minion-reviewed, approved ones first, then oldest first. It skips an
@@ -23,8 +29,8 @@
 // changes nothing.
 //
 // Exit codes: 0 for a valid verdict, a dupes list or a batch; 1 for
-// no verdict, after its row is written, or for a GitHub failure; 2 for
-// a usage or environment error.
+// no verdict (after its row is written, for the gate) or for a GitHub
+// failure; 2 for a usage or environment error.
 package main
 
 import (
@@ -43,8 +49,9 @@ import (
 const (
 	gateUsage  = "usage: minion-review gate --issue <number> --verdict <path> [--mode sweep|build] [--dry-run] [--night YYYY-MM-DD]"
 	dupesUsage = "usage: minion-review dupes --title <title> [--source <ref>]... [--exclude <number>]"
+	checkUsage = "usage: minion-review check --issue <number> --verdict <path>"
 	nextUsage  = "usage: minion-review next [--sample <n>]"
-	usage      = gateUsage + "\n" + dupesUsage + "\n" + nextUsage
+	usage      = gateUsage + "\n" + checkUsage + "\n" + dupesUsage + "\n" + nextUsage
 )
 
 func main() {
@@ -55,6 +62,8 @@ func main() {
 	switch os.Args[1] {
 	case "gate":
 		os.Exit(gate(os.Args[2:]))
+	case "check":
+		os.Exit(check(os.Args[2:], os.Stdout))
 	case "dupes":
 		os.Exit(dupes(os.Args[2:], os.Stdout))
 	case "next":
@@ -230,6 +239,51 @@ func dupes(args []string, stdout io.Writer) int {
 	enc := json.NewEncoder(stdout)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(found); err != nil {
+		fmt.Fprintf(os.Stderr, "minion-review: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+// check runs the checks of the gate on one verdict file. It prints the
+// cause of "no verdict" and exits 1 when the gate would refuse the
+// verdict, and it exits 0 when the verdict passes.
+func check(args []string, stdout io.Writer) int {
+	fs := flag.NewFlagSet("check", flag.ContinueOnError)
+	var (
+		issue   = fs.Int("issue", 0, "reviewed issue number (required)")
+		verdict = fs.String("verdict", "", "path to the verdict file (required)")
+	)
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *issue <= 0 || *verdict == "" || fs.NArg() > 0 {
+		fmt.Fprintln(os.Stderr, checkUsage)
+		return 2
+	}
+	repo, token, api, ok := githubEnv()
+	if !ok {
+		return 2
+	}
+
+	cause, err := review.Check(review.Config{
+		VerdictPath: *verdict,
+		Repo:        repo,
+		Issue:       *issue,
+		APIBaseURL:  api,
+		Token:       token,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "minion-review: %v\n", err)
+		return 1
+	}
+	if cause != "" {
+		if _, err := fmt.Fprintf(stdout, "no verdict: %s\n", cause); err != nil {
+			fmt.Fprintf(os.Stderr, "minion-review: %v\n", err)
+		}
+		return 1
+	}
+	if _, err := fmt.Fprintln(stdout, "the verdict passes the checks of the gate"); err != nil {
 		fmt.Fprintf(os.Stderr, "minion-review: %v\n", err)
 		return 1
 	}

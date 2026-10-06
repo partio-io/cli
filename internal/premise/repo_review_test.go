@@ -231,6 +231,24 @@ func TestReviewCorrectsAFalseFactTheIdeaDoesNotRestOn(t *testing.T) {
 	}
 }
 
+// TestReviewChecksItsOwnVerdict checks that the review runs the checks of the
+// gate on its verdict before its session ends. Two of the first four dry runs
+// on #31 ended with no verdict for a cause the gate checks in code: a body the
+// premise parser refused, and a failing claim with no correction.
+func TestReviewChecksItsOwnVerdict(t *testing.T) {
+	agent := reviewer(t)
+
+	for _, want := range []string{
+		`go run ./cmd/minion-review check --issue <issue number> --verdict "$MINION_REVIEW_DIR/verdict.json"`,
+		"fix the file and run the check again",
+		"Run it at most three times",
+	} {
+		if !containsPhrase(agent, want) {
+			t.Errorf("%s does not carry %q", reviewAgentH3, want)
+		}
+	}
+}
+
 // TestReviewRewriteKeepsTheIdea checks that a rewrite changes the issue's shape
 // and not its idea. It keeps the idea and the link to its source item, and it
 // drops the pointer to a proposal file: proposal files no longer exist, so the
