@@ -1,0 +1,42 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "c80cbf7433e9",
+  "strategy": "manual-commit",
+  "branch": "proposal-review",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "cmd/minion-review/main.go",
+    "docs/2026-10-06-proposal-review/issues.md",
+    "docs/2026-10-06-proposal-review/issues/03-verdict-and-dry-run-gate.md",
+    "internal/github/client.go",
+    "internal/github/comment.go",
+    "internal/github/comment_test.go",
+    "internal/github/issue.go",
+    "internal/github/label.go",
+    "internal/github/label_test.go",
+    "internal/review/check_verdict.go",
+    "internal/review/gate.go",
+    "internal/review/gate_test.go",
+    "internal/review/load_verdict.go",
+    "internal/review/load_verdict_test.go",
+    "internal/review/row.go",
+    "internal/review/tracking.go",
+    "internal/review/tracking_test.go",
+    "internal/review/verdict.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/c8/0cbf7433e9/0/metadata.json",
+      "transcript": "/c8/0cbf7433e9/0/full.jsonl",
+      "content_hash": "/c8/0cbf7433e9/0/content_hash.txt",
+      "prompt": "/c8/0cbf7433e9/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 58,
+    "cache_creation_tokens": 93871,
+    "cache_read_tokens": 2020538,
+    "output_tokens": 41012,
+    "api_call_count": 29
+  }
+}
