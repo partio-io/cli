@@ -73,17 +73,17 @@ closed issues, because a dry run writes nothing to them.
 
 ## Acceptance criteria
 
-- [ ] A review program exists with one agent whose instructions sit in its agents section, and the program-shape test passes.
-- [ ] The program applies the verifier and the ingest prompt's relevance rule, and it describes the proposer's issue shape for a keep or a rewrite.
-- [ ] The program writes only the verdict file at `$MINION_REVIEW_DIR/verdict.json`, and it says that it makes no GitHub change and writes nothing in its working directory.
-- [ ] The program keeps the original idea and source link in a rewrite, and drops the pointer to a proposal file.
-- [ ] The sweep workflow has a manual dispatch with an issue list and a dry-run flag, and it runs the program and then the gate for each issue, in sequence, in one job.
-- [ ] A crashed session or a "no verdict" exit does not stop the loop.
-- [ ] The workflow installs minions at the same pinned version as the other workflows, and it runs the gate with `go run`.
-- [ ] The verifier no longer says that the backlog is not swept or forbids a rewrite, while the premise-gate program and the stage gate still forbid a backfill.
-- [ ] The August verifier tests that pinned "not swept" and "not rewritten" now pin the split: the verifier checks, and the caller writes.
-- [ ] A repo test proves that the workflow runs the program before the gate for each issue, and the program and workflow tests know the new program.
-- [ ] `make test` and `make lint` pass.
+- [x] A review program exists with one agent whose instructions sit in its agents section, and the program-shape test passes.
+- [x] The program applies the verifier and the ingest prompt's relevance rule, and it describes the proposer's issue shape for a keep or a rewrite.
+- [x] The program writes only the verdict file at `$MINION_REVIEW_DIR/verdict.json`, and it says that it makes no GitHub change and writes nothing in its working directory.
+- [x] The program keeps the original idea and source link in a rewrite, and drops the pointer to a proposal file.
+- [x] The sweep workflow has a manual dispatch with an issue list and a dry-run flag, and it runs the program and then the gate for each issue, in sequence, in one job.
+- [x] A crashed session or a "no verdict" exit does not stop the loop.
+- [x] The workflow installs minions at the same pinned version as the other workflows, and it runs the gate with `go run`.
+- [x] The verifier no longer says that the backlog is not swept or forbids a rewrite, while the premise-gate program and the stage gate still forbid a backfill.
+- [x] The August verifier tests that pinned "not swept" and "not rewritten" now pin the split: the verifier checks, and the caller writes.
+- [x] A repo test proves that the workflow runs the program before the gate for each issue, and the program and workflow tests know the new program.
+- [x] `make test` and `make lint` pass.
 
 ## Modules touched
 

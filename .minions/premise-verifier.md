@@ -68,14 +68,12 @@ settle, and treating the two alike would block most of the backlog at once.
 Say so in your report: state that the prose makes no checkable claim, and name
 what you read to decide that.
 
-Check the proposal in front of you, and no other. The backlog is not swept: a
-proposal is checked when a stage next touches it, so nothing is listed, closed
-or relabelled ahead of time.
+Check the proposal in front of you, and no other.
 
-Extraction happens here, at check time, and leaves nothing behind. Do not
-rewrite the issue body. Do not backfill a premise block into it, and do not
-add one to an issue that passes. The proposal keeps its own words; the claims
-you extracted live in your report and nowhere else.
+Extraction happens here, at check time. The verifier writes nothing itself: it
+decides each claim and reports the claim, its evidence, its verdict and its
+excerpt. What a caller writes with that result, on the issue or anywhere else,
+belongs to the caller, and the caller states it in its own instructions.
 
 ## Procedure
 

@@ -234,21 +234,27 @@ func TestAFailedExtractedClaimStopsTheStageTheSameWay(t *testing.T) {
 	}
 }
 
-// TestAnOldProposalIsNotRewritten checks the promise that makes this gate cheap
-// enough to apply at all: extraction happens at check time and leaves nothing
-// behind. Backfilling a block would rewrite the operator's words in hundreds of
-// issues, one stage run at a time, and the gate would start editing the backlog
-// it was only meant to check. The gate's passing path is where the risk sits —
-// it refreshes the block it just verified, and on an old proposal there is no
-// block to refresh.
-func TestAnOldProposalIsNotRewritten(t *testing.T) {
+// TestTheVerifierChecksAndTheCallerWrites pins the split between checking and
+// writing. In August the verifier itself forbade a rewrite and a backfilled
+// block, because only the gates applied it. The proposal review applies it too,
+// and a review may rewrite an issue, so the verifier now writes nothing and
+// leaves what is written with the result to its caller. The gates did not
+// change: each still forbids a backfill in its own words, so an old proposal
+// that passes a gate keeps the operator's words.
+func TestTheVerifierChecksAndTheCallerWrites(t *testing.T) {
 	body, ok := section(readRepoFile(t, verifierDoc), noBlockHeading)
 	if !ok {
 		t.Fatalf("the premise verifier has no %q section", noBlockHeading)
 	}
-	for _, want := range []string{"rewrite", "backfill"} {
-		if !strings.Contains(flat(body), want) {
-			t.Errorf("the %q section never rules out a %s of the issue body", noBlockHeading, want)
+	lower := flat(body)
+	for _, want := range []string{"writes nothing", "belongs to the caller"} {
+		if !strings.Contains(lower, want) {
+			t.Errorf("the %q section never says %q, so it does not split checking from writing", noBlockHeading, want)
+		}
+	}
+	for _, gone := range []string{"do not rewrite the issue body", "do not backfill"} {
+		if strings.Contains(lower, gone) {
+			t.Errorf("the %q section still says %q, which forbids the review's rewrite", noBlockHeading, gone)
 		}
 	}
 
@@ -256,31 +262,44 @@ func TestAnOldProposalIsNotRewritten(t *testing.T) {
 	if !ok {
 		t.Fatal("the stage gate does not say what happens when the premise holds")
 	}
-	if !strings.Contains(flat(holds), "no block") {
-		t.Error("the stage gate refreshes the premise block unconditionally, so a proposal that carries none gets one written into it")
+	for _, want := range []string{"no block gets none", "not written back"} {
+		if !strings.Contains(flat(holds), want) {
+			t.Errorf("the stage gate no longer says %q, so a proposal that carries no block gets one written into it", want)
+		}
+	}
+
+	checker, ok := section(readRepoFile(t, gateProgram), "### premise-checker")
+	if !ok {
+		t.Fatalf("%s has no ### premise-checker section", gateProgram)
+	}
+	if !strings.Contains(flat(checker), "do not backfill a block into it") {
+		t.Errorf("%s no longer forbids a backfill, so its pass writes a block into an old proposal", gateProgram)
 	}
 }
 
-// TestTheBacklogIsNotSwept checks that applying the gate to old proposals stays
-// a per-run cost and never becomes a pass over the 534 open ones. The operator
-// chose that explicitly: not swept ahead of time, not pruned. A sweep would
-// relabel or close issues nobody asked about, in bulk, from a stage that was
-// only meant to check the one in front of it — so the checking is lazy, and the
-// only issue a run may edit is the one it was handed.
-func TestTheBacklogIsNotSwept(t *testing.T) {
+// TestTheVerifierChecksOnlyTheIssueItIsHanded checks that the verifier and the
+// stage gate never reach past the issue in front of them. In August this test
+// also pinned "the backlog is not swept". The proposal review now sweeps it, by
+// a list the operator dispatches, so the verifier no longer says so: whatever
+// picks the issues, each check covers one issue, and only the issue it was
+// handed.
+func TestTheVerifierChecksOnlyTheIssueItIsHanded(t *testing.T) {
 	body, ok := section(readRepoFile(t, verifierDoc), noBlockHeading)
 	if !ok {
 		t.Fatalf("the premise verifier has no %q section", noBlockHeading)
 	}
 	lower := flat(body)
-	for _, want := range []string{"check time", "touches"} {
+	for _, want := range []string{"check time", "and no other"} {
 		if !strings.Contains(lower, want) {
-			t.Errorf("the %q section never says %q, so it does not say when an old proposal is checked", noBlockHeading, want)
+			t.Errorf("the %q section never says %q, so it does not say which proposal it checks, or when", noBlockHeading, want)
 		}
 	}
+	if strings.Contains(lower, "not swept") {
+		t.Errorf("the %q section still says the backlog is not swept, but the proposal review sweeps it", noBlockHeading)
+	}
 
-	// Neither description may reach for the backlog. A stage is handed one
-	// issue; listing the others is the sweep this slice must not introduce.
+	// Neither description may reach for the backlog. A check is handed one
+	// issue; a list of issues is the caller's to assemble.
 	for _, doc := range []string{verifierDoc, gateDoc} {
 		src := readRepoFile(t, doc)
 		for _, banned := range []string{"gh issue list", "gh issue close"} {
