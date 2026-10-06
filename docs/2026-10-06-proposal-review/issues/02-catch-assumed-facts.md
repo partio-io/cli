@@ -64,17 +64,17 @@ the agent's section, with bold labels.
 
 ## Acceptance criteria
 
-- [ ] The verifier's no-block rule lists, as a kind of claim to extract, a fact that a requested behaviour, a design instruction or an acceptance criterion takes for granted about today's code or data.
-- [ ] The verifier tells the checker to quote the phrase that carries such a fact and to state it again as a checkable claim with evidence.
-- [ ] The verifier carries #31's phrase as its worked example of an assumed fact.
-- [ ] The verifier tells the checker to settle a sweeping claim with a command that lists every path that changes the data, and says that one counterexample fails it.
-- [ ] The verifier's "leave these" rule skips the behaviour a proposal asks for, but not the facts that behaviour rests on.
-- [ ] The ingest prompt's premise rule says that an assumption about today's code or data inside a "should" statement is a premise.
-- [ ] The research program's premise checker no longer declares an issue without a premise block out of scope, and it extracts claims from the prose through the verifier's no-block section.
-- [ ] A repo test fails if the research program writes a pass for an issue with no premise block, like the test that already guards the premise-gate program.
-- [ ] Repo tests pin the assumed-fact rule in the verifier and in the ingest prompt by their contract phrases.
-- [ ] The program-shape test passes for every changed program.
-- [ ] `make test` and `make lint` pass.
+- [x] The verifier's no-block rule lists, as a kind of claim to extract, a fact that a requested behaviour, a design instruction or an acceptance criterion takes for granted about today's code or data.
+- [x] The verifier tells the checker to quote the phrase that carries such a fact and to state it again as a checkable claim with evidence.
+- [x] The verifier carries #31's phrase as its worked example of an assumed fact.
+- [x] The verifier tells the checker to settle a sweeping claim with a command that lists every path that changes the data, and says that one counterexample fails it.
+- [x] The verifier's "leave these" rule skips the behaviour a proposal asks for, but not the facts that behaviour rests on.
+- [x] The ingest prompt's premise rule says that an assumption about today's code or data inside a "should" statement is a premise.
+- [x] The research program's premise checker no longer declares an issue without a premise block out of scope, and it extracts claims from the prose through the verifier's no-block section.
+- [x] A repo test fails if the research program writes a pass for an issue with no premise block, like the test that already guards the premise-gate program.
+- [x] Repo tests pin the assumed-fact rule in the verifier and in the ingest prompt by their contract phrases.
+- [x] The program-shape test passes for every changed program.
+- [x] `make test` and `make lint` pass.
 
 ## Modules touched
 

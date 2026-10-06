@@ -339,3 +339,93 @@ func section(src, heading string) (string, bool) {
 	}
 	return strings.Join(lines[start:], "\n"), true
 }
+
+// TestAnAssumedFactIsExtracted guards the gap that let #31 through. #31 asked
+// for "a merge strategy appropriate for append-only checkpoint data". The
+// phrase sits in a request, so a checker that extracts only statements about
+// today's code skipped it — but it asserts that nothing deletes checkpoint
+// data, and `partio prune` and `partio reset` both do. A fact a request takes
+// for granted is still a fact about today's tree.
+func TestAnAssumedFactIsExtracted(t *testing.T) {
+	body, ok := section(readRepoFile(t, verifierDoc), noBlockHeading)
+	if !ok {
+		t.Fatalf("the premise verifier has no %q section", noBlockHeading)
+	}
+	lower := flat(body)
+	for _, want := range []string{
+		"takes for granted",
+		"requested behaviour",
+		"design instruction",
+		"acceptance criterion",
+	} {
+		if !strings.Contains(lower, want) {
+			t.Errorf("the %q section never names %q, so an assumed fact is not extracted", noBlockHeading, want)
+		}
+	}
+}
+
+// TestAnAssumedFactIsRestatedAsACheckableClaim checks that the checker does not
+// verify the request's wording, which no tree settles. It quotes the phrase that
+// carries the fact and states the fact again as a claim the tree can decide.
+// #31 is the worked example, because it is the proposal the old rule let pass.
+func TestAnAssumedFactIsRestatedAsACheckableClaim(t *testing.T) {
+	body, ok := section(readRepoFile(t, verifierDoc), noBlockHeading)
+	if !ok {
+		t.Fatalf("the premise verifier has no %q section", noBlockHeading)
+	}
+	lower := flat(body)
+	for _, want := range []string{
+		"quote the phrase",
+		"checkable claim",
+		"evidence",
+		"appropriate for append-only checkpoint data",
+		"nothing in partio deletes or rewrites checkpoint data",
+	} {
+		if !strings.Contains(lower, want) {
+			t.Errorf("the %q section never says %q", noBlockHeading, want)
+		}
+	}
+}
+
+// TestASweepingClaimIsSettledByEveryPath checks how a claim like "append-only"
+// is decided. Reading the one path that appends proves nothing about the paths
+// that delete; #31's claim survived because nobody listed them. A sweeping
+// claim is settled by a command that lists every path that changes the data,
+// and one counterexample on that list fails it. The rule sits in the procedure,
+// not in the no-block section: the ingest prompt now puts an assumed fact into
+// the premise block, so a block claim needs the same rule as a prose claim.
+func TestASweepingClaimIsSettledByEveryPath(t *testing.T) {
+	body, ok := section(readRepoFile(t, verifierDoc), "## Procedure")
+	if !ok {
+		t.Fatal("the premise verifier describes no procedure")
+	}
+	lower := flat(body)
+	for _, want := range []string{
+		"sweeping claim",
+		"lists every path that changes the data",
+		"one counterexample fails it",
+		"applies to a claim from a block and to a claim from the prose",
+	} {
+		if !strings.Contains(lower, want) {
+			t.Errorf("the procedure never says %q", want)
+		}
+	}
+}
+
+// TestTheLeaveRuleSkipsOnlyTheRequestedBehaviour checks the other half of #31's
+// gap. The old rule left "what the proposal wants to build, and its acceptance
+// criteria" whole, and the assumed fact went out with them. The rule now skips
+// the behaviour a proposal asks for, and keeps the facts that behaviour rests on.
+func TestTheLeaveRuleSkipsOnlyTheRequestedBehaviour(t *testing.T) {
+	body, ok := section(readRepoFile(t, verifierDoc), noBlockHeading)
+	if !ok {
+		t.Fatalf("the premise verifier has no %q section", noBlockHeading)
+	}
+	lower := flat(body)
+	if strings.Contains(lower, "wants to build, and its acceptance criteria") {
+		t.Error("the leave rule still skips a proposal's acceptance criteria whole, with the facts they rest on")
+	}
+	if !strings.Contains(lower, "not the facts that behaviour rests on") {
+		t.Errorf("the %q section never says the leave rule keeps the facts the requested behaviour rests on", noBlockHeading)
+	}
+}

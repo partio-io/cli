@@ -31,15 +31,28 @@ When the issue carries no `<!-- partio:premise:v1 -->` marker, extract the
 factual claims from the issue prose and verify those. A factual claim is a
 statement about this repository that the tree can settle. Take each one word
 for word from the body, and name the path, symbol or command that settles it.
+An assumed fact, below, is the one exception: quote its phrase word for word,
+and report the claim you state from it next to that phrase.
 
 Extract these:
 
 - what the code does today, or does not do
 - how it behaves, performs or is structured
+- a fact that a requested behaviour, a design instruction or an acceptance
+  criterion takes for granted about today's code or data
+
+**An assumed fact.** A request can carry a fact about today's tree. Quote the
+phrase that carries the fact, then state the fact again as a checkable claim,
+and name the evidence that settles it. For example, #31 asked for "a merge
+strategy appropriate for append-only checkpoint data". The phrase
+"appropriate for append-only checkpoint data" carries the claim "nothing in
+Partio deletes or rewrites checkpoint data". Verify that claim, not the
+request around it.
 
 Leave these, because no tree settles them:
 
-- what the proposal wants to build, and its acceptance criteria
+- the behaviour the proposal asks for, but not the facts that behaviour rests
+  on: extract those as assumed facts above
 - what a sibling product does, and where the idea came from
 - whether the idea is worth doing
 
@@ -81,6 +94,15 @@ For each claim, in order, whether it came from a block or from the prose:
 Gather first, decide second. A claim you gathered no evidence for is
 `unresolved`. It is never `holds`.
 
+**A sweeping claim.** A claim such as "append-only", "nothing deletes" or
+"never changes" covers every path, so one path that agrees with it does not
+settle it. Settle a sweeping claim with a command that lists every path that
+changes the data, for example `grep -rn --include='*.go' 'update-ref\|"-D"' .`
+for the checkpoint branch, and read each path on the list. One counterexample
+fails it: for #31, `partio prune` removes checkpoints, and `partio reset`
+deletes and recreates the checkpoint branch.
+This applies to a claim from a block and to a claim from the prose.
+
 ## Verdicts
 
 For one claim:
@@ -97,7 +119,8 @@ is unresolved. Otherwise `holds`.
 
 Report every claim, whichever way it went:
 
-- the claim, word for word
+- the claim, word for word (for an assumed fact, the quoted phrase and the
+  claim stated from it)
 - the evidence the claim named
 - the verdict
 - the excerpt that produced the verdict

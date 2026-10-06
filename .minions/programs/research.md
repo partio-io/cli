@@ -113,15 +113,23 @@ working directory. Read it. Do not decide a claim from the issue text,
 and do not decide it from memory of how similar projects work.
 
 1. Read the parent issue body, which is provided under the "Issue"
-   section of your prompt, and take the `## Premise` section that
-   carries the `<!-- partio:premise:v1 -->` marker. That block is what
-   you verify.
+   section of your prompt, and find the claims you must verify.
 
-2. Apply `.minions/premise-verifier.md` to that block against the
+   When the body carries a `## Premise` section with the
+   `<!-- partio:premise:v1 -->` marker, that block is what you verify,
+   and you do not verify the prose around it.
+
+   When the body carries no such marker, the claims come from the prose
+   instead. Every proposal filed before the block format existed is in
+   this state, and none of them is exempt. The verifier's `## When there
+   is no block` section describes the extraction. Follow it as written.
+
+2. Apply `.minions/premise-verifier.md` to the claims against the
    checked-out tree. It describes verification once, for every stage
    that needs it. Follow it as written — gather the evidence each claim
    names, then decide, then record the excerpt that decided it. Do not
-   restate its procedure and do not invent your own.
+   restate its procedure and do not invent your own. A claim from the
+   prose meets the same bar as a claim from a block.
 
 3. Apply `.minions/stage-gate.md` to the verdict it produced. That file
    describes what a stage does when a premise does not hold, and what it
@@ -135,13 +143,16 @@ and do not decide it from memory of how similar projects work.
    ```
 
    Write `$PREMISE` fresh, truncating any stale content from a previous
-   run. Its first line is exactly `PREMISE_OK` when the block holds, and
-   exactly `PREMISE_BLOCKED` when it does not. Below that first line,
+   run. Its first line is exactly `PREMISE_OK` when the premise holds,
+   and exactly `PREMISE_BLOCKED` when it does not. When the issue carries
+   no block and the verifier finds that its prose makes no checkable
+   claim, there is nothing to block on: the first line is `PREMISE_OK`,
+   and below it you name what you read to decide that. Below that first line,
    record every claim, the evidence it named, its verdict, and the
    excerpt that produced it — for a block that holds as well as for one
    that does not. A run that passed carries its evidence too.
 
-5. When the block does not hold, the gate has already labelled the
+5. When the premise does not hold, the gate has already labelled the
    issue and posted the comment naming what you checked and what you
    found. Stop there. Produce no PRD, no slice plan and no further
    artifact, and do not close the issue. Which label the gate applies,
@@ -150,9 +161,13 @@ and do not decide it from memory of how similar projects work.
    labels. Verify against the tree on every run, whatever labels the
    issue already carries.
 
-6. When the block holds, refresh the premise section in the parent issue
-   with the evidence you just gathered, so the build stage checks against
-   today's facts rather than the filing-time ones.
+6. When the premise holds and the issue carries a premise block, refresh
+   that section in the parent issue with the evidence you just gathered,
+   so the build stage checks against today's facts rather than the
+   filing-time ones. An issue whose claims you extracted from its prose
+   gets no block: the extraction lives in `$PREMISE` and nowhere else.
+   Leave that body as the operator wrote it, and do not backfill a block
+   into it.
 
    Read the current body, replace the evidence excerpts inside the
    `## Premise` section with what you read on this run, and keep the
@@ -164,10 +179,6 @@ and do not decide it from memory of how similar projects work.
    REFRESHED_BODY="/tmp/minion-research-body-${MINION_ISSUE_NUMBER:-0}.md"
    gh issue edit "$MINION_ISSUE_NUMBER" --repo partio-io/cli --body-file "$REFRESHED_BODY"
    ```
-
-A parent issue whose body carries no `## Premise` section at all is out
-of scope for this program and is not your call to make. Write
-`PREMISE_OK` and continue.
 
 Write only `$PREMISE` and the refreshed issue body. Do not create or
 modify any file in the working directory, do not run `git`, and do not

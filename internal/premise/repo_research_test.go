@@ -449,3 +449,42 @@ func readRepoFile(t *testing.T, path string) string {
 	}
 	return string(raw)
 }
+
+// TestResearchVerifiesAProposalThatCarriesNoBlock mirrors the build stage's
+// guard for research. The August work removed the "out of scope" escape from
+// the premise-gate program and left it here, so research wrote PREMISE_OK for
+// every blockless proposal and planned it unchecked — #31 among them. The
+// verifier already describes where those claims come from, so research routes
+// to it, and a blockless issue reaches a verdict like any other.
+func TestResearchVerifiesAProposalThatCarriesNoBlock(t *testing.T) {
+	if !containsPhrase(readRepoFile(t, verifierDoc), NoBlockSection) {
+		t.Fatalf("%s no longer carries %q, so no stage has a described route for a blockless proposal",
+			VerifierPath, NoBlockSection)
+	}
+
+	checker, ok := section(readRepoFile(t, researchProgram), "### premise-checker")
+	if !ok {
+		t.Fatal("research program has no premise-checker agent")
+	}
+
+	if !containsPhrase(checker, NoBlockSection) {
+		t.Errorf("the premise-checker never routes to %q in %s, so a proposal with no block is never verified",
+			NoBlockSection, VerifierPath)
+	}
+
+	// A blockless issue that only describes what to build has no claim to
+	// settle. The verifier says to continue, so the checker needs a first line
+	// for that case, or the later agents stop on a proposal that should pass.
+	if !containsPhrase(checker, "makes no checkable claim") {
+		t.Error("the premise-checker never says what to write when the prose makes no checkable claim")
+	}
+
+	// The exact wording that shipped the bug: a pass written for a blockless
+	// issue without a verdict behind it.
+	for _, escape := range []string{"out of scope", "Write `PREMISE_OK` and continue"} {
+		if containsPhrase(checker, escape) {
+			t.Errorf("the premise-checker says %q of a blockless issue; that is most open proposals, so research plans them unchecked",
+				escape)
+		}
+	}
+}
