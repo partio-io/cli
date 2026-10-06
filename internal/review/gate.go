@@ -74,14 +74,7 @@ func Run(cfg Config) (Result, error) {
 			return Result{}, err
 		}
 	}
-	v, err := LoadVerdict(cfg.VerdictPath, cfg.Issue)
-	badShape := false
-	// A facts-only check never uses the rewrite text, so its shape
-	// does not matter.
-	if err == nil && v.Outcome == OutcomeRewrite && !res.FactsOnly {
-		err = checkShape(issue.Body, *v.Rewrite)
-		badShape = err != nil
-	}
+	v, badShape, err := verdictFor(cfg.VerdictPath, cfg.Issue, issue.Body, res.FactsOnly)
 	var kept *github.Issue
 	if err == nil && !cfg.DryRun {
 		kept, err = actable(gh, cfg.Repo, issue, v, res.FactsOnly)
@@ -137,4 +130,40 @@ func Run(cfg Config) (Result, error) {
 		return res, err
 	}
 	return res, nil
+}
+
+// verdictFor loads the verdict for issue from path and, for a rewrite,
+// checks the shape of the new body against oldBody. A facts-only check
+// never uses the rewrite text, so its shape does not matter there.
+// badShape reports a rewrite that failed the shape check. Run and Check
+// share it, so the review's own check never drifts from the gate's.
+func verdictFor(path string, issue int, oldBody string, factsOnly bool) (v Verdict, badShape bool, err error) {
+	v, err = LoadVerdict(path, issue)
+	if err != nil || v.Outcome != OutcomeRewrite || factsOnly {
+		return v, false, err
+	}
+	if err := checkShape(oldBody, *v.Rewrite); err != nil {
+		return v, true, err
+	}
+	return v, false, nil
+}
+
+// Check runs the checks of the gate on a verdict file, and changes
+// nothing. The review program runs it on its own verdict before its
+// session ends, so the session can still fix a verdict that the gate
+// would record as "no verdict". It returns the cause of "no verdict",
+// or "" when the verdict passes. It checks the shape of every rewrite,
+// because it does not decide the facts-only mode, and it leaves to the
+// gate what it checks on GitHub when it acts: an open issue, and an
+// open issue that stays for a duplicate. A non-nil error means that
+// Check could not read the issue.
+func Check(cfg Config) (string, error) {
+	issue, err := cfg.client().GetIssue(cfg.Repo, cfg.Issue)
+	if err != nil {
+		return "", fmt.Errorf("read issue #%d: %w", cfg.Issue, err)
+	}
+	if _, _, err := verdictFor(cfg.VerdictPath, cfg.Issue, issue.Body, false); err != nil {
+		return err.Error(), nil
+	}
+	return "", nil
 }

@@ -260,7 +260,17 @@ and do not decide it from memory of how similar projects work.
 
    The gate checks this file after your session ends. A missing file, a
    malformed one, or one that contradicts itself is recorded as "no
-   verdict", and the issue stays as it is.
+   verdict", and the issue stays as it is. Run the same checks before
+   you end:
+
+   ```bash
+   go run ./cmd/minion-review check --issue <issue number> --verdict "$MINION_REVIEW_DIR/verdict.json"
+   ```
+
+   It prints "no verdict" and the cause when the gate would refuse the
+   file. Then fix the file and run the check again. Run it at most three
+   times: when it still fails, end the session, and the gate records the
+   cause.
 
 Make no change on GitHub. Your `gh` calls only read: do not comment,
 label, edit, close or create anything. The gate records your verdict,

@@ -272,6 +272,61 @@ func TestGateBuildModeUsageErrors(t *testing.T) {
 	}
 }
 
+// check runs the checks of the gate on one verdict file. It prints the
+// cause and exits 1 for a verdict the gate would refuse, exits 0 for one
+// it would accept, and only reads from GitHub in both cases.
+func TestCheckPrintsTheCauseAndChangesNothing(t *testing.T) {
+	const keep = `"outcome": "keep", "fit": {"applies": true, "reason": "in scope"}, "built": {"built": false, "evidence": ""}, "duplicates": []`
+	tests := []struct {
+		name     string
+		verdict  string
+		wantCode int
+		wantOut  string
+	}{
+		{"valid keep", `{"issue": 12, ` + keep + `, "premise": {"verdict": "no-claims", "claims": []}}`,
+			0, "the verdict passes the checks of the gate"},
+		{"keep with a failing claim", `{"issue": 12, ` + keep + `, "premise": {"verdict": "fails", "claims": [` +
+			`{"claim": "c", "evidence": "e", "verdict": "fails", "excerpt": "x"}]}}`,
+			1, "no verdict: keep with a failing premise"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := fakeGateGitHub(t)
+			path := filepath.Join(t.TempDir(), "verdict.json")
+			if err := os.WriteFile(path, []byte(tt.verdict), 0o644); err != nil {
+				t.Fatal(err)
+			}
+
+			var out bytes.Buffer
+			code := check([]string{"--issue", "12", "--verdict", path}, &out)
+
+			if code != tt.wantCode || !strings.Contains(out.String(), tt.wantOut) {
+				t.Errorf("check exit %d, output %q; want exit %d with %q", code, out.String(), tt.wantCode, tt.wantOut)
+			}
+			for _, r := range *got {
+				if !strings.HasPrefix(r, "GET ") {
+					t.Errorf("check changed something: %s", r)
+				}
+			}
+		})
+	}
+}
+
+func TestCheckUsageErrors(t *testing.T) {
+	t.Setenv("GITHUB_REPOSITORY", "partio-io/cli")
+	t.Setenv("GH_TOKEN", "tok")
+	for _, args := range [][]string{
+		{"--issue", "12"},
+		{"--verdict", "v.json"},
+		{"--issue", "12", "--verdict", "v.json", "extra"},
+	} {
+		var out bytes.Buffer
+		if code := check(args, &out); code != 2 {
+			t.Errorf("check %q exit %d, want 2", args, code)
+		}
+	}
+}
+
 func TestNextPrintsOneIssuePerLine(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/repos/partio-io/cli/issues" || r.URL.Query().Get("labels") != "minion-proposal" {
