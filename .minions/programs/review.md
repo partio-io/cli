@@ -124,11 +124,9 @@ and do not decide it from memory of how similar projects work.
    - `close` when the issue must not reach a build. Give exactly one
      reason, in this order of precedence: `built` when step 4 found the
      behaviour; `duplicate` when a rule of step 5 closes the issue as a
-     duplicate; `false-premise` when a claim fails and the idea rests on
-     it; `does-not-apply` when step 3 found no fit; `could-not-verify`
-     when a claim stays unresolved.
-   - `rewrite` with a corrected premise when a claim fails but the idea
-     does not rest on it, the idea fits, and it is not built.
+     duplicate; `false-premise` when a claim fails; `does-not-apply`
+     when step 3 found no fit; `could-not-verify` when a claim stays
+     unresolved.
    - `keep` when nothing above applies and the body already has the
      issue shape below, with a premise block whose claims all hold.
    - `rewrite` when nothing above applies but the body lacks that shape,
@@ -137,15 +135,11 @@ and do not decide it from memory of how similar projects work.
      whose evidence is not inside backticks, or claim lines with a
      backslash before each backtick.
 
-   **When a claim fails, decide whether the idea rests on it.** The idea
-   rests on the false fact when the problem it solves exists only
-   because of that fact: once the fact is corrected, nothing is left to
-   build. Close it as `false-premise`. The idea does not rest on the
-   false fact when the problem still exists and only the design takes
-   the fact for granted: a design that respects the correct fact still
-   solves the problem. Rewrite it. Give each failing claim a
-   `correction`, the fact that holds instead, and turn each correction
-   into a criterion (step 7).
+   **A failing claim closes the issue**, also when its idea could
+   survive a correction. Give each failing claim a `correction`: the
+   fact that holds instead, as its evidence shows it. Do not correct
+   the issue yourself. The operator reopens an idea worth keeping and
+   corrects its text.
 
 7. **Compose the body for a keep or a rewrite.** Use the issue shape
    that the proposer files today, so that a build reads a reviewed issue
@@ -191,25 +185,10 @@ and do not decide it from memory of how similar projects work.
    - `Proposal id: <id>` is the last line. Keep the id the issue already
      carries. When it carries none, make a kebab-case id from its title.
 
-   A rewrite with a corrected premise designs nothing new. Its premise
-   block states each correction as a claim, with the evidence that
-   settles it. For each correction, add an acceptance criterion that a
-   build can test: what must stay true when the correct fact occurs.
-   For example, when the claim "the hook runs once per commit" fails, a
-   criterion states what must hold when the hook runs twice for one
-   commit. Then check each step, rule and reason in "What to build"
-   against each new criterion. Remove each one that breaks a criterion
-   or takes the false fact for granted. Add nothing in its place:
-   research designs the rest from the corrected issue. Name each failing
-   claim, its correction, each criterion you added and each part you
-   removed in `rewrite.changes`.
-
-   A rewrite changes the shape of the issue, not its idea. For a
-   corrected premise, it also removes the design that rests on a false
-   fact. Keep the original idea, and keep the source link to the
-   entireio/cli item it came from. Drop any `<!-- program: … -->`
-   pointer to a proposal file: proposal files no longer exist, so the
-   pointer leads nowhere.
+   A rewrite changes the shape of the issue, not its idea. Keep the
+   original idea, and keep the source link to the entireio/cli item it
+   came from. Drop any `<!-- program: … -->` pointer to a proposal
+   file: proposal files no longer exist, so the pointer leads nowhere.
 
 8. **Write the verdict.** Write one JSON object to
    `$MINION_REVIEW_DIR/verdict.json`, in this form:
@@ -247,10 +226,10 @@ and do not decide it from memory of how similar projects work.
    - Every claim carries its evidence and its excerpt. The premise
      verdict is `no-claims` only when the body states no checkable fact,
      in a block or in its prose.
-   - Set `correction` on each failing claim of a rewrite with a
-     corrected premise, and leave it out otherwise. A keep with a failing
-     claim, and a rewrite with a failing claim that has no correction,
-     contradict themselves.
+   - Set `correction` on each failing claim: the fact that holds
+     instead, as its evidence shows it. Leave it out on a claim that
+     holds or stays unresolved. A keep or a rewrite with a failing claim
+     contradicts itself, because a failing claim closes the issue.
    - A close carries the evidence for its reason: a failing claim for
      `false-premise`, an unresolved claim for `could-not-verify`,
      `built: true` with evidence for `built`, and `applies: false` with a

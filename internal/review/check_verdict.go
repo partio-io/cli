@@ -49,6 +49,9 @@ func (p Premise) check() error {
 		if c.Excerpt == "" {
 			return fmt.Errorf("claim %d: no excerpt", i+1)
 		}
+		if c.Verdict == Fails && strings.TrimSpace(c.Correction) == "" {
+			return fmt.Errorf("claim %d fails and has no correction", i+1)
+		}
 		if c.Correction != "" && c.Verdict != Fails {
 			return fmt.Errorf("claim %d: a correction on a claim whose verdict is %s", i+1, c.Verdict)
 		}
@@ -97,25 +100,17 @@ func (v Verdict) checkClose() error {
 }
 
 // checkNoContradiction rejects a keep or a rewrite whose own parts say
-// the issue should close. A rewrite may carry a failing claim when it
-// corrects that claim: the idea survives the false fact, and the new
-// body rests on the correction. A keep never carries one.
+// the issue should close. A failing claim closes the issue, even when its
+// idea could survive the correction: the operator reopens an idea worth
+// keeping and corrects its text.
 func (v Verdict) checkNoContradiction() error {
-	failing := v.Premise.Verdict == Fails || v.Premise.hasClaim(Fails)
 	switch {
-	case failing && v.Outcome == OutcomeKeep:
+	case v.Premise.Verdict == Fails || v.Premise.hasClaim(Fails):
 		return fmt.Errorf("%s with a failing premise", v.Outcome)
-	case failing && !v.Premise.hasClaim(Fails):
-		return fmt.Errorf("%s with a failing premise and no failing claim to correct", v.Outcome)
 	case !v.Fit.Applies:
 		return fmt.Errorf("%s with applies: false", v.Outcome)
 	case v.Built.Built:
 		return fmt.Errorf("%s with built: true", v.Outcome)
-	}
-	for i, c := range v.Premise.Claims {
-		if c.Verdict == Fails && strings.TrimSpace(c.Correction) == "" {
-			return fmt.Errorf("%s with failing claim %d and no correction", v.Outcome, i+1)
-		}
 	}
 	return nil
 }

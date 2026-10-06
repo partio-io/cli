@@ -16,6 +16,7 @@ func TestCheckReportsWhatTheGateWouldRefuse(t *testing.T) {
 	}
 	failing := strings.Replace(rewriteVerdict, noClaims,
 		`"premise": {"verdict": "fails", "claims": [{"claim": "the hook runs once", "evidence": "internal/hooks", "verdict": "fails", "excerpt": "run()"}]}`, 1)
+	corrected := strings.Replace(failing, `"excerpt": "run()"}`, `"excerpt": "run()", "correction": "the hook runs twice"}`, 1)
 	noBlock := strings.Replace(rewriteVerdict, "<!-- partio:premise:v1 -->", "", 1)
 
 	tests := []struct {
@@ -26,7 +27,8 @@ func TestCheckReportsWhatTheGateWouldRefuse(t *testing.T) {
 		{"valid keep", keepVerdict, ""},
 		{"valid rewrite", rewriteVerdict, ""},
 		{"no verdict file", "", "read verdict"},
-		{"rewrite with a failing claim and no correction", failing, "rewrite with failing claim 1 and no correction"},
+		{"failing claim without a correction", failing, "claim 1 fails and has no correction"},
+		{"rewrite with a corrected failing claim", corrected, "rewrite with a failing premise"},
 		{"rewrite whose body has no premise block", noBlock, "rewrite body has no premise block"},
 	}
 	for _, tt := range tests {

@@ -49,9 +49,10 @@ type Premise struct {
 
 // Claim is one factual claim, checked against the repository.
 //
-// Correction is the fact that holds where a failing claim does not. A
-// rewrite whose idea survives the false fact states the correction as a
-// claim of its new premise block, and builds the issue on it.
+// Correction is the fact that holds where a failing claim does not, as
+// the claim's evidence shows it. Every failing claim carries one, so the
+// evidence comment of a false-premise close tells the operator what to
+// correct when they reopen the issue to keep its idea.
 type Claim struct {
 	Claim      string `json:"claim"`
 	Evidence   string `json:"evidence"`

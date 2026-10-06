@@ -45,10 +45,9 @@ func renderEvidence(v Verdict, kept *github.Issue, pulls []github.PullRequest, e
 	}
 
 	fmt.Fprintf(&b, "### Premise: %s\n\n", v.Premise.Verdict)
-	if v.Outcome == OutcomeRewrite && v.Premise.hasClaim(Fails) {
-		b.WriteString("The issue as filed rests on a false fact. The rewrite keeps the idea, " +
-			"adds a criterion for the correction under each failing claim, and removes " +
-			"the design that rested on the false fact.\n\n")
+	if v.Outcome == OutcomeClose && v.CloseReason == ReasonFalsePremise {
+		b.WriteString("To keep the idea, reopen the issue and correct its text. The correction " +
+			"under each failing claim is the fact that holds instead.\n\n")
 	}
 	writeClaims(&b, v.Premise.Claims, excerpts)
 	b.WriteString("\n### Decisions\n\n")
