@@ -1,0 +1,40 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "26e15d26ce85",
+  "strategy": "manual-commit",
+  "branch": "proposal-review",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".minions/programs/review.md",
+    "cmd/minion-review/main.go",
+    "cmd/minion-review/main_test.go",
+    "docs/2026-10-06-proposal-review/issues.md",
+    "docs/2026-10-06-proposal-review/issues/05-duplicate-search.md",
+    "internal/premise/repo_review_dupes_test.go",
+    "internal/review/dupes.go",
+    "internal/review/dupes_test.go",
+    "internal/review/list_proposals.go",
+    "internal/review/source_refs.go",
+    "internal/review/source_refs_test.go",
+    "internal/review/testdata/issue-681-body.md",
+    "internal/review/testdata/issue-688-body.md",
+    "internal/review/testdata/issue-710-body.md",
+    "internal/review/testdata/issue-736-body.md",
+    "internal/review/title_words.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/26/e15d26ce85/0/metadata.json",
+      "transcript": "/26/e15d26ce85/0/full.jsonl",
+      "content_hash": "/26/e15d26ce85/0/content_hash.txt",
+      "prompt": "/26/e15d26ce85/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 112,
+    "cache_creation_tokens": 128152,
+    "cache_read_tokens": 4825149,
+    "output_tokens": 55762,
+    "api_call_count": 56
+  }
+}
