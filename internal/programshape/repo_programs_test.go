@@ -1,8 +1,11 @@
 package programshape
 
 import (
+	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -45,6 +48,45 @@ func TestRepoProgramsKeepInstructionsReachable(t *testing.T) {
 		case len(scan.Unreachable[name]) == 0:
 			t.Errorf("%s is listed in knownUnreachable, but its instructions now reach "+
 				"the model — delete its entry from knownUnreachable.", name)
+		}
+	}
+}
+
+// runtimeHeading is the heading pattern of the minions program parser
+// (internal/program/parse.go, headingRe, at v0.0.14). The parser applies it to
+// every line and knows nothing of fences, so a heading line inside a fenced
+// example still opens a section there, and the agent loses the rest of its
+// instructions. Check skips fenced lines, so it cannot see that cut. An
+// indented line does not match, which is why a fenced example inside a list
+// item is safe.
+var runtimeHeading = regexp.MustCompile(`^(#{1,6})\s+(.+)$`)
+
+// TestRepoProgramsShowNoHeadingInAFence guards the fenced examples in the
+// programs: the review program shows a whole issue body, with its ## headings,
+// inside the reviewer's instructions.
+func TestRepoProgramsShowNoHeadingInAFence(t *testing.T) {
+	paths, err := filepath.Glob(filepath.Join(programsDir, "*.md"))
+	if err != nil {
+		t.Fatalf("list the repository programs: %v", err)
+	}
+	if len(paths) == 0 {
+		t.Fatalf("no .md programs found in %s", programsDir)
+	}
+
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		inFence := false
+		for n, line := range strings.Split(string(raw), "\n") {
+			if isFence(line) {
+				inFence = !inFence
+				continue
+			}
+			if inFence && runtimeHeading.MatchString(line) {
+				t.Errorf("%s:%d: %q sits in a fence, but the runtime reads it as a heading and ends the section there; indent the fenced block", path, n+1, line)
+			}
 		}
 	}
 }

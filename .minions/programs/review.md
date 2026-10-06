@@ -119,23 +119,54 @@ and do not decide it from memory of how similar projects work.
    - `keep` when nothing above applies and the body already has the
      issue shape below, with a premise block whose claims all hold.
    - `rewrite` when nothing above applies but the body lacks that shape,
-     or a claim in its block needs to be stated again.
+     or a claim in its block needs to be stated again. A premise block
+     that breaks a rule of step 7 lacks that shape: for example, a claim
+     whose evidence is not inside backticks, or claim lines with a
+     backslash before each backtick.
 
 7. **Compose the body for a keep or a rewrite.** Use the issue shape
    that the proposer files today, so that a build reads a reviewed issue
-   the way it reads a new one:
-   - what to build, in full, so that a fresh session can build from the
-     issue and nothing else;
-   - the acceptance criteria as a `- [ ]` checklist under
-     `## Acceptance Criteria`;
-   - a `## Premise` section with the `<!-- partio:premise:v1 -->`
-     marker and one claim per line, each in the form
-     `- <claim> [evidence: <path, symbol or command that settles it>]`;
-   - the evidence you gathered in step 2: each claim, the evidence, the
-     verdict and the excerpt;
-   - a final line of its own: `Proposal id: <id>`. Keep the id the issue
-     already carries. When it carries none, make a kebab-case id from
-     its title.
+   the way it reads a new one. Use this skeleton, with its headings in
+   this order:
+
+   ```markdown
+   ## Description
+
+   <the idea, and the link to the item it came from, when it has one>
+
+   ## What to build
+
+   <what to build, in full, so that a fresh session can build from the issue and nothing else>
+
+   ## Acceptance Criteria
+
+   - [ ] <one criterion per line>
+
+   ## Premise
+
+   <!-- partio:premise:v1 -->
+
+   - <one factual claim this issue depends on> [evidence: `<path, symbol or command that settles it>`]
+
+   ## Gathered Evidence
+
+   <the evidence you gathered in step 2: each claim, the evidence, the verdict and the excerpt>
+
+   Proposal id: <id>
+   ```
+
+   The gate checks a rewritten body with the premise parser that every
+   later stage uses, and it records no verdict when the body fails:
+   - The acceptance criteria are a `- [ ]` checklist under
+     `## Acceptance Criteria`.
+   - The premise section holds the marker and the claim lines, and
+     nothing else. Each claim is one line, and it ends with its
+     evidence inside backticks, as in the skeleton.
+   - `## Gathered Evidence` comes directly after the premise section.
+     Without that heading, the lines below the claims fall into the
+     premise section, and the parser rejects them.
+   - `Proposal id: <id>` is the last line. Keep the id the issue already
+     carries. When it carries none, make a kebab-case id from its title.
 
    A rewrite changes the shape of the issue, not its idea. Keep the
    original idea, and keep the source link to the entireio/cli item it
