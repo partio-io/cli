@@ -73,10 +73,47 @@ and do not decide it from memory of how similar projects work.
    the proposal describes. Name the path or symbol that shows it, or name
    what you searched when you found nothing.
 
-5. **Decide.** Choose one outcome:
+5. **Look for duplicates.** Run the duplicate search in your working
+   directory. Pass each source reference the issue cites, as written
+   (`owner/repo#N`, a URL, or the text of its `Origin:` line), its
+   title, and its number:
+
+   ```bash
+   go run ./cmd/minion-review dupes --source "entireio/cli#2075" --title "<issue title>" --exclude <issue number>
+   ```
+
+   Repeat `--source` for each reference. The command prints a JSON list
+   of candidates: other `minion-proposal` issues, open and closed, that
+   cite the same source item (`"match": "source"`) or have a strongly
+   overlapping title (`"match": "title"`). Source matches come first.
+   Each candidate carries its `state`, `state_reason` and `labels`. The
+   list is the backlog you judge against: do not look for duplicates in
+   another way.
+
+   A shared source or title does not make the same idea. Read each
+   candidate with `gh issue view <n>`, and decide whether it asks for
+   the same change. Then apply these rules to each candidate that is
+   the same idea. The first issue reviewed stays:
+   - An open candidate that carries `minion-reviewed` stays, and this
+     issue closes as its duplicate.
+   - An open candidate without `minion-reviewed` lets this issue stay.
+     The other one closes when its own review runs.
+   - A candidate that the review closed (`state_reason` `not_planned`,
+     label `minion-reviewed`) makes this issue its duplicate, because the
+     idea already has a verdict. When that candidate closed as a
+     duplicate (`state_reason` `duplicate`, or a review that names the
+     issue it duplicates), apply these rules to the issue it names
+     instead, so that `duplicate_of` names the issue that stays.
+   - A candidate closed as `completed` makes this issue `built` only
+     when the tree shows the work, by the search of step 4. A build can
+     close an issue while its pull request never merges (#31 is such a
+     case), so the closed state alone proves nothing.
+
+6. **Decide.** Choose one outcome:
    - `close` when the issue must not reach a build. Give exactly one
      reason, in this order of precedence: `built` when step 4 found the
-     behaviour; `false-premise` when a claim fails; `does-not-apply`
+     behaviour; `duplicate` when a rule of step 5 closes the issue as a
+     duplicate; `false-premise` when a claim fails; `does-not-apply`
      when step 3 found no fit; `could-not-verify` when a claim stays
      unresolved.
    - `keep` when nothing above applies and the body already has the
@@ -84,7 +121,7 @@ and do not decide it from memory of how similar projects work.
    - `rewrite` when nothing above applies but the body lacks that shape,
      or a claim in its block needs to be stated again.
 
-6. **Compose the body for a keep or a rewrite.** Use the issue shape
+7. **Compose the body for a keep or a rewrite.** Use the issue shape
    that the proposer files today, so that a build reads a reviewed issue
    the way it reads a new one:
    - what to build, in full, so that a fresh session can build from the
@@ -105,14 +142,15 @@ and do not decide it from memory of how similar projects work.
    came from. Drop any `<!-- program: … -->` pointer to a proposal
    file: proposal files no longer exist, so the pointer leads nowhere.
 
-7. **Write the verdict.** Write one JSON object to
+8. **Write the verdict.** Write one JSON object to
    `$MINION_REVIEW_DIR/verdict.json`, in this form:
 
    ```json
    {
      "issue": 123,
      "outcome": "keep | rewrite | close",
-     "close_reason": "built | false-premise | does-not-apply | could-not-verify",
+     "close_reason": "built | duplicate | false-premise | does-not-apply | could-not-verify",
+     "duplicate_of": 456,
      "premise": {
        "verdict": "holds | fails | unresolved | no-claims",
        "claims": [
@@ -121,14 +159,22 @@ and do not decide it from memory of how similar projects work.
      },
      "fit": {"applies": true, "reason": "…"},
      "built": {"built": false, "evidence": "…"},
-     "duplicates": [],
+     "duplicates": [
+       {"issue": 456, "same": true, "why": "…"}
+     ],
      "rewrite": {"title": "…", "body": "…", "changes": ["…"]}
    }
    ```
 
    - `issue` is the number of the issue you reviewed.
-   - Set `close_reason` for a close only, and `rewrite` for a rewrite
-     only. Leave each out otherwise.
+   - Set `close_reason` for a close only, `duplicate_of` for a
+     `duplicate` close only, and `rewrite` for a rewrite only. Leave each
+     out otherwise.
+   - `duplicates` lists every candidate the search of step 5 returned:
+     its number, `same` for whether it is the same idea, and `why`. A
+     search with no candidate gives an empty list.
+   - A `duplicate` close names the issue that stays in `duplicate_of`,
+     and that issue is in `duplicates` with `same: true`.
    - Every claim carries its evidence and its excerpt. The premise
      verdict is `no-claims` only when the body states no checkable fact,
      in a block or in its prose.
@@ -136,7 +182,7 @@ and do not decide it from memory of how similar projects work.
      `false-premise`, an unresolved claim for `could-not-verify`,
      `built: true` with evidence for `built`, and `applies: false` with a
      reason for `does-not-apply`.
-   - `rewrite.body` is the whole body from step 6, and `rewrite.changes`
+   - `rewrite.body` is the whole body from step 7, and `rewrite.changes`
      lists what you changed against the current body, one line each.
 
    The gate checks this file after your session ends. A missing file, a

@@ -53,18 +53,18 @@ issue reviewed stays):
 
 ## Acceptance criteria
 
-- [ ] The search lists every `minion-proposal` issue, open and closed, with pagination, through the shared GitHub client.
-- [ ] It extracts source items in each form (shorthand, issue URL, pull request URL, `Origin:` line, legacy `source:` line) and normalizes them to `owner/repo#N`.
-- [ ] A candidate with the same source item matches, whether it is open or closed.
-- [ ] A candidate with a strongly overlapping normalized title matches, and an unrelated idea returns no candidate.
-- [ ] The issue under review never appears among its own candidates.
-- [ ] Each candidate carries number, title, state, state reason, labels and match reason, with source matches first.
-- [ ] Test fixtures include at least one confirmed duplicate pair from the backlog (#710/#736, #714/#720 or #681/#688), and the pair matches.
-- [ ] `minion-review dupes` prints the candidates as JSON.
-- [ ] The review program calls the command and writes every candidate it considered into the verdict, with `same` and `why`.
-- [ ] The review program applies the duplicate rules above and names the issue that stays in a duplicate close.
-- [ ] Search tests run against a fake GitHub server, and a repo test pins that the review program calls the command.
-- [ ] `make test` and `make lint` pass.
+- [x] The search lists every `minion-proposal` issue, open and closed, with pagination, through the shared GitHub client.
+- [x] It extracts source items in each form (shorthand, issue URL, pull request URL, `Origin:` line, legacy `source:` line) and normalizes them to `owner/repo#N`.
+- [x] A candidate with the same source item matches, whether it is open or closed.
+- [x] A candidate with a strongly overlapping normalized title matches, and an unrelated idea returns no candidate.
+- [x] The issue under review never appears among its own candidates.
+- [x] Each candidate carries number, title, state, state reason, labels and match reason, with source matches first.
+- [x] Test fixtures include at least one confirmed duplicate pair from the backlog (#710/#736, #714/#720 or #681/#688), and the pair matches.
+- [x] `minion-review dupes` prints the candidates as JSON.
+- [x] The review program calls the command and writes every candidate it considered into the verdict, with `same` and `why`.
+- [x] The review program applies the duplicate rules above and names the issue that stays in a duplicate close.
+- [x] Search tests run against a fake GitHub server, and a repo test pins that the review program calls the command.
+- [x] `make test` and `make lint` pass.
 
 ## Modules touched
 

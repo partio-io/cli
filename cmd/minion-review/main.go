@@ -7,27 +7,64 @@
 // Only --dry-run exists yet: the gate records the verdict and changes
 // nothing on the reviewed issue.
 //
-// Exit codes: 0 for a valid verdict; 1 for no verdict, after its row is
-// written, or for a GitHub failure; 2 for a usage or environment error.
+// Its dupes subcommand lists the minion-proposal issues that may hold
+// the same idea as one issue, by source item or by title, and prints
+// them as JSON. The review program calls it; it changes nothing.
+//
+// Exit codes: 0 for a valid verdict or a dupes list; 1 for no verdict,
+// after its row is written, or for a GitHub failure; 2 for a usage or
+// environment error.
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/partio-io/cli/internal/github"
 	"github.com/partio-io/cli/internal/review"
 )
 
-const usage = "usage: minion-review gate --issue <number> --verdict <path> --dry-run [--night YYYY-MM-DD]"
+const (
+	gateUsage  = "usage: minion-review gate --issue <number> --verdict <path> --dry-run [--night YYYY-MM-DD]"
+	dupesUsage = "usage: minion-review dupes --title <title> [--source <ref>]... [--exclude <number>]"
+	usage      = gateUsage + "\n" + dupesUsage
+)
 
 func main() {
-	if len(os.Args) < 2 || os.Args[1] != "gate" {
+	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, usage)
 		os.Exit(2)
 	}
-	os.Exit(gate(os.Args[2:]))
+	switch os.Args[1] {
+	case "gate":
+		os.Exit(gate(os.Args[2:]))
+	case "dupes":
+		os.Exit(dupes(os.Args[2:], os.Stdout))
+	default:
+		fmt.Fprintln(os.Stderr, usage)
+		os.Exit(2)
+	}
+}
+
+// githubEnv reads the repo, token and API root the workflow sets. It
+// returns false, after it prints the cause, when one is missing.
+func githubEnv() (repo, token, api string, ok bool) {
+	repo = os.Getenv("GITHUB_REPOSITORY")
+	token = os.Getenv("GH_TOKEN")
+	if repo == "" || token == "" {
+		fmt.Fprintln(os.Stderr, "minion-review: GITHUB_REPOSITORY and GH_TOKEN must be set")
+		return "", "", "", false
+	}
+	api = os.Getenv("GITHUB_API_URL")
+	if api == "" {
+		api = "https://api.github.com"
+	}
+	return repo, token, api, true
 }
 
 func gate(args []string) int {
@@ -44,22 +81,16 @@ func gate(args []string) int {
 		return 2
 	}
 	if *issue <= 0 || *verdict == "" || !*dryRun {
-		fmt.Fprintln(os.Stderr, usage)
+		fmt.Fprintln(os.Stderr, gateUsage)
 		return 2
 	}
 	if _, err := time.Parse(time.DateOnly, *night); err != nil {
 		fmt.Fprintf(os.Stderr, "minion-review: --night %q is not a YYYY-MM-DD date\n", *night)
 		return 2
 	}
-	repo := os.Getenv("GITHUB_REPOSITORY")
-	token := os.Getenv("GH_TOKEN")
-	if repo == "" || token == "" {
-		fmt.Fprintln(os.Stderr, "minion-review: GITHUB_REPOSITORY and GH_TOKEN must be set")
+	repo, token, api, ok := githubEnv()
+	if !ok {
 		return 2
-	}
-	api := os.Getenv("GITHUB_API_URL")
-	if api == "" {
-		api = "https://api.github.com"
 	}
 
 	res, err := review.Run(review.Config{
@@ -80,5 +111,55 @@ func gate(args []string) int {
 		return 1
 	}
 	fmt.Println("minion-review:", res.Outcome, "(dry run)")
+	return 0
+}
+
+// sourceFlags collects each --source value.
+type sourceFlags []string
+
+func (s *sourceFlags) String() string     { return strings.Join(*s, " ") }
+func (s *sourceFlags) Set(v string) error { *s = append(*s, v); return nil }
+
+func dupes(args []string, stdout io.Writer) int {
+	fs := flag.NewFlagSet("dupes", flag.ContinueOnError)
+	var sources sourceFlags
+	fs.Var(&sources, "source", "a source reference of the issue, in any form: owner/repo#N, a URL, an Origin: line (repeatable)")
+	var (
+		title   = fs.String("title", "", "title of the issue (required)")
+		exclude = fs.Int("exclude", 0, "the issue under review, left out of the candidates")
+	)
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if strings.TrimSpace(*title) == "" || fs.NArg() > 0 {
+		fmt.Fprintln(os.Stderr, dupesUsage)
+		return 2
+	}
+	for _, src := range sources {
+		if len(review.SourceRefs(src)) == 0 {
+			fmt.Fprintf(os.Stderr, "minion-review: --source %q names no owner/repo#N item; it matches nothing\n", src)
+		}
+	}
+	repo, token, api, ok := githubEnv()
+	if !ok {
+		return 2
+	}
+
+	found, err := review.FindDupes(github.Client{BaseURL: api, Token: token}, review.DupesQuery{
+		Repo: repo, Sources: sources, Title: *title, Exclude: *exclude,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "minion-review: %v\n", err)
+		return 1
+	}
+	if found == nil {
+		found = []review.Dupe{}
+	}
+	enc := json.NewEncoder(stdout)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(found); err != nil {
+		fmt.Fprintf(os.Stderr, "minion-review: %v\n", err)
+		return 1
+	}
 	return 0
 }
