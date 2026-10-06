@@ -133,6 +133,144 @@ func TestGatePassesTheDryRunValue(t *testing.T) {
 	}
 }
 
+// buildVerdicts are the verdict files the build-mode tests run the gate
+// on: one per outcome, and one that is no verdict.
+var buildVerdicts = map[string]string{
+	"keep": `{"issue": 12, "outcome": "keep",
+		"premise": {"verdict": "no-claims", "claims": []},
+		"fit": {"applies": true, "reason": "in scope"},
+		"built": {"built": false, "evidence": ""}, "duplicates": []}`,
+	"rewrite": `{"issue": 12, "outcome": "rewrite",
+		"premise": {"verdict": "no-claims", "claims": []},
+		"fit": {"applies": true, "reason": "in scope"},
+		"built": {"built": false, "evidence": ""}, "duplicates": [],
+		"rewrite": {"title": "Retry the push once", "changes": ["added the premise block"],
+			"body": "## What\n\nRetry the push once.\n\n## Premise\n\n<!-- partio:premise:v1 -->\n\n- the pre-push hook has no retry [evidence: ` + "`internal/hooks/prepush.go`" + `]\n\n## Acceptance Criteria\n\n- [ ] a push that fails runs once more\n\nProposal id: retry-pre-push\n"}}`,
+	"close": `{"issue": 12, "outcome": "close", "close_reason": "built",
+		"premise": {"verdict": "no-claims", "claims": []},
+		"fit": {"applies": true, "reason": "in scope"},
+		"built": {"built": true, "evidence": "internal/hooks/retry.go already retries"}, "duplicates": []}`,
+	"no verdict": `not json`,
+}
+
+// A build reviews its issue with --mode build: the gate acts on the
+// issue as a real run, and appends the blocked and changed step outputs
+// the build workflow reads to GITHUB_OUTPUT. No verdict exits 1 and
+// writes no output, so the job fails closed.
+func TestGateBuildModeWritesTheStepOutputs(t *testing.T) {
+	for _, tt := range []struct {
+		outcome string
+		code    int
+		outputs string
+		acted   bool
+	}{
+		{"keep", 0, "blocked=false\nchanged=false\n", true},
+		{"rewrite", 0, "blocked=false\nchanged=true\n", true},
+		{"close", 0, "blocked=true\n", true},
+		{"no verdict", 1, "", false},
+	} {
+		t.Run(tt.outcome, func(t *testing.T) {
+			verdict := filepath.Join(t.TempDir(), "verdict.json")
+			if err := os.WriteFile(verdict, []byte(buildVerdicts[tt.outcome]), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			output := filepath.Join(t.TempDir(), "output")
+			if err := os.WriteFile(output, []byte("earlier=1\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("GITHUB_OUTPUT", output)
+			got := fakeGateGitHub(t)
+
+			code := gate([]string{"--mode", "build", "--issue", "12", "--verdict", verdict})
+
+			if code != tt.code {
+				t.Fatalf("gate exit %d, want %d; requests %q", code, tt.code, *got)
+			}
+			if acted := slices.Contains(*got, "POST /repos/partio-io/cli/issues/12/labels"); acted != tt.acted {
+				t.Errorf("acted on #12 = %v, want %v; requests %q", acted, tt.acted, *got)
+			}
+			out, err := os.ReadFile(output)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := "earlier=1\n" + tt.outputs; string(out) != want {
+				t.Errorf("GITHUB_OUTPUT = %q, want %q", out, want)
+			}
+		})
+	}
+}
+
+// The gate can fail on the tracking issue after it acted. A build still
+// gets its outputs then, so the failure step does not mark an issue the
+// gate closed as a failed build.
+func TestGateBuildModeWritesOutputsWhenTrackingFailsAfterActing(t *testing.T) {
+	verdict := filepath.Join(t.TempDir(), "verdict.json")
+	if err := os.WriteFile(verdict, []byte(`{"issue": 12, "outcome": "keep",
+		"premise": {"verdict": "no-claims", "claims": []},
+		"fit": {"applies": true, "reason": "in scope"},
+		"built": {"built": false, "evidence": ""}, "duplicates": []}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(t.TempDir(), "output")
+	t.Setenv("GITHUB_OUTPUT", output)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/partio-io/cli/issues/12":
+			_, _ = w.Write([]byte(`{"number": 12, "title": "Retry the push", "state": "open", "html_url": "https://github.com/partio-io/cli/issues/12"}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/partio-io/cli/issues":
+			w.WriteHeader(http.StatusInternalServerError) // the tracking issue lookup fails
+		case r.Method == http.MethodGet && (strings.HasSuffix(r.URL.Path, "/comments") || r.URL.Path == "/repos/partio-io/cli/pulls"):
+			_, _ = w.Write([]byte(`[]`))
+		case r.Method == http.MethodGet:
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{}`))
+		}
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("GITHUB_REPOSITORY", "partio-io/cli")
+	t.Setenv("GH_TOKEN", "tok")
+	t.Setenv("GITHUB_API_URL", srv.URL)
+
+	if code := gate([]string{"--mode", "build", "--issue", "12", "--verdict", verdict}); code != 1 {
+		t.Fatalf("gate exit %d, want 1", code)
+	}
+	out, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "blocked=false\nchanged=false\n"; string(out) != want {
+		t.Errorf("GITHUB_OUTPUT = %q, want %q", out, want)
+	}
+}
+
+// Build mode acts, so it refuses --dry-run, and it needs GITHUB_OUTPUT
+// to hand its outputs to the workflow.
+func TestGateBuildModeUsageErrors(t *testing.T) {
+	verdict := filepath.Join(t.TempDir(), "verdict.json")
+	for _, tt := range []struct {
+		name   string
+		args   []string
+		output string
+	}{
+		{"dry run", []string{"--mode", "build", "--dry-run", "--issue", "12", "--verdict", verdict}, filepath.Join(t.TempDir(), "output")},
+		{"no GITHUB_OUTPUT", []string{"--mode", "build", "--issue", "12", "--verdict", verdict}, ""},
+		{"unknown mode", []string{"--mode", "nightly", "--issue", "12", "--verdict", verdict}, filepath.Join(t.TempDir(), "output")},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("GITHUB_OUTPUT", tt.output)
+			got := fakeGateGitHub(t)
+			if code := gate(tt.args); code != 2 {
+				t.Errorf("gate exit %d, want 2", code)
+			}
+			if len(*got) != 0 {
+				t.Errorf("a usage error reached GitHub: %q", *got)
+			}
+		})
+	}
+}
+
 func TestNextPrintsOneIssuePerLine(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/repos/partio-io/cli/issues" || r.URL.Query().Get("labels") != "minion-proposal" {

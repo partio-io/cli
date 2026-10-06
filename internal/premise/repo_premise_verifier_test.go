@@ -238,9 +238,11 @@ func TestAFailedExtractedClaimStopsTheStageTheSameWay(t *testing.T) {
 // writing. In August the verifier itself forbade a rewrite and a backfilled
 // block, because only the gates applied it. The proposal review applies it too,
 // and a review may rewrite an issue, so the verifier now writes nothing and
-// leaves what is written with the result to its caller. The gates did not
-// change: each still forbids a backfill in its own words, so an old proposal
-// that passes a gate keeps the operator's words.
+// leaves what is written with the result to its caller. The stage gate did
+// not change: it still forbids a backfill, so an old proposal that passes
+// research keeps the operator's words. The premise-gate program that also
+// forbade one is gone; a build now runs the review, whose rewrite is its own
+// gated outcome.
 func TestTheVerifierChecksAndTheCallerWrites(t *testing.T) {
 	body, ok := section(readRepoFile(t, verifierDoc), noBlockHeading)
 	if !ok {
@@ -266,14 +268,6 @@ func TestTheVerifierChecksAndTheCallerWrites(t *testing.T) {
 		if !strings.Contains(flat(holds), want) {
 			t.Errorf("the stage gate no longer says %q, so a proposal that carries no block gets one written into it", want)
 		}
-	}
-
-	checker, ok := section(readRepoFile(t, gateProgram), "### premise-checker")
-	if !ok {
-		t.Fatalf("%s has no ### premise-checker section", gateProgram)
-	}
-	if !strings.Contains(flat(checker), "do not backfill a block into it") {
-		t.Errorf("%s no longer forbids a backfill, so its pass writes a block into an old proposal", gateProgram)
 	}
 }
 

@@ -15,6 +15,7 @@ type Config struct {
 	Issue       int    // the reviewed issue
 	Night       string // UTC date, YYYY-MM-DD, that names the night comment
 	DryRun      bool   // record only; change nothing on the reviewed issue
+	Build       bool   // a build reviews its issue: act, and mark the row as a build
 	APIBaseURL  string
 	Token       string
 	HTTPClient  *http.Client // nil means http.DefaultClient
@@ -27,6 +28,18 @@ type Result struct {
 	Cause   string // why there is no verdict when not Valid
 }
 
+// mark is the suffix of the verdict column: what kind of run wrote the
+// row. A sweep that acts writes no mark.
+func (c Config) mark() string {
+	switch {
+	case c.DryRun:
+		return dryRunMark
+	case c.Build:
+		return buildMark
+	}
+	return ""
+}
+
 func (c Config) client() github.Client {
 	return github.Client{BaseURL: c.APIBaseURL, Token: c.Token, HTTPClient: c.HTTPClient}
 }
@@ -36,11 +49,14 @@ func (c Config) client() github.Client {
 // invalid verdict, or a rewrite whose new text fails a shape check, is
 // "no verdict": Run records that row with its cause and returns a
 // Result that is not Valid, with a nil error. A non-nil error means the
-// gate could not talk to GitHub. In dry-run mode Run reads the reviewed
-// issue and changes nothing on it, and the row of a rewrite that fails
-// a shape check also carries the proposed text. Outside dry-run a
+// gate could not talk to GitHub; when the tracking issue fails after
+// the gate acted, the Result still names the verdict it acted on. In
+// dry-run mode Run reads the reviewed issue and changes nothing on it,
+// and the row of a rewrite that fails a shape check also carries the
+// proposed text. Outside dry-run a
 // verdict the gate cannot act on is no verdict: a closed issue, a pull
-// request, or a duplicate close whose kept issue is not open.
+// request, or a duplicate close whose kept issue is not open. A build
+// run acts as a real run does, and its row carries the build mark.
 func Run(cfg Config) (Result, error) {
 	gh := cfg.client()
 	issue, err := gh.GetIssue(cfg.Repo, cfg.Issue)
@@ -66,13 +82,19 @@ func Run(cfg Config) (Result, error) {
 	var r string
 	if err != nil {
 		res.Cause = err.Error()
-		r = noVerdictRow(issue, res.Cause)
+		// A dry run's "no verdict" row has always gone unmarked; only
+		// a build marks its own.
+		mark := ""
+		if cfg.Build {
+			mark = buildMark
+		}
+		r = noVerdictRow(issue, res.Cause, mark)
 		if badShape && cfg.DryRun {
 			r += indent(rewriteDetails(*v.Rewrite))
 		}
 	} else {
 		res.Valid, res.Outcome = true, v.Outcome
-		r = row(issue, v, cfg.DryRun)
+		r = row(issue, v, cfg.mark())
 	}
 	if res.Valid && !cfg.DryRun {
 		if err := act(gh, cfg.Repo, issue, v, kept); err != nil {
@@ -80,16 +102,18 @@ func Run(cfg Config) (Result, error) {
 		}
 	}
 
+	// Any action on the issue is done from here, so an error still
+	// returns res: a build can tell a close it made from no verdict.
 	tracking, err := findOrCreateTracking(gh, cfg.Repo)
 	if err != nil {
-		return Result{}, err
+		return res, err
 	}
 	nights, err := appendRow(gh, cfg.Repo, tracking.Number, cfg.Night, r)
 	if err != nil {
-		return Result{}, err
+		return res, err
 	}
 	if err := writeSummary(gh, cfg.Repo, tracking, nights); err != nil {
-		return Result{}, err
+		return res, err
 	}
 	return res, nil
 }

@@ -7,15 +7,19 @@ import (
 	"github.com/partio-io/cli/internal/github"
 )
 
-// row is one tracking line for a valid verdict: number, title, verdict,
-// reason and link. A rewrite carries its full proposed text in a
+// The marks row and noVerdictRow put after the verdict: the row of a
+// dry run, and the row of the review a build runs first.
+const (
+	dryRunMark = " (dry run)"
+	buildMark  = " (build)"
+)
+
+// row is one tracking line for a valid verdict: number, title, verdict
+// with its mark, reason and link. A rewrite carries its full proposed text in a
 // collapsed section, indented so it stays under its row, with the body
 // fenced so its own markup cannot close the section or hide later rows.
-func row(issue github.Issue, v Verdict, dryRun bool) string {
-	verdict := "**" + v.Outcome + "**"
-	if dryRun {
-		verdict += " (dry run)"
-	}
+func row(issue github.Issue, v Verdict, mark string) string {
+	verdict := "**" + v.Outcome + "**" + mark
 	line := fmt.Sprintf("- #%d · %s · %s · %s · [link](%s)\n",
 		issue.Number, oneLine(issue.Title), verdict, reason(v), issue.HTMLURL)
 	if v.Outcome != OutcomeRewrite {
@@ -25,9 +29,9 @@ func row(issue github.Issue, v Verdict, dryRun bool) string {
 }
 
 // noVerdictRow is the tracking line for a missing or invalid verdict.
-func noVerdictRow(issue github.Issue, cause string) string {
-	return fmt.Sprintf("- #%d · %s · **no verdict** · %s · [link](%s)\n",
-		issue.Number, oneLine(issue.Title), oneLine(cause), issue.HTMLURL)
+func noVerdictRow(issue github.Issue, cause, mark string) string {
+	return fmt.Sprintf("- #%d · %s · **no verdict**%s · %s · [link](%s)\n",
+		issue.Number, oneLine(issue.Title), mark, oneLine(cause), issue.HTMLURL)
 }
 
 func reason(v Verdict) string {

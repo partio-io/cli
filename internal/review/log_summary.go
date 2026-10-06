@@ -14,11 +14,11 @@ import (
 const noVerdictLimit = 2
 
 // rowLine matches one row of a night comment, as row and noVerdictRow
-// write it: the issue number, the verdict, the dry-run mark and the
-// reason. The indented details under a rewrite row never match. The
+// write it: the issue number, the verdict, the dry-run or build mark
+// and the reason. The indented details under a rewrite row never match. The
 // title match is lazy, so a reason that quotes a bold verdict cannot
 // take the place of the real one.
-var rowLine = regexp.MustCompile(`^- #(\d+) · .*? · \*\*(keep|rewrite|close|no verdict)\*\*( \(dry run\))? · (.*) · \[link\]\(.*\)$`)
+var rowLine = regexp.MustCompile(`^- #(\d+) · .*? · \*\*(keep|rewrite|close|no verdict)\*\*( \((?:dry run|build)\))? · (.*) · \[link\]\(.*\)$`)
 
 // logSummary is what the night comments of the tracking issue add up to.
 type logSummary struct {
@@ -62,7 +62,7 @@ func summarize(nights []string) logSummary {
 			if err != nil {
 				continue // a number too long for an int names no issue
 			}
-			verdict, dryRun := m[2], m[3] != ""
+			verdict, dryRun := m[2], m[3] == dryRunMark
 			s.verdicts.add(verdict, dryRun)
 			if verdict == OutcomeClose {
 				// row writes a duplicate close as "duplicate of #N".

@@ -58,17 +58,17 @@ could close or rewrite an issue that the operator wrote. Slices 09 and
 
 ## Acceptance criteria
 
-- [ ] The build workflow runs the review program and then `minion-review gate --mode build` as its first steps after the install, and no step runs the premise-gate program.
-- [ ] Build mode writes the `blocked` and `changed` outputs per the table above.
-- [ ] No verdict fails the job, and the current failure step marks the issue.
-- [ ] A close stops the run as blocked: neither the done step nor the failure step runs.
-- [ ] When `changed` is true, the workflow runs research even if the issue carries a slice plan.
-- [ ] After a rewrite, the build accepts only a slice plan published after the rewrite; an older plan does not count.
-- [ ] A build-time verdict writes its row to the tracking issue, marked as a build.
-- [ ] The premise-gate program is removed, and the program-set and workflow tests agree.
-- [ ] Build and chain tests that named the premise-gate program now name the review step, and they still prove that a blocked build creates no branch and no pull request.
-- [ ] Build-mode tests run against a fake GitHub server and assert the outputs for each outcome and for no verdict.
-- [ ] `make test` and `make lint` pass.
+- [x] The build workflow runs the review program and then `minion-review gate --mode build` as its first steps after the install, and no step runs the premise-gate program.
+- [x] Build mode writes the `blocked` and `changed` outputs per the table above.
+- [x] No verdict fails the job, and the current failure step marks the issue.
+- [x] A close stops the run as blocked: neither the done step nor the failure step runs.
+- [x] When `changed` is true, the workflow runs research even if the issue carries a slice plan.
+- [x] After a rewrite, the build accepts only a slice plan published after the rewrite; an older plan does not count.
+- [x] A build-time verdict writes its row to the tracking issue, marked as a build.
+- [x] The premise-gate program is removed, and the program-set and workflow tests agree.
+- [x] Build and chain tests that named the premise-gate program now name the review step, and they still prove that a blocked build creates no branch and no pull request.
+- [x] Build-mode tests run against a fake GitHub server and assert the outputs for each outcome and for no verdict.
+- [x] `make test` and `make lint` pass.
 
 ## Modules touched
 

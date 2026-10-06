@@ -7,7 +7,9 @@
 // missing or invalid verdict is "no verdict", recorded with its cause.
 //
 // With --dry-run the gate records the verdict and changes nothing on
-// the reviewed issue.
+// the reviewed issue. With --mode build it runs as the first step of a
+// build: it acts, marks its row as a build, and appends the blocked and
+// changed step outputs to the file GITHUB_OUTPUT names.
 //
 // Its dupes subcommand lists the minion-proposal issues that may hold
 // the same idea as one issue, by source item or by title, and prints
@@ -39,7 +41,7 @@ import (
 )
 
 const (
-	gateUsage  = "usage: minion-review gate --issue <number> --verdict <path> [--dry-run] [--night YYYY-MM-DD]"
+	gateUsage  = "usage: minion-review gate --issue <number> --verdict <path> [--mode sweep|build] [--dry-run] [--night YYYY-MM-DD]"
 	dupesUsage = "usage: minion-review dupes --title <title> [--source <ref>]... [--exclude <number>]"
 	nextUsage  = "usage: minion-review next [--sample <n>]"
 	usage      = gateUsage + "\n" + dupesUsage + "\n" + nextUsage
@@ -85,6 +87,7 @@ func gate(args []string) int {
 		issue   = fs.Int("issue", 0, "reviewed issue number (required)")
 		verdict = fs.String("verdict", "", "path to the verdict file (required)")
 		dryRun  = fs.Bool("dry-run", false, "record the verdict only; change nothing on the reviewed issue")
+		mode    = fs.String("mode", "sweep", "sweep, or build for the review a build runs first")
 		// The sweep passes one night per run, so a run that crosses
 		// midnight still writes one comment.
 		night = fs.String("night", time.Now().UTC().Format(time.DateOnly), "UTC date of the night comment")
@@ -94,6 +97,16 @@ func gate(args []string) int {
 	}
 	if *issue <= 0 || *verdict == "" || fs.NArg() > 0 {
 		fmt.Fprintln(os.Stderr, gateUsage)
+		return 2
+	}
+	build := *mode == "build"
+	if (*mode != "sweep" && !build) || (build && *dryRun) {
+		fmt.Fprintln(os.Stderr, gateUsage)
+		return 2
+	}
+	output := os.Getenv("GITHUB_OUTPUT")
+	if build && output == "" {
+		fmt.Fprintln(os.Stderr, "minion-review: --mode build needs GITHUB_OUTPUT")
 		return 2
 	}
 	if _, err := time.Parse(time.DateOnly, *night); err != nil {
@@ -111,23 +124,58 @@ func gate(args []string) int {
 		Issue:       *issue,
 		Night:       *night,
 		DryRun:      *dryRun,
+		Build:       build,
 		APIBaseURL:  api,
 		Token:       token,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "minion-review: %v\n", err)
+		// The gate can fail after it acted, on the tracking row. A
+		// build still gets blocked=true after a close it made, so the
+		// failure step does not mark a closed issue as a failed build.
+		if build && res.Valid {
+			if werr := writeOutputs(output, res); werr != nil {
+				fmt.Fprintf(os.Stderr, "minion-review: %v\n", werr)
+			}
+		}
 		return 1
 	}
 	if !res.Valid {
 		fmt.Println("minion-review: no verdict:", res.Cause)
 		return 1
 	}
-	mode := ""
-	if *dryRun {
-		mode = " (dry run)"
+	if build {
+		if err := writeOutputs(output, res); err != nil {
+			fmt.Fprintf(os.Stderr, "minion-review: %v\n", err)
+			return 1
+		}
 	}
-	fmt.Println("minion-review:", res.Outcome+mode)
+	suffix := ""
+	switch {
+	case *dryRun:
+		suffix = " (dry run)"
+	case build:
+		suffix = " (build)"
+	}
+	fmt.Println("minion-review:", res.Outcome+suffix)
 	return 0
+}
+
+// writeOutputs appends the build's step outputs to the GITHUB_OUTPUT
+// file.
+func writeOutputs(path string, res review.Result) error {
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o644)
+	if err != nil {
+		return fmt.Errorf("open GITHUB_OUTPUT: %w", err)
+	}
+	err = review.WriteBuildOutputs(f, res)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return fmt.Errorf("write GITHUB_OUTPUT: %w", err)
+	}
+	return nil
 }
 
 // sourceFlags collects each --source value.
