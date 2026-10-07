@@ -26,10 +26,17 @@ permissions:
 
 jobs:
   run-minion:
+    # A comment starts a build only when the command opens it and a trusted
+    # account wrote it. The repository is public, so anyone can comment, and
+    # the build runs on the self-hosted runner with GH_PAT. The review posts
+    # its own comments as the operator, so a quote of the command inside a
+    # comment must not start a build either.
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issues' && (github.event.label.name == 'minion-ready' || github.event.label.name == 'minion-approved')) ||
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/minion build'))
+      (github.event_name == 'issue_comment' &&
+       startsWith(github.event.comment.body, '/minion build') &&
+       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: github-runner-partio-minion-ai-01
     timeout-minutes: 180
 
