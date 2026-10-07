@@ -349,3 +349,149 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #1882–#2073 (dependency updates, CI hang fix, trail backend retirement, dispatch routing, telemetry, release channel, OpenCode plugin, Cursor/Codex subagent fixes, search TUI changes, changelog PRs)`
 - reason: `irrelevant`
 - note: The bulk of PRs in this range are dependency version bumps, CI configuration fixes (e.g. #2072 apt hang), platform routing changes (e.g. #2046–#2051 cell targets, dispatch), telemetry (#2023–#2024), trail backend retirement (#2021, #2037), OpenCode plugin changes (#2018, #2027, #2053), Cursor/Codex subagent bug fixes (#2066–#2071), search TUI updates (#2022, #2044), and changelog/credit PRs (#2039, #2050, #2073). None of these map to Partio's domain of git hook-based session capture and checkpoint storage.
+
+## `git diff --name-only` output used for path comparison would fail on non-ASCII filenames
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2398 (Checkpoint linking fails for non-ASCII filenames)`
+- reason: `premise-failed`
+- claim: `DiffNameOnly` output (from `git diff --name-only`, without `-z`) is used to compare file paths in the session-linking or checkpoint-writing flow [evidence: `internal/git/diff_name_only.go`, `internal/hooks/postcommit.go`]
+- verdict: `fails`
+- found: `DiffNameOnly` is called at `postcommit.go:95` inside a `slog.LevelDebug` guard (`if slog.Default().Enabled(context.Background(), slog.LevelDebug)`). Its result is only logged for diagnostics; it is not compared against session file paths or used in any decision. The path-mismatch bug Entire fixed does not exist in Partio.
+
+## Control-plane HTTP proxy not honored
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2686 (Control-plane HTTP client does not honor HTTP_PROXY/HTTPS_PROXY)`
+- reason: `irrelevant`
+- note: Partio has no control-plane HTTP client. All operations are local git plumbing commands or GitHub API calls made via the `gh` CLI. There is no network-dialing code in Partio's CLI.
+
+## Workflow-spawned agents leave no task record
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2685 (Claude Code Workflow-spawned agents leave no task record)`
+- reason: `irrelevant`
+- note: Partio has no subagent or task tracking. It captures the main Claude Code session JSONL once per commit. There is no task-record, transcript-per-subagent, or token-accounting path.
+
+## Shadow branches grow quadratically (whole transcript re-stored every turn)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2663 (Shadow branches re-store the whole transcript every turn)`
+- reason: `irrelevant`
+- note: Partio has no shadow branches and no per-turn checkpoint commits. Each `git commit` by the developer produces exactly one checkpoint commit on the orphan branch. The per-turn accumulation issue is specific to Entire's shadow-branch strategy.
+
+## Background subagent lines attributed to human when parent commits in same turn
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2653 (Background subagent's lines are attributed to the human when the parent commits in the same turn)`
+- reason: `irrelevant`
+- note: Partio has no subagent tracking. Attribution is binary: 0% or 100% based on whether any agent was detected running during pre-commit. There is no per-subagent line attribution.
+
+## Native repos as primary host with outbound mirror
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2623 (Native repos as primary host: outbound mirror to GitHub, webhooks, deploy path)`
+- reason: `irrelevant`
+- note: Partio has no hosted Git service and no mirroring capability. It is a CLI hook tool that stores checkpoints on a local orphan branch.
+
+## session resume can silently overwrite ignored untracked files during branch checkout
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2604 (session resume can silently overwrite ignored untracked files during branch checkout)`
+- reason: `irrelevant`
+- note: Partio has no `session resume` command. The `partio resume` command (`cmd/partio/resume.go`) continues a Partio session within the current branch; it does not perform branch checkouts.
+
+## OpenCode 2 integration (V1 plugin API rejected, V1 export command fails)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2588 (Captures nothing on OpenCode 2: V1 plugin API rejected and V1 export command prints help)`
+- reason: `irrelevant`
+- note: Partio has no OpenCode support. There is no OpenCode agent, plugin, or hook configuration in this codebase.
+
+## git-refs writes return success without durable push bookkeeping
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2393 (git-refs writes can return success without durable push bookkeeping)`
+- reason: `irrelevant`
+- note: Partio's pre-push hook pushes the checkpoint branch synchronously via a direct `git push` call. There is no asynchronous push queue or separate push bookkeeping file. The failure mode described is specific to Entire's push-queue architecture.
+
+## Cleanup can make checkpoint commits unreachable after state expiry
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2378 (Cleanup can make uncondensed checkpoint commits unreachable after state expiry or a ref read failure)`
+- reason: `irrelevant`
+- note: Partio's cleanup (`cmd/partio/clean.go`) removes stale session state files from `.partio/`. It does not maintain shadow refs or decide reachability by session-state inventory. The cleanup race described is specific to Entire's shadow-branch/session-state coupling.
+
+## Post-push cleanup deletes uncondensed shadow ref when session state is malformed
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2350 (Post-push cleanup deletes an uncondensed shadow ref when its session state is malformed)`
+- reason: `irrelevant`
+- note: Partio has no shadow branches and no post-push cleanup that consults session state to decide whether to delete refs. The race between malformed state and shadow-ref deletion is specific to Entire's architecture.
+
+## Install script hides GitHub API authentication and rate-limit errors
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2318 (Install script hides GitHub API authentication and rate-limit errors)`
+- reason: `irrelevant`
+- note: Partio has no install script. It is distributed as a Go binary built with `make build` or installed via `make install`.
+
+## `disable` does not reach linked worktrees
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2274 (entire disable does not reach linked worktrees: settings.local.json is per worktree)`
+- reason: `irrelevant`
+- note: Partio's `partio disable` removes git hooks from `git rev-parse --git-common-dir`, which is shared across all worktrees. Disabling Partio in one worktree disables it for all worktrees in the same repo. The per-worktree re-enable problem does not apply.
+
+## Read(./.entire/metadata/**) deny rule blocks ordinary commands
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2260 (Read(./.entire/metadata/**) deny rule makes ordinary commands ask for approval)`
+- reason: `irrelevant`
+- note: Partio does not write any `permissions.deny` rules to `.claude/settings.json` or any other settings file. It writes only its own `.partio/` directory. No deny rules are installed.
+
+## Forged Entire-Checkpoint lines in commit bodies can select and mutate unrelated checkpoints
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2255 (Forged Entire-Checkpoint lines in commit bodies can select and mutate unrelated checkpoints)`
+- reason: `irrelevant`
+- note: Partio only writes `Partio-Checkpoint:` trailers via `AmendTrailers`; it never reads checkpoint trailer lines back from commit messages to resolve or mutate checkpoint storage. A forged line would be cosmetically appended alongside the real trailer but would not affect any checkpoint operation.
+
+## PRs #2074–#2091: dependency bumps, OpenCode fixes, performance profiling, trail changes
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #2074–#2091 (dependency bumps, OpenCode plugin fixes, hook latency profiling, checkpoint explain fix, index-emptied fix, performance regression, trail changes, git-config cleanup)`
+- reason: `irrelevant`
+- note: This range consists of: dependency version bumps, OpenCode-specific fixes (#2076, #2078, #2089), hook latency profiling for Entire's per-prompt hooks (#2091), a checkpoint explain scan-limit fix (#2089), an index-emptied race condition in Entire's staging pipeline (#2111), CLI performance regressions specific to Entire's per-prompt attribution model (#2098), and infrastructure/trail changes. None map to Partio's git-hook checkpoint architecture.
+
+## PRs #2550–#2570: trail/project features, mirror/remote changes, auth and cell routing
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #2550–#2570 (trail merge, AGENTS.md swap, auth cells, trail/project scope, resume, dispatch, repo delete, repo clone hint, lint, OPF, activity date DST, transcript reader)`
+- reason: `irrelevant`
+- note: This range includes trail and project management PRs, hosted cell and auth routing, repo clone/delete commands, and Entire-specific lint/infrastructure. None apply to Partio's architecture.
+
+## PRs #2605–#2645: hook manager compatibility, import/attach, background scan, interactive wizards
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #2605–#2645 (session import, remote checkpoint listing, hook chaining fixes already filed, Husky v9, trail models, background OPF scan, wizard for repo/project create, strategy fixes, secure enclave tokens, worktree local settings, auth fail-closed, capture growing sessions)`
+- reason: `irrelevant`
+- note: The hook-chaining and worktree-settings fixes (#2643, #2634) in this range are already covered by open Partio proposals (#747 for hook chaining; worktree disable is not applicable per the #2274 analysis above). The remaining PRs deal with Entire-specific features: session import/attach, remote checkpoint listing, trail models, background privacy filter, interactive repo/project wizards, secure-enclave tokens, and auth infrastructure.
