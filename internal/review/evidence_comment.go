@@ -14,8 +14,8 @@ const ReviewMarker = "<!-- partio:review:v1 -->"
 // the outcome and its reason, for a rewrite what changed, every claim
 // with its evidence, verdict, excerpt and any correction, the fit, built
 // and duplicate decisions, and any open pull request from an older
-// build. kept is the issue that stays for a duplicate close, and nil
-// otherwise.
+// build. kept is the issue that a duplicate close names: open, or closed
+// by the review. It is nil otherwise.
 // When the excerpts push the comment past GitHub's size limit, the
 // comment leaves them out and says so.
 func evidenceComment(v Verdict, kept *github.Issue, pulls []github.PullRequest) string {
@@ -30,8 +30,12 @@ func renderEvidence(v Verdict, kept *github.Issue, pulls []github.PullRequest, e
 	b.WriteString(ReviewMarker + "\n")
 	fmt.Fprintf(&b, "## Proposal review: %s\n\n", v.Outcome)
 	fmt.Fprintf(&b, "**Outcome:** %s · **Reason:** %s\n\n", v.Outcome, reason(v))
-	if kept != nil {
+	switch {
+	case kept != nil && kept.State == "open":
 		fmt.Fprintf(&b, "Duplicate of #%d, which stays: [%s](%s)\n\n", kept.Number, oneLine(kept.Title), kept.HTMLURL)
+	case kept != nil:
+		fmt.Fprintf(&b, "Duplicate of #%d, which the review closed: [%s](%s). The idea has its verdict there. To keep the idea, reopen #%d.\n\n",
+			kept.Number, oneLine(kept.Title), kept.HTMLURL, kept.Number)
 	}
 	if v.Outcome == OutcomeRewrite {
 		b.WriteString("### What changed\n\n")
