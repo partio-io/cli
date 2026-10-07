@@ -30,8 +30,8 @@ func (r refusal) Error() string { return string(r) }
 
 // actable checks, outside dry-run, that the gate can act on v for
 // issue: an open issue and not a pull request, and for a duplicate
-// close an open kept issue, which it returns. A facts-only check never
-// closes, so it needs no kept issue.
+// close a kept issue that is open or that the review closed, which it
+// returns. A facts-only check never closes, so it needs no kept issue.
 func actable(gh github.Client, repo string, issue github.Issue, v Verdict, factsOnly bool) (*github.Issue, error) {
 	switch {
 	case issue.PullRequest != nil:
@@ -49,16 +49,28 @@ func actable(gh github.Client, repo string, issue github.Issue, v Verdict, facts
 	if err != nil {
 		return nil, fmt.Errorf("read kept issue #%d: %w", v.DuplicateOf, err)
 	}
-	if kept.PullRequest != nil || kept.State != "open" {
-		return nil, refusal(fmt.Sprintf("kept issue #%d is not an open issue, so it does not stay", v.DuplicateOf))
+	if kept.PullRequest != nil {
+		return nil, refusal(fmt.Sprintf("kept issue #%d is a pull request", v.DuplicateOf))
+	}
+	if kept.State != "open" && !closedByReview(kept) {
+		return nil, refusal(fmt.Sprintf("kept issue #%d is closed, but not by a review close, so it holds no verdict for the idea", v.DuplicateOf))
 	}
 	return &kept, nil
+}
+
+// closedByReview reports whether a review close closed issue: closed as
+// not planned, with minion-reviewed. Its idea already has a verdict, so
+// a later issue with the same idea closes as its duplicate. A review
+// close for a built idea is completed, and makes a later issue built,
+// not a duplicate.
+func closedByReview(issue github.Issue) bool {
+	return issue.State == "closed" && issue.StateReason == github.StateReasonNotPlanned && issue.HasLabel(ReviewedLabel)
 }
 
 // act applies a verdict to the reviewed issue: one evidence comment,
 // for a rewrite the new title and body, the label changes and, for a
 // close, the close with its state reason. A rewrite takes the label
-// changes of a keep. kept is the issue that stays for a duplicate close.
+// changes of a keep. kept is the issue that a duplicate close names.
 // It never changes a pull request; it only names an open one from an
 // older build in the comment. The evidence comment is found by its
 // marker and updated in place, so a run that failed after the comment
