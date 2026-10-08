@@ -377,7 +377,8 @@ func TestGateEveryActionWritesItsRow(t *testing.T) {
 
 // Outside dry-run the gate refuses a verdict it cannot act on: a closed
 // issue, a pull request, or a duplicate close whose kept issue is
-// closed or absent. It writes a no-verdict row and changes nothing.
+// absent, a pull request, or closed other than by a review close. It
+// writes a no-verdict row and changes nothing.
 func TestGateRefusesWhatItCannotActOn(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -387,7 +388,12 @@ func TestGateRefusesWhatItCannotActOn(t *testing.T) {
 	}{
 		{"closed issue", func(gh *fakeGitHub) { gh.issues[12]["state"] = "closed" }, keepVerdict, "open issues only"},
 		{"pull request", func(gh *fakeGitHub) { gh.issues[12]["pull_request"] = map[string]any{} }, keepVerdict, "pull request"},
-		{"closed kept issue", func(gh *fakeGitHub) { gh.issues[13]["state"] = "closed" }, closeVerdictFor(ReasonDuplicate), "#13 is not an open issue"},
+		{"kept issue closed by hand", func(gh *fakeGitHub) { closeIssue(gh, 13, "not_planned") }, closeVerdictFor(ReasonDuplicate), "#13 is closed, but not by a review close"},
+		{"kept issue closed as built", func(gh *fakeGitHub) {
+			gh.issues[13] = issueJSON(13, "Cache the session index", "body", []string{proposalLabel, ReviewedLabel})
+			closeIssue(gh, 13, "completed")
+		}, closeVerdictFor(ReasonDuplicate), "#13 is closed, but not by a review close"},
+		{"kept pull request", func(gh *fakeGitHub) { gh.issues[13]["pull_request"] = map[string]any{} }, closeVerdictFor(ReasonDuplicate), "#13 is a pull request"},
 		{"absent kept issue", func(gh *fakeGitHub) { delete(gh.issues, 13) }, closeVerdictFor(ReasonDuplicate), "#13 does not exist"},
 	}
 	for _, tt := range tests {
@@ -412,6 +418,41 @@ func TestGateRefusesWhatItCannotActOn(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A duplicate close may name an issue that the review closed, because
+// its idea already has a verdict. The gate closes the issue, and the
+// comment says that the review closed the kept issue and how to keep
+// the idea.
+func TestGateClosesADuplicateOfAReviewClose(t *testing.T) {
+	gh := newFakeGitHub()
+	gh.trackingIssue(77)
+	gh.issues[13] = issueJSON(13, "Cache the session index", "body", []string{proposalLabel, ReviewedLabel})
+	closeIssue(gh, 13, "not_planned")
+
+	res := runAct(t, gh, 12, writeVerdict(t, closeVerdictFor(ReasonDuplicate)))
+
+	if !res.Valid {
+		t.Fatalf("Result = %+v, want a valid verdict", res)
+	}
+	issue := gh.issues[12]
+	if issue["state"] != "closed" || issue["state_reason"] != "not_planned" {
+		t.Errorf("state = %v/%v, want closed/not_planned", issue["state"], issue["state_reason"])
+	}
+	body := gh.comments[12][0]["body"].(string)
+	want := "Duplicate of #13, which the review closed: [Cache the session index](https://github.com/partio-io/cli/issues/13). The idea has its verdict there. To keep the idea, reopen #13."
+	if !strings.Contains(body, want) {
+		t.Errorf("comment does not name the review close of #13:\n%s", body)
+	}
+	if strings.Contains(body, "which stays") {
+		t.Errorf("comment says that the closed #13 stays:\n%s", body)
+	}
+}
+
+// closeIssue closes number in the fake with reason as its state reason.
+func closeIssue(gh *fakeGitHub, number int, reason string) {
+	gh.issues[number]["state"] = "closed"
+	gh.issues[number]["state_reason"] = reason
 }
 
 // A second acting run on the same issue, after a run that failed past

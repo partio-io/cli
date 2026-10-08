@@ -154,9 +154,9 @@ func verdictFor(path string, issue int, oldBody string, factsOnly bool) (v Verdi
 // would record as "no verdict". It returns the cause of "no verdict",
 // or "" when the verdict passes. It checks the shape of every rewrite,
 // because it does not decide the facts-only mode, and it leaves to the
-// gate what it checks on GitHub when it acts: an open issue, and an
-// open issue that stays for a duplicate. A non-nil error means that
-// Check could not read the issue.
+// gate what it checks on GitHub when it acts: an open issue, and for a
+// duplicate a kept issue that is open or that the review closed. A
+// non-nil error means that Check could not read the issue.
 func Check(cfg Config) (string, error) {
 	issue, err := cfg.client().GetIssue(cfg.Repo, cfg.Issue)
 	if err != nil {

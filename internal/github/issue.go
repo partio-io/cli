@@ -10,12 +10,15 @@ import (
 
 // Issue is the part of a GitHub issue the minion tools read.
 type Issue struct {
-	Number  int     `json:"number"`
-	Title   string  `json:"title"`
-	Body    string  `json:"body"`
-	HTMLURL string  `json:"html_url"`
-	State   string  `json:"state"` // "open" or "closed"
-	Labels  []Label `json:"labels"`
+	Number  int    `json:"number"`
+	Title   string `json:"title"`
+	Body    string `json:"body"`
+	HTMLURL string `json:"html_url"`
+	State   string `json:"state"` // "open" or "closed"
+	// StateReason is GitHub's reason for the last state change, such
+	// as "completed" or "not_planned" for a closed issue, or "reopened".
+	StateReason string  `json:"state_reason"`
+	Labels      []Label `json:"labels"`
 	// PullRequest is set when the item is a pull request: the issues
 	// API lists pull requests as issues.
 	PullRequest *struct{} `json:"pull_request,omitempty"`
