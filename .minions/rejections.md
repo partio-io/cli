@@ -503,3 +503,51 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #2692–#2699`
 - reason: `irrelevant`
 - note: PR #2692 removes Entire's shadow branches and line attribution (Partio has neither). #2693 fixes activity display for external agent names (Partio has no activity command). #2694 isolates summary generation from external plugins (Partio has no summary generation). #2695 resolves commit SHAs in cross-repo checkpoint explain (Partio has no cross-repo feature). #2696 adds `entire checkpoint delete` — the analogous `partio checkpoint delete` was filed as Partio issue #757. #2697 shows why a Pi reviewer failed (Partio has no Pi reviewer). #2698 counts subagent API calls written after stop (Partio has no subagent tracking). #2699 fixes Claude Code 2.1.x stream-json system events causing false review failures (Partio has no review runner).
+
+## changelog 0.10.6: Windows installer, runner setup, trail/native repo features, named-pipe hang
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.10.6`
+- reason: `irrelevant`
+- note: The additions in 0.10.6 (Windows PowerShell installer, `entire runner setup` rework, `entire trail create` pre-push hooks, trail commands against native repos, named-pipe config-file hang fix, concurrent OPF checkpoint-write fix) are either platform infrastructure Partio has no equivalent of (installer, runner, trails, native repos) or internal fixes for Entire's cloud checkpoint pipeline. Partio stores checkpoints on a local orphan branch with no installer script, no trail concept, and no OPF pipeline.
+
+## changelog 0.11.0: cloud platform additions and non-Claude agent support
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.11.0`
+- reason: `irrelevant`
+- note: The bulk of 0.11.0 changes are cloud-only (native repository references, `entire cluster list`, `entire repo protection list|add|remove`, `entire repo remote url`, `entire logout` revocation, `entire enable` no longer creates GitHub remotes) or support agents Partio does not implement (Codex and Copilot CLI subagent tracking, OpenCode tailored summary runners, factoryai-droid Windows fix). The fixes for Windows console handles and PE version metadata are Windows-specific build concerns. The `investigate` plugin extraction and control-plane rename changes have no equivalent in Partio's command set.
+
+## changelog 0.11.2: trail RFD and credential transport security fix
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.11.2`
+- reason: `irrelevant`
+- note: 0.11.2 changes a trail request wire format (RFD-026) and patches a security bug where `ENTIRE_CHECKPOINT_TOKEN` was attached to non-git transports. Partio has no trail concept and no `PARTIO_CHECKPOINT_TOKEN`; checkpoint pushes are plain `git push` calls with no bearer token.
+
+## changelog 0.11.3: new agent, org/repo management, squash trailers, session lifecycle
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.11.3`
+- reason: `irrelevant`
+- note: Antigravity CLI (`agy`) is a new agent Partio does not support. `entire org invite`, `entire repo clone --nearest`, and interactive multi-select for grants are cloud management features with no Partio equivalent. The squash-trailer fix preserves existing `Entire-Checkpoint` trailers across `git merge --squash`; Partio's post-commit hook creates fresh trailers on every new commit, so squash commits get a new checkpoint rather than carrying old ones — the scenario Entire fixed does not arise. The "hooks no longer delete live idle sessions" and pushurl-only remote-election fixes are Entire-internal session lifecycle and cloud-push concerns.
+
+## changelog 0.11.4: checkpoint explain subagents, trail API, review security, agent relocation at attach
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.11.4`
+- reason: `irrelevant`
+- note: `entire checkpoint explain` subagent-task and token-breakdown support requires a subagent pipeline Partio does not have. `entire trail create --repo` and account display names are cloud-management additions. The `entire review` agent-config-isolation fix is specific to Entire's review command. `StopFailure` turn-end handling is specific to Entire's hook-based session lifecycle; Partio reads session JSONL at commit time and does not use Claude Code's stop hooks. The session resume/attach agent-home relocation improvements are already captured as filed proposals (#708, #715).
+
+## Issues and PRs not individually logged above: remaining items from this run
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2066–#2689 and entireio-cli-pulls #2074–#2706 (remaining items not logged individually)`
+- reason: `irrelevant`
+- note: Items from this run not individually logged: issues #2689 (UserPromptSubmit timeout — no such hook in Partio), #2664 (pre-push SIGKILL temp packs — Partio's pre-push is a simple git push), #2653 already covered above, #2612 (Codex daemon worktree session sharing — daemon model is Codex-specific), #2606 (Codex TOML hook trust — no Codex hook trust mechanism in Partio), #2588 already covered, #2556 (backgrounded subagent treated as foreground — no subagent tracking), #2535 (enable --force TTY dialog — Partio's enable has no interactive agent selection), #2518 (repo grant list — cloud only), #2416 (doctor interactive prompt blocks CI — Partio's doctor has no interactive prompts), #2402/#2401 (ULID shard case collision — Partio uses only lowercase hex IDs), #2394 (Homebrew pre-trust docs — no Homebrew formula), #2368 (token overwrite — no incremental token accounting), #2362 (status collapses sessions — Partio has no multi-session status view), #2360 (checkpoint_push_remote pushurl-only — no configurable checkpoint push remote), #2328 (Devin agent — already filed as #585, duplicate), #2276 (Windows install URL — no install script), #2271 (docs security page — not a code issue), #2264 (status reports sync when hooks missing — Partio's status already checks hooks at cmd/partio/status.go:65–83), #2249 (stale agent hints — no such hints in Partio), #2218 (Windows PE metadata — not applicable), #2215 (SubagentStop correlation — no subagent tracking), #2204 (OPF writers race — no OPF pipeline), #2203 (install.sh shellcheck — no install script), #2410 (enable writes through symlink — Partio's os.Rename renames the symlink itself before writing, so target is never touched; backup-overwrite aspect already filed as #710), #2257 (AddExternalAgent settings scope — no external-agent management command), #2256 (AppendCheckpointTrailer grammar — Partio's AmendTrailers always appends without grammar detection), #2689–#2392 issues otherwise not covered, and PRs #2700–#2706 (#2700 per-commit build stamp — not user-facing; #2701 GIT_HTTP_USER_AGENT — no HTTP; #2702 repo delete mirrors — cloud only; #2703 agent home registry — cloud only; #2704 HTTP credential security — no HTTP; #2705/#2706 dependency bumps).
