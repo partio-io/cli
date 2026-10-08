@@ -495,3 +495,11 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #2605–#2645 (session import, remote checkpoint listing, hook chaining fixes already filed, Husky v9, trail models, background OPF scan, wizard for repo/project create, strategy fixes, secure enclave tokens, worktree local settings, auth fail-closed, capture growing sessions)`
 - reason: `irrelevant`
 - note: The hook-chaining and worktree-settings fixes (#2643, #2634) in this range are already covered by open Partio proposals (#747 for hook chaining; worktree disable is not applicable per the #2274 analysis above). The remaining PRs deal with Entire-specific features: session import/attach, remote checkpoint listing, trail models, background privacy filter, interactive repo/project wizards, secure-enclave tokens, and auth infrastructure.
+
+## PRs #2692–#2699: shadow branch removal, activity display, summary isolation, transcript reader, checkpoint delete (filed), Pi reviewer, subagent token count, Claude stream event
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #2692–#2699`
+- reason: `irrelevant`
+- note: PR #2692 removes Entire's shadow branches and line attribution (Partio has neither). #2693 fixes activity display for external agent names (Partio has no activity command). #2694 isolates summary generation from external plugins (Partio has no summary generation). #2695 resolves commit SHAs in cross-repo checkpoint explain (Partio has no cross-repo feature). #2696 adds `entire checkpoint delete` — the analogous `partio checkpoint delete` was filed as Partio issue #757. #2697 shows why a Pi reviewer failed (Partio has no Pi reviewer). #2698 counts subagent API calls written after stop (Partio has no subagent tracking). #2699 fixes Claude Code 2.1.x stream-json system events causing false review failures (Partio has no review runner).
