@@ -456,7 +456,31 @@ this file is the only record that the idea was seen at all.
 - reason: `irrelevant`
 - note: Partio's `partio disable` removes git hooks from `git rev-parse --git-common-dir`, which is shared across all worktrees. Disabling Partio in one worktree disables it for all worktrees in the same repo. The per-worktree re-enable problem does not apply.
 
-## Read(./.entire/metadata/**) deny rule blocks ordinary commands
+## issues #2066–#2115, #2148: subagent tracking, hook timeouts, and index-lock hazard
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2066–#2115, #2148 (Cursor/Codex subagent fixes, hook timeouts, index emptied between staging and commit, finalizeAllTurnCheckpoints deadline)`
+- reason: `irrelevant`
+- note: These issues cover subagent lifecycle tracking (Partio has no subagent support), hook timeout budgets (Partio's git hooks have no configurable timeout mechanism), and index-lock hazards from concurrent git-status invocations (Partio does not call git status in its hooks). None apply to Partio's architecture.
+
+## issues #2197–#2215: persistent-ref lock files, test isolation, auth, and SubagentStop
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2197–#2215 (persistent-ref lock files accumulate, test git isolation, auth-go lock dir, SubagentStop dropped)`
+- reason: `irrelevant`
+- note: Partio stores checkpoints on a single orphan branch via git plumbing; it has no per-ref lock files. The test isolation and auth issues are Entire-specific infrastructure. SubagentStop requires subagent tracking that Partio lacks entirely.
+
+## issues #2249, #2255, #2256: stale configure --agent hints and trailer grammar bugs
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2249 (stale configure --agent hints), #2255 (forged Entire-Checkpoint lines), #2256 (AppendCheckpointTrailer grammar)`
+- reason: `irrelevant`
+- note: Partio uses PARTIO_AGENT env var and a `partio agent` config field, not Entire's `agent add/configure` commands. Partio's trailer writing is a simple string append (`git/amend_trailers.go`) with no separate strict parser that could reject its own output. Partio also has no code path that reads `Partio-Checkpoint` from commit messages to mutate checkpoint storage.
+
+## issue #2260: Read deny rule in .claude/settings.json breaks auto mode
 
 <!-- partio:rejection:v1 -->
 
