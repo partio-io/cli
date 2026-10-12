@@ -102,7 +102,19 @@ create feature proposals. Work through the steps below in order.
      ```
 
      Keep the two kinds apart. A dropped idea was checked and this repository contradicted it; a skipped item was never about this project. A reader who cannot tell them apart cannot tell a bar set too high from a source that has gone quiet, which is the one question this log answers.
-   - If the block holds, create a GitHub issue: `gh issue create --repo <this-repo> --label minion-proposal --label minion-reviewed --title "<title>" --body "<description + what to build + acceptance criteria + premise section + gathered evidence + source line + proposal id line>"`
+   - If the block holds, create a GitHub issue. Pass the body on stdin from a quoted heredoc, never as a `--body "…"` argument:
+
+     ```bash
+     gh issue create --repo <this-repo> --label minion-proposal --label minion-reviewed --title "<title>" --body-file - <<'PROPOSAL_BODY'
+     <description + what to build + acceptance criteria + premise section + gathered evidence + source line + proposal id line>
+     PROPOSAL_BODY
+     ```
+
+     Write the body exactly as the issue must show it, with no escapes. The quotes around `PROPOSAL_BODY` stop the shell from reading the body, so each backtick, `$` and backslash reaches the issue as you wrote it. A backslash in front of a backtick reaches the issue too, and it breaks every code span and code block there: on 2026-10-11 the proposer filed #767, #768 and #769 from a quoted heredoc with 254 escaped backticks. Put code that holds a backtick, such as a Go struct tag, in a double-backtick span. No line of the body may be exactly `PROPOSAL_BODY`.
+
+     The title is different: it sits inside double quotes, where the shell reads a backtick and a `$`. In the title only, put a backslash in front of each of them.
+
+     Then read the body back: `gh issue view <number> --repo <this-repo> --json body --jq .body`. If a backslash stands in front of a backtick anywhere in it, write the body again, without the backslashes, with `gh issue edit <number> --repo <this-repo> --body-file -` and the same heredoc.
 
      The issue is the whole proposal. A build reads the issue and nothing else, so the body carries everything a fresh session needs to build from: what to build, in full, and the acceptance criteria as a `- [ ]` checklist under `## Acceptance Criteria`. Write no file for the proposal. `.minions/programs/` holds the programs the workflows run, and a proposal is not one of them.
 

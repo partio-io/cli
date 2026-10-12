@@ -48,7 +48,7 @@ func TestProposeProgramFilesPremiseWithEveryProposal(t *testing.T) {
 		t.Fatalf("read propose program: %v", err)
 	}
 
-	create, ok := lineContaining(string(src), "gh issue create")
+	create, ok := fencedBlockContaining(string(src), "gh issue create")
 	if !ok {
 		t.Fatal("propose program gives no gh issue create instruction")
 	}
@@ -67,7 +67,7 @@ func TestProposeProgramKeepsItsExistingProposalBehaviour(t *testing.T) {
 	}
 	src := string(raw)
 
-	create, ok := lineContaining(src, "gh issue create")
+	create, ok := fencedBlockContaining(src, "gh issue create")
 	if !ok {
 		t.Fatal("propose program gives no gh issue create instruction")
 	}
@@ -132,7 +132,7 @@ func TestProposeProgramChecksDuplicatesBySourceAndTitle(t *testing.T) {
 
 	// A later run finds this issue by its source item only when the body cites
 	// it in a form the search reads.
-	issue, _ := lineContaining(agents, "gh issue create")
+	issue, _ := fencedBlockContaining(agents, "gh issue create")
 	if !strings.Contains(issue, "source line") {
 		t.Errorf("the issue body does not cite its source item, so a later duplicate search cannot match it by source:\n%s", issue)
 	}
@@ -150,7 +150,7 @@ func TestProposeProgramMarksItsIssuesReviewed(t *testing.T) {
 		t.Fatalf("read propose program: %v", err)
 	}
 
-	create, ok := lineContaining(string(raw), "gh issue create")
+	create, ok := fencedBlockContaining(string(raw), "gh issue create")
 	if !ok {
 		t.Fatal("propose program gives no gh issue create instruction")
 	}
@@ -367,7 +367,7 @@ func TestProposeProgramFilesTheEvidenceItGathered(t *testing.T) {
 		t.Fatalf("read propose program: %v", err)
 	}
 
-	create, ok := lineContaining(string(raw), "gh issue create")
+	create, ok := fencedBlockContaining(string(raw), "gh issue create")
 	if !ok {
 		t.Fatal("propose program gives no gh issue create instruction")
 	}
@@ -392,7 +392,7 @@ func TestProposeProgramKeepsTheWholeProposalInTheIssue(t *testing.T) {
 		t.Fatal("propose program has no agents section")
 	}
 
-	create, ok := lineContaining(agents, "gh issue create")
+	create, ok := fencedBlockContaining(agents, "gh issue create")
 	if !ok {
 		t.Fatal("propose program gives no gh issue create instruction")
 	}
@@ -411,6 +411,52 @@ func TestProposeProgramKeepsTheWholeProposalInTheIssue(t *testing.T) {
 	for _, gone := range []string{"write a program file", "<!-- program:"} {
 		if strings.Contains(agents, gone) {
 			t.Errorf("the proposer is still told %q; a proposal is an issue, not a file", gone)
+		}
+	}
+}
+
+// TestProposeProgramFilesTheBodyAsWritten checks that the proposer passes the
+// issue body on stdin from a quoted heredoc, writes it with no escapes, and
+// reads it back. The program used to show the body as a double-quoted --body
+// argument. The agent then escaped each backtick as if the body sat inside
+// double quotes, also when it wrapped the body in a quoted heredoc, where the
+// shell keeps the backslash: on 2026-10-11, #767, #768 and #769 reached GitHub
+// with 254 escaped backticks, and none of their code rendered.
+func TestProposeProgramFilesTheBodyAsWritten(t *testing.T) {
+	raw, err := os.ReadFile(proposeProgram)
+	if err != nil {
+		t.Fatalf("read propose program: %v", err)
+	}
+	agents, ok := section(string(raw), "## Agents")
+	if !ok {
+		t.Fatal("propose program has no agents section")
+	}
+
+	create, ok := fencedBlockContaining(agents, "gh issue create")
+	if !ok {
+		t.Fatal("propose program shows no gh issue create command in a code block")
+	}
+	command, _, _ := strings.Cut(create, "\n")
+	_, terminator, ok := strings.Cut(command, "--body-file - <<'")
+	if !ok {
+		t.Fatalf("the gh issue create command does not read its body from a quoted heredoc:\n%s", command)
+	}
+	terminator, _, _ = strings.Cut(terminator, "'")
+	lines := strings.Split(create, "\n")
+	if last := strings.TrimSpace(lines[len(lines)-1]); terminator == "" || last != terminator {
+		t.Errorf("the heredoc opened with %q is not closed on a line of its own:\n%s", terminator, create)
+	}
+
+	if strings.Contains(agents, `--body "<`) {
+		t.Error("the proposer is still shown a double-quoted --body argument")
+	}
+	for want, why := range map[string]string{
+		"with no escapes":        "it escapes the backticks that a quoted heredoc keeps",
+		"gh issue view <number>": "nothing reads the filed body back, so an escaped body stays broken",
+		"gh issue edit <number>": "it cannot repair a body that it finds broken",
+	} {
+		if !strings.Contains(agents, want) {
+			t.Errorf("the proposer is never told %q, so %s", want, why)
 		}
 	}
 }
