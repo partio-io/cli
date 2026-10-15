@@ -349,3 +349,87 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #1882–#2073 (dependency updates, CI hang fix, trail backend retirement, dispatch routing, telemetry, release channel, OpenCode plugin, Cursor/Codex subagent fixes, search TUI changes, changelog PRs)`
 - reason: `irrelevant`
 - note: The bulk of PRs in this range are dependency version bumps, CI configuration fixes (e.g. #2072 apt hang), platform routing changes (e.g. #2046–#2051 cell targets, dispatch), telemetry (#2023–#2024), trail backend retirement (#2021, #2037), OpenCode plugin changes (#2018, #2027, #2053), Cursor/Codex subagent bug fixes (#2066–#2071), search TUI updates (#2022, #2044), and changelog/credit PRs (#2039, #2050, #2073). None of these map to Partio's domain of git hook-based session capture and checkpoint storage.
+
+## Claude Code subagent transcripts not captured in checkpoint
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2556 (Claude Code: a subagent backgrounded by default is treated as foreground, and its task record is dropped at launch)`
+- reason: `premise-failed`
+- claim: Claude Code stores subagent session transcripts in separate JSONL files outside the parent session's file, which Partio does not discover [evidence: `internal/agent/claude/find_latest_session.go`]
+- verdict: `unresolved`
+- found: `FindLatestSession` reads the single most-recently-modified JSONL in the session directory and returns it; the code makes no attempt to walk sibling JSONL files or follow parent/child session links. Whether Claude Code actually stores subagent transcripts as separate JSONL files (rather than embedding them in the parent JSONL) cannot be verified from the Partio source tree alone. The claim about Claude Code's on-disk format is not groundable here, so the premise is unresolved and the idea is dropped.
+
+## Forged Partio-Checkpoint trailer in commit body could select unrelated checkpoint
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2255 (Forged Entire-Checkpoint lines in commit bodies can select and mutate unrelated checkpoints)`
+- reason: `premise-failed`
+- claim: Partio reads `Partio-Checkpoint` trailers from commit messages to look up or mutate checkpoint storage [evidence: `internal/git/amend_trailers.go`, `internal/hooks/postcommit.go`]
+- verdict: `fails`
+- found: Searching `amend_trailers.go` and `postcommit.go` shows that Partio only _writes_ `Partio-Checkpoint: <id>` into commits as a human-readable reference; no code in this repository reads that field back from commit messages to select, reuse, or mutate checkpoints. Checkpoints are looked up exclusively by walking the sharded tree on `partio/checkpoints/v1`. The attack surface Entire's issue described does not exist in Partio's architecture.
+
+## SubagentStop hook event correlation missing
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2215 (Claude Code SubagentStop is dropped: Entire correlates on tool_use_id, which the hook does not send)`
+- reason: `irrelevant`
+- note: Partio does not install Claude Code lifecycle hooks (UserPromptSubmit, SubagentStart, SubagentStop, etc.). It captures sessions via git hooks (pre-commit, post-commit, pre-push) by reading the JSONL file at commit time. The correlation problem described is specific to Entire's real-time hook pipeline and has no analogue in Partio.
+
+## Issues #2066–#2089: Entire platform issues with no Partio analogue
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2066–#2089 (checkpoint explain scan limit false negative, hook latency, performance regression, empty tree commit, finalizeAllTurnCheckpoints deadline, test git isolation, token counting, persistent-ref lock files)`
+- reason: `irrelevant`
+- note: These issues concern Entire's server-side or advanced pipeline features: checkpoint explain's server-side scan limits (#2089), remaining hook latency work (#2091), agent performance regression in CI (#2098), an index emptied between staging and commit (#2111, a git behaviour issue), finalizeAllTurnCheckpoints total deadline (#2148, Entire's Claude hook pipeline), structural git isolation for tests (#2202), and persistent-ref lock file accumulation (#2197). Partio shares git hooks and JSONL parsing but lacks the async checkpoint pipeline, test-isolation infrastructure mismatch, and server-side scan paths these issues target.
+
+## Issues #2249–#2318: Entire CLI and platform bugs with no Partio analogue
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2249–#2318 (stale configure --agent hints, re-install discards newer backup hook, SubagentStop dropped, test isolation, lock files, git-refs write bookkeeping, stale-state cleanup, post-push cleanup on malformed state, install script error hiding)`
+- reason: `irrelevant`
+- note: `#2249` references `entire configure --agent`, which Partio does not have. `#2215`/`#2237`/`#2256`/`#2255`/`#2264`/`#2274` all have Partio analogues already filed (#717, #710, #763, #751). `#2318` is about Entire's install script; Partio has no install script. `#2350` and `#2378` concern Entire's shadow-branch and async cleanup pipeline, which Partio does not replicate.
+
+## Issues #2393–#2416: push bookkeeping, case-insensitive FS refs, non-ASCII filenames, doctor prompts
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2393–#2416 (git-refs write bookkeeping, ULID case-insensitive FS, checkpoint linking non-ASCII, doctor stuck-session prompt, entire enable --force without TTY)`
+- reason: `irrelevant`
+- note: `#2393` (push queue bookkeeping race) has no Partio analogue — Partio pushes synchronously and has no queue. `#2401` (ULID case collision on macOS/Windows) does not apply — Partio uses lowercase hex IDs which cannot collide on case-insensitive filesystems. `#2398` (non-ASCII filenames) is already filed as #713. `#2416` (doctor prompt blocks in CI) does not apply — `partio doctor` prints to stdout only and has no interactive prompts. `#2535` (enable --force exits 0 without TTY) is not applicable — `partio enable` has no --force flag or interactive flow.
+
+## Issues #2551–#2612: session resume, OpenCode, hooks, commit linking, worktrees, shadow branches
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2551–#2612 (Unicode branch names, session resume ignored files, OpenCode 2 integration, git config-based hooks, SubagentStop, worktree disable, enable --force, commit linking, shadow branch storage, hook $0 break, user-prompt-submit timeout)`
+- reason: `irrelevant`
+- note: `#2551` (Unicode NFC/NFD) → filed as #718. `#2604` (resume overwrites ignored files) → filed as #730. `#2588` (OpenCode 2) → closed as not_planned (#98). `#2580` (git config hooks) → filed as #726. `#2556` (SubagentStop) → logged as dropped above. `#2274` (worktree disable) → filed as #751. `#2535` (enable --force) → not applicable. `#2612` (Codex worktree commit linking) → filed as #755. `#2663` (shadow branch storage) → Partio has no shadow branches. `#2673` ($0 hook chaining) → filed as #747. `#2689` (user-prompt-submit timeout) → Partio installs no user-prompt-submit hook.
+
+## Issues #2623–#2746: native repos, amend drops trailers, subagent attribution, worktree settings, README rendering
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2623–#2746 (native repo primary host, amend -m drops trailers, subagent attribution, worktree local settings, git commit --amend $0, doctor interactive CI, checkpoint list filters, Windows hook stall, README rendering bugs)`
+- reason: `irrelevant`
+- note: `#2637` (amend drops trailers) → filed as #735. `#2653` (subagent attribution) → filed as #755. `#2634` (worktree local settings) → filed as #751. `#2718` (checkpoint list filters) → filed as #761. `#2726` (Windows prepare-commit-msg hang) → Partio installs no prepare-commit-msg hook. `#2745` and `#2746` (README rendering bugs) → entire.io web UI issues, entirely irrelevant. `#2623` (native repos as primary host) → Partio is a local capture tool with no hosting platform.
+
+## changelog 0.10.3–0.11.5: Entire platform features with no Partio analogue
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.10.3–0.11.5`
+- reason: `irrelevant`
+- note: The changelog spans nine versions (0.10.3 through 0.11.5). Most changes concern Entire's hosted platform: trail management, native repo hosting, cluster routing, OPF redaction, mirror workflows, org invitations, device-code auth, Windows PE metadata, Antigravity integration, token breakdowns, shadow-branch removal, and line-attribution changes. These have no Partio analogue. Items with Partio relevance: transcript redaction parallelization (already filed as #712), checkpoint delete by ID (already filed as #461), git config-based hooks (already filed as #726), amend drops trailers (already filed as #735), pre-push checkpoint push timeout (filed this run as #776). Named pipes and confined filesystem operations were evaluated but could not be grounded from the Partio source tree without knowing Entire's specific failure scenario.
+
+## PRs #2074–#2791: Entire platform PRs with limited Partio relevance
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #2074–#2791 (dependency bumps, trail features, native repo routing, OPF redaction, mirror async, Windows build, hook manager fixes, token counting, agent add/list/remove, JSONL transcript refactoring)`
+- reason: `irrelevant`
+- note: The vast majority are dependency updates (#2764, #2765, #2766, #2788, #2787), platform routing (#2778, #2756), trail/review features (#2749, #2759, #2760, #2776, #2780), mirror and cluster features (#2751, #2762, #2768, #2782, #2783, #2785, #2786), and Entire-specific bug fixes. PRs with Partio analogues already have proposals filed: #2790 (hook reinstall) → #710, #2713 (preserve checkpoint links across amend) → #735, #2634 (worktree local settings) → #751, #2643 (Husky v9 chaining) → #747, #2611 (ignore files during checkout) → #730, #2684 (sync_prompts) → #752, #2668 (session-commit mismatch) → #755.
