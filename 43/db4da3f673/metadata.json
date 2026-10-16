@@ -1,0 +1,31 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "43db4da3f673",
+  "strategy": "manual-commit",
+  "branch": "dupes-ranked-candidates",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "cmd/minion-review/main.go",
+    "cmd/minion-review/main_test.go",
+    "docs/2026-10-14-dupes-ranked-candidates/issues.md",
+    "docs/2026-10-14-dupes-ranked-candidates/issues/03-code-names-in-the-score.md",
+    "internal/review/code_names.go",
+    "internal/review/code_names_test.go",
+    "internal/review/dupes.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/43/db4da3f673/0/metadata.json",
+      "transcript": "/43/db4da3f673/0/full.jsonl",
+      "content_hash": "/43/db4da3f673/0/content_hash.txt",
+      "prompt": "/43/db4da3f673/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 58,
+    "cache_creation_tokens": 80434,
+    "cache_read_tokens": 2019788,
+    "output_tokens": 19368,
+    "api_call_count": 29
+  }
+}
