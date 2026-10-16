@@ -99,7 +99,7 @@ func TestFindDupesWalksEveryPageForASourceMatch(t *testing.T) {
 	want := []Dupe{{
 		Number: 688, Title: "Add Goose coding agent integration",
 		State: "closed", StateReason: "completed", Labels: []string{"minion-proposal"},
-		Match: MatchSource, Shared: []string{"entireio/cli#2075"},
+		Match: MatchSource, Shared: []string{"entireio/cli#2075"}, Excerpt: "**Origin:** entireio/cli#2075",
 	}}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Errorf("FindDupes = %+v\nwant %+v", got, want)
@@ -121,6 +121,9 @@ func TestFindDupesMatchesASourceOpenOrClosed(t *testing.T) {
 	}
 	var nums []int
 	for _, d := range got {
+		if d.Match == MatchRanked {
+			continue
+		}
 		if d.Match != MatchSource {
 			t.Errorf("#%d matched by %q, want %q", d.Number, d.Match, MatchSource)
 		}
@@ -145,14 +148,17 @@ func TestFindDupesMatchesAStrongTitleOverlap(t *testing.T) {
 		issues = append(issues, fakeProposal(800+i, fmt.Sprintf("Checkpoint session tweak %d", i), "", "open", ""))
 	}
 	f := newFakeBacklog(t, issues)
+	// "Compact checkpoint session" shares only the common words, so it
+	// gets ranked candidates and no strong match.
 	tests := []struct {
-		title string
-		want  string
+		title  string
+		want   string
+		ranked bool
 	}{
-		{"Hook installer silently overwrites existing backup on re-install", "[710]"},
-		{"Add Goose: Coding Agent integration!", "[681]"},
-		{"Compact checkpoint session", "[]"},
-		{"Show the binary size in the status output", "[]"},
+		{"Hook installer silently overwrites existing backup on re-install", "[710]", false},
+		{"Add Goose: Coding Agent integration!", "[681]", false},
+		{"Compact checkpoint session", "[]", true},
+		{"Show the binary size in the status output", "[]", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.title, func(t *testing.T) {
@@ -161,7 +167,12 @@ func TestFindDupesMatchesAStrongTitleOverlap(t *testing.T) {
 				t.Fatal(err)
 			}
 			nums := []int{}
+			ranked := false
 			for _, d := range got {
+				if d.Match == MatchRanked {
+					ranked = true
+					continue
+				}
 				if d.Match != MatchTitle {
 					t.Errorf("#%d matched by %q, want %q", d.Number, d.Match, MatchTitle)
 				}
@@ -169,6 +180,9 @@ func TestFindDupesMatchesAStrongTitleOverlap(t *testing.T) {
 			}
 			if fmt.Sprint(nums) != tt.want {
 				t.Errorf("matched %v, want %s", nums, tt.want)
+			}
+			if ranked != tt.ranked {
+				t.Errorf("ranked candidates = %v, want %v", ranked, tt.ranked)
 			}
 		})
 	}
@@ -204,9 +218,11 @@ func TestFindDupesPutsSourceMatchesFirst(t *testing.T) {
 	}
 	want := []Dupe{
 		{Number: 690, Title: "Rename a flag", State: "closed", StateReason: "not_planned",
-			Labels: []string{"minion-proposal", "minion-reviewed"}, Match: MatchSource, Shared: []string{"entireio/cli#2075"}},
+			Labels: []string{"minion-proposal", "minion-reviewed"}, Match: MatchSource, Shared: []string{"entireio/cli#2075"},
+			Excerpt: "**Origin:** entireio/cli#2075"},
 		{Number: 681, Title: "Add Goose coding agent integration", State: "open", StateReason: "",
-			Labels: []string{"minion-proposal"}, Match: MatchTitle, Shared: []string{"agent", "coding", "goose", "integration"}},
+			Labels: []string{"minion-proposal"}, Match: MatchTitle, Shared: []string{"agent", "coding", "goose", "integration"}, Score: 1,
+			Excerpt: "Origin: other/repo#5"},
 	}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Errorf("FindDupes = %+v\nwant %+v", got, want)

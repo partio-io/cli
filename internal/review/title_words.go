@@ -1,6 +1,7 @@
 package review
 
 import (
+	"maps"
 	"math"
 	"slices"
 	"strings"
@@ -77,9 +78,11 @@ func (ww wordWeights) weight(w string) float64 {
 	return math.Log(float64(ww.n+1)/float64(ww.df[w]+1)) + 1
 }
 
+// sum adds the weights in sorted word order, so that the same words
+// give the same float on every run.
 func (ww wordWeights) sum(words map[string]bool) float64 {
 	var s float64
-	for w := range words {
+	for _, w := range slices.Sorted(maps.Keys(words)) {
 		s += ww.weight(w)
 	}
 	return s

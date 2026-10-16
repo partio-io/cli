@@ -13,8 +13,10 @@
 // changed step outputs to the file GITHUB_OUTPUT names.
 //
 // Its dupes subcommand lists the minion-proposal issues that may hold
-// the same idea as one issue, by source item or by title, and prints
-// them as JSON. The review program calls it; it changes nothing.
+// the same idea as one issue, by source item or by title, then up to 10
+// ranked candidates by title score, and prints them as JSON with a
+// score and an excerpt of each body. The review program calls it; it
+// changes nothing.
 //
 // Its check subcommand runs the checks of the gate on one verdict file
 // and prints "no verdict" with the cause when the gate would refuse it.

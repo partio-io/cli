@@ -4,7 +4,7 @@ Source: [prd.md](./prd.md)
 
 | Done | # | Title | Blocked by |
 |------|---|-------|------------|
-| [ ]  | 1 | [Ranked candidates by title](./issues/01-ranked-candidates-by-title.md) | None |
+| [x]  | 1 | [Ranked candidates by title](./issues/01-ranked-candidates-by-title.md) | None |
 | [ ]  | 2 | [The review checks by issue number](./issues/02-review-checks-by-issue-number.md) | [#1](./issues/01-ranked-candidates-by-title.md) |
 | [ ]  | 3 | [Code names in the score](./issues/03-code-names-in-the-score.md) | [#2](./issues/02-review-checks-by-issue-number.md) |
 | [ ]  | 4 | [The proposer checks with the text of its idea](./issues/04-proposer-checks-with-its-idea-text.md) | [#3](./issues/03-code-names-in-the-score.md) |
