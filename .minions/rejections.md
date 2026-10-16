@@ -433,3 +433,101 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #2074–#2791 (dependency bumps, trail features, native repo routing, OPF redaction, mirror async, Windows build, hook manager fixes, token counting, agent add/list/remove, JSONL transcript refactoring)`
 - reason: `irrelevant`
 - note: The vast majority are dependency updates (#2764, #2765, #2766, #2788, #2787), platform routing (#2778, #2756), trail/review features (#2749, #2759, #2760, #2776, #2780), mirror and cluster features (#2751, #2762, #2768, #2782, #2783, #2785, #2786), and Entire-specific bug fixes. PRs with Partio analogues already have proposals filed: #2790 (hook reinstall) → #710, #2713 (preserve checkpoint links across amend) → #735, #2634 (worktree local settings) → #751, #2643 (Husky v9 chaining) → #747, #2611 (ignore files during checkout) → #730, #2684 (sync_prompts) → #752, #2668 (session-commit mismatch) → #755.
+
+## entireio/cli#2637: git commit --amend -m/-F drops the Entire-Checkpoint trailer
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2637`
+- reason: `duplicate`
+- note: Already filed as Partio issue #735 (post-commit: restore Partio-Checkpoint trailers on git commit --amend -m when agent is no longer running).
+
+## entireio/cli#2612: Commit linking attaches an unrelated Codex session from another worktree
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2612`
+- reason: `duplicate`
+- note: Already filed as Partio issue #773 (Codex FindLatestSession picks up main-worktree session when committing from a linked worktree nested inside the main worktree).
+
+## entireio/cli#2673: Wrapped hooks chained under renamed backup path break hooks that check $0
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2673`
+- reason: `duplicate`
+- note: Already filed as Partio issue #747 (Chaining to backup hook by renamed path breaks tools that dispatch on $0 (Trunk, Husky v9)).
+
+## entireio/cli#2685: Claude Code Workflow-spawned agents leave no task record
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2685`
+- reason: `duplicate`
+- note: Already filed as Partio issue #760 (Include Claude Code subagent session transcripts in checkpoint data).
+
+## entireio/cli#2626: Honor PI_CODING_AGENT_SESSION_DIR when resolving session dir
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2626`
+- reason: `duplicate`
+- note: Already filed as Partio issue #750 (Honor CLAUDE_CONFIG_DIR when locating Claude Code sessions and plans).
+
+## Hook execution timeout
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.11.5 (each Entire Claude Code hook has a timeout)`
+- reason: `duplicate`
+- note: Already filed as Partio issue #212 (Add configurable hook execution timeout with graceful degradation).
+
+## entireio/cli#2718: --author and --branch filters for entire checkpoint list
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2718`
+- reason: `duplicate`
+- note: Already filed as Partio issue #761 (Add --author filter to partio rewind --list).
+
+## entireio/cli#2663: Shadow branches re-store the whole transcript every turn (quadratic storage growth)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2663`
+- reason: `premise-failed`
+- claim: Partio re-stores session content on every checkpoint write, causing the total size of the checkpoint branch to grow quadratically across sessions.
+- verdict: `fails`
+- found: `internal/checkpoint/store.go` uses `git hash-object -w --stdin` to write blobs. Git's object model deduplicates identical blobs by content hash; if the same JSONL content appears in two checkpoint commits, git stores only one blob object. The checkpoint branch grows linearly (one new tree + metadata per commit), not quadratically. The source's issue was specific to Entire's architecture of storing full transcripts on every turn; Partio captures once per commit and benefits from git's native deduplication.
+
+## entireio/cli#2689: user-prompt-submit .git/info/exclude paths counted as user changes
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2689`
+- reason: `irrelevant`
+- note: Partio has no UserPromptSubmit hook. Its attribution logic (`internal/attribution/calculate.go`) uses `git diff --numstat` on the actual commit, not on all files including excluded ones. The issue's `unbounded per-prompt state` and `stale-base diff` are Entire-specific concepts not present in Partio.
+
+## entireio/cli#2653: Background subagent's lines are attributed to the human when the parent commits in the same turn
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2653`
+- reason: `irrelevant`
+- note: Partio's attribution is binary (0% or 100%) based solely on `state.AgentActive` in `internal/attribution/calculate.go`. Partio has no subagent concept and no multi-agent attribution logic. The source's issue requires a subagent model that does not exist in Partio.
+
+## entireio-cli-issues #2748, #2746, #2745, #2740–#2732, #2728, #2726, #2725, #2686, #2664, #2627, #2623, #2606: various cloud/UI/docs/Windows/auth issues
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2748, #2746, #2745, #2740–#2732, #2728, #2726, #2725, #2686, #2664, #2627, #2623, #2606`
+- reason: `irrelevant`
+- note: These issues concern: remote helper auth (#2748), README rendering (#2746, #2745), docs/page writing tasks (#2740–#2732), Windows CLI hook stalls (#2728, #2726, #2725), HTTP proxy support (#2686), pre-push budget kill / tmp_pack cleanup (#2664), surface agent relocation in status (#2627), native repos as primary host cloud feature (#2623), and TOML key parsing in a Codex hook trust check (#2606). None of these map to Partio's architecture: Partio is Unix-only (bash hooks), has no credential helper, no cloud backend, no HTTP client, no Codex hook trust check, and no TOML configuration.
+
+## entireio-cli-pulls #2795, #2793, #2792, #2791, #2789, #2786, #2785, #2784, #2783, #2782, #2781, #2780, #2779, #2778, #2777, #2776, #2775, #2774, #2773, #2772, #2771: dependency bumps, cloud/trail/transcript/token-counting changes
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #2795, #2793, #2792, #2791, #2789, #2786, #2785, #2784, #2783, #2782, #2781, #2780, #2779, #2778, #2777, #2776, #2775, #2774, #2773, #2772, #2771`
+- reason: `irrelevant`
+- note: These PRs cover: CDN fallback releases (#2795), trail server URL (#2793), search pagination (#2792), external agent discovery (#2791), JSONL conversion architecture (#2786), redo commit checkpoints (#2785), Brain checkpoint hint (#2784), Claude fork launch message counting (#2783), per-agent token sources (#2782), session state save timing (#2781), full-ref default branch resolution (#2780), turn step/token deduplication (#2779), structured tool result subagent counting (#2777), reviewer prompts on stdin (#2776), hook exec ETXTBSY retry (#2775), antigravity/pi summary prompts (#2773, #2772), trail-review reporting (#2771), and the 0.11.5 changelog (#2774). Partio has no trail, no cloud dispatch, no token counting, no JSONL conversion pipeline, no multi-agent turn tracking, and no stdin-based reviewer. The hooks ETXTBSY retry (#2775) could be relevant on Linux but is a test infrastructure concern, not a production bug in Partio's hook scripts.
