@@ -531,3 +531,19 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #2795, #2793, #2792, #2791, #2789, #2786, #2785, #2784, #2783, #2782, #2781, #2780, #2779, #2778, #2777, #2776, #2775, #2774, #2773, #2772, #2771`
 - reason: `irrelevant`
 - note: These PRs cover: CDN fallback releases (#2795), trail server URL (#2793), search pagination (#2792), external agent discovery (#2791), JSONL conversion architecture (#2786), redo commit checkpoints (#2785), Brain checkpoint hint (#2784), Claude fork launch message counting (#2783), per-agent token sources (#2782), session state save timing (#2781), full-ref default branch resolution (#2780), turn step/token deduplication (#2779), structured tool result subagent counting (#2777), reviewer prompts on stdin (#2776), hook exec ETXTBSY retry (#2775), antigravity/pi summary prompts (#2773, #2772), trail-review reporting (#2771), and the 0.11.5 changelog (#2774). Partio has no trail, no cloud dispatch, no token counting, no JSONL conversion pipeline, no multi-agent turn tracking, and no stdin-based reviewer. The hooks ETXTBSY retry (#2775) could be relevant on Linux but is a test infrastructure concern, not a production bug in Partio's hook scripts.
+
+## entireio/cli#2806: OPF pre-push batching leaves CR intact (CRLF multi-document failure)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2806 (OPF batch sanitizer leaves CR intact, causing multiple JSON documents for CRLF input)`
+- reason: `irrelevant`
+- note: Partio has no OpenAI Privacy Filter integration and no batch sanitization pipeline. The pre-push hook pushes the checkpoint branch with a plain `git push` and performs no transcript redaction at push time. The CRLF / multi-document failure is specific to Entire's OPF pipeline.
+
+## entireio-cli-pulls #2796–#2805: redaction fixes, trail features, dependency bumps
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #2796–#2805 (session sweep redaction loading fix, trail merge branch reporting, custom redaction rule validation, git-remote-entire TLS connection reuse, redaction prefix cache invalidation, dispatch polling on refused redirect, git-remote-entire error messages, golang.org/x/net bump, external agents transcript compaction, project trail URL agent-help)`
+- reason: `irrelevant`
+- note: These PRs are all Entire-specific: redaction pipeline fixes (#2796, #2800), trail merge output (#2797), custom rule validation (#2798), TLS reuse in git-remote-entire (#2799), dispatch polling (#2801), git-remote-entire error formatting (#2802), a dependency bump (#2803), external agent transcript compaction via plugin (#2804), and agent-help project trail URL guidance (#2805). Partio has no redaction pipeline, no trail management, no git remote helper, and no dispatch client. None of these map to Partio's domain.
