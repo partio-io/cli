@@ -1,0 +1,34 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "4d3dc0605f66",
+  "strategy": "manual-commit",
+  "branch": "dupes-ranked-candidates",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "cmd/minion-review/main.go",
+    "cmd/minion-review/main_test.go",
+    "docs/2026-10-14-dupes-ranked-candidates/issues.md",
+    "docs/2026-10-14-dupes-ranked-candidates/issues/01-ranked-candidates-by-title.md",
+    "internal/review/dupes.go",
+    "internal/review/dupes_ranked_test.go",
+    "internal/review/dupes_test.go",
+    "internal/review/excerpt.go",
+    "internal/review/excerpt_test.go",
+    "internal/review/title_words.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/4d/3dc0605f66/0/metadata.json",
+      "transcript": "/4d/3dc0605f66/0/full.jsonl",
+      "content_hash": "/4d/3dc0605f66/0/content_hash.txt",
+      "prompt": "/4d/3dc0605f66/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 56,
+    "cache_creation_tokens": 95074,
+    "cache_read_tokens": 2032579,
+    "output_tokens": 21013,
+    "api_call_count": 28
+  }
+}
