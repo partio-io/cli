@@ -1,0 +1,52 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "80ad45a0f437",
+  "strategy": "manual-commit",
+  "branch": "dupes-ranked-candidates",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "docs/2026-10-14-dupes-ranked-candidates/after-merge.md",
+    "docs/2026-10-14-dupes-ranked-candidates/issues.md",
+    "docs/2026-10-14-dupes-ranked-candidates/issues/06-recall-test-and-count-after-merge.md",
+    "internal/review/dupes_recall_test.go",
+    "internal/review/testdata/recall/corpus.json.gz",
+    "internal/review/testdata/recall/pairs-github-dup.tsv",
+    "internal/review/testdata/recall/pairs-tool.txt",
+    "internal/review/testdata/recall/premerge/212.body.before-596.md",
+    "internal/review/testdata/recall/premerge/212.body.before-700.md",
+    "internal/review/testdata/recall/premerge/344.body.before-716.md",
+    "internal/review/testdata/recall/premerge/350.body.before-590.md",
+    "internal/review/testdata/recall/premerge/427.body.before-464.md",
+    "internal/review/testdata/recall/premerge/434.body.before-440.md",
+    "internal/review/testdata/recall/premerge/456.body.before-541.md",
+    "internal/review/testdata/recall/premerge/461.body.before-757.md",
+    "internal/review/testdata/recall/premerge/469.body.before-667.md",
+    "internal/review/testdata/recall/premerge/470.body.before-557.md",
+    "internal/review/testdata/recall/premerge/476.body.before-587.md",
+    "internal/review/testdata/recall/premerge/476.body.before-685.md",
+    "internal/review/testdata/recall/premerge/48.body.before-656.md",
+    "internal/review/testdata/recall/premerge/617.body.before-642.md",
+    "internal/review/testdata/recall/premerge/65.body.before-419.md",
+    "internal/review/testdata/recall/premerge/750.body.before-708.md",
+    "internal/review/testdata/recall/premerge/759.body.before-740.md",
+    "internal/review/testdata/recall/premerge/762.body.before-768.md",
+    "internal/review/testdata/recall/premerge/763.body.before-704.md",
+    "internal/review/testdata/recall/premerge/763.body.before-721.md",
+    "internal/review/testdata/recall/premerge/765.body.before-709.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/80/ad45a0f437/0/metadata.json",
+      "transcript": "/80/ad45a0f437/0/full.jsonl",
+      "content_hash": "/80/ad45a0f437/0/content_hash.txt",
+      "prompt": "/80/ad45a0f437/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 38,
+    "cache_creation_tokens": 63307,
+    "cache_read_tokens": 1118756,
+    "output_tokens": 11002,
+    "api_call_count": 19
+  }
+}
