@@ -1,0 +1,58 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "c23f38ca5a4e",
+  "session_id": "51eed8ad-0f88-48f8-b1b8-8203b9bf4d57",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-16T06:19:08.752858174Z",
+  "branch": "dupes-ranked-candidates",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".minions/programs/propose.md",
+    "docs/2026-10-14-dupes-ranked-candidates/issues.md",
+    "docs/2026-10-14-dupes-ranked-candidates/issues/05-escaped-backticks-in-the-whole-body.md",
+    "internal/premise/repo_propose_test.go"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "9c71fc2c1d26",
+  "token_usage": {
+    "input_tokens": 30,
+    "cache_creation_tokens": 49576,
+    "cache_read_tokens": 755336,
+    "output_tokens": 6023,
+    "api_call_count": 15
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-16T06:19:08.742445208Z",
+    "agent_lines": 73,
+    "agent_removed": 8,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 73,
+    "total_lines_changed": 81,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 1625,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/2026-08-18-premise-gate-test-run/handoff.md": 372,
+        "docs/2026-09-24-minion-pipeline-state/handoff.md": 154,
+        "docs/2026-09-25-issue-31-chained-run-review/handoff.md": 227,
+        "docs/2026-09-25-issue-31-chained-run-review/issue-31.md": 59,
+        "docs/2026-09-25-issue-31-chained-run-review/prd.md": 136,
+        "docs/2026-09-25-issue-31-chained-run-review/run-36099180129.log": 574,
+        "docs/2026-09-25-issue-31-chained-run-review/slice-plan.md": 103
+      }
+    }
+  ]
+}
