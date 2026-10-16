@@ -24,6 +24,11 @@ type DupesQuery struct {
 	Sources []string // source references of the idea, in any form SourceRefs reads
 	Title   string
 	Exclude int // the issue under review; zero excludes nothing
+	// Issue, when set, is the issue under review: the search takes its
+	// title and the source items of its body, and excludes it. It
+	// replaces Title, Body and Exclude, and adds to Sources.
+	Issue int
+	Body  string // the body of the idea; with Issue, the body of that issue
 }
 
 // Dupe is one backlog issue that may hold the same idea.
@@ -46,6 +51,11 @@ func FindDupes(gh github.Client, q DupesQuery) ([]Dupe, error) {
 	proposals, err := listProposals(gh, q.Repo)
 	if err != nil {
 		return nil, err
+	}
+	if q.Issue != 0 {
+		if q, err = withIssue(gh, q, proposals); err != nil {
+			return nil, err
+		}
 	}
 	var want []string
 	for _, s := range q.Sources {
@@ -100,6 +110,24 @@ func FindDupes(gh github.Client, q DupesQuery) ([]Dupe, error) {
 		out = append(out, dupe(h.p, MatchRanked, h.words, h.score))
 	}
 	return out, nil
+}
+
+// withIssue fills q from the issue under review: from the listing when
+// it holds the issue, else from one read of the issue.
+func withIssue(gh github.Client, q DupesQuery, proposals []proposal) (DupesQuery, error) {
+	i := slices.IndexFunc(proposals, func(p proposal) bool { return p.Number == q.Issue })
+	if i >= 0 {
+		q.Title, q.Body = proposals[i].Title, proposals[i].Body
+	} else {
+		is, err := gh.GetIssue(q.Repo, q.Issue)
+		if err != nil {
+			return q, err
+		}
+		q.Title, q.Body = is.Title, is.Body
+	}
+	q.Sources = append(slices.Clone(q.Sources), q.Body)
+	q.Exclude = q.Issue
+	return q, nil
 }
 
 func dupe(p proposal, match string, shared []string, score float64) Dupe {

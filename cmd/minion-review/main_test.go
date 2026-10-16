@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -374,4 +375,71 @@ func TestNextRefusesABadSample(t *testing.T) {
 			t.Errorf("next %q exit %d, want 2", args, code)
 		}
 	}
+}
+
+func TestDupesByIssuePrintsTheCandidatesOfThatIssue(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/partio-io/cli/issues" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`[
+			{"number": 681, "title": "Add Goose coding agent integration", "state": "open",
+			 "body": "Origin: entireio/cli#2075", "labels": [{"name": "minion-proposal"}]},
+			{"number": 688, "title": "Support another agent", "state": "closed", "state_reason": "completed",
+			 "body": "Inspired by entireio/cli PR #2075", "labels": [{"name": "minion-proposal"}]}
+		]`))
+	}))
+	defer srv.Close()
+	t.Setenv("GITHUB_REPOSITORY", "partio-io/cli")
+	t.Setenv("GH_TOKEN", "tok")
+	t.Setenv("GITHUB_API_URL", srv.URL)
+
+	var out bytes.Buffer
+	if code := dupes([]string{"--issue", "681"}, &out); code != 0 {
+		t.Fatalf("dupes exit %d, output %q", code, out.String())
+	}
+	var got []map[string]any
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatalf("output is not a JSON list: %v\n%s", err, out.String())
+	}
+	if len(got) != 1 || got[0]["number"] != float64(688) || got[0]["match"] != "source" {
+		t.Errorf("dupes --issue 681 = %s, want only #688 by source", out.String())
+	}
+}
+
+func TestDupesByIssueRefusesTheOtherFlags(t *testing.T) {
+	t.Setenv("GITHUB_REPOSITORY", "partio-io/cli")
+	t.Setenv("GH_TOKEN", "tok")
+	for _, extra := range [][]string{
+		{"--title", "Anything"}, {"--source", "entireio/cli#1"}, {"--exclude", "5"},
+	} {
+		code, msg := captureStderr(t, func() int {
+			return dupes(append([]string{"--issue", "7"}, extra...), &bytes.Buffer{})
+		})
+		if code != 2 {
+			t.Errorf("dupes --issue with %s exit %d, want 2", extra[0], code)
+		}
+		if !strings.Contains(msg, "--issue") || !strings.Contains(msg, extra[0]) {
+			t.Errorf("dupes --issue with %s said %q, want it to name both flags", extra[0], msg)
+		}
+	}
+}
+
+// captureStderr runs f and returns its result and what it wrote to
+// os.Stderr.
+func captureStderr(t *testing.T, f func() int) (int, string) {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := os.Stderr
+	os.Stderr = w
+	defer func() { os.Stderr = old }()
+	code := f()
+	_ = w.Close()
+	msg, _ := io.ReadAll(r)
+	_ = r.Close()
+	return code, string(msg)
 }
