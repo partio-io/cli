@@ -1,0 +1,28 @@
+{
+  "cli_version": "dev",
+  "checkpoint_id": "b4b5a6b41672",
+  "strategy": "manual-commit",
+  "branch": "dupes-ranked-candidates",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".minions/programs/propose.md",
+    "docs/2026-10-14-dupes-ranked-candidates/issues.md",
+    "docs/2026-10-14-dupes-ranked-candidates/issues/04-proposer-checks-with-its-idea-text.md",
+    "internal/premise/repo_propose_test.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/b4/b5a6b41672/0/metadata.json",
+      "transcript": "/b4/b5a6b41672/0/full.jsonl",
+      "content_hash": "/b4/b5a6b41672/0/content_hash.txt",
+      "prompt": "/b4/b5a6b41672/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 48,
+    "cache_creation_tokens": 65669,
+    "cache_read_tokens": 1480954,
+    "output_tokens": 11570,
+    "api_call_count": 24
+  }
+}
