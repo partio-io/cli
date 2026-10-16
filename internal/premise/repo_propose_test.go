@@ -514,6 +514,34 @@ func TestProposeProgramFilesTheBodyAsWritten(t *testing.T) {
 	}
 }
 
+func TestProposeProgramCountsEscapedBackticksInTheWholeBody(t *testing.T) {
+	agents := proposeAgents(t)
+
+	const count = `gh issue view <number> --repo <this-repo> --json body --jq '[.body | scan("\\\\` + "`" + `")] | length'`
+	block, ok := fencedBlockContaining(agents, "scan(")
+	if !ok {
+		t.Fatal("propose program shows no count of escaped backticks in a code block")
+	}
+	if strings.TrimSpace(block) != count {
+		t.Errorf("the count command is\n%s\nwant\n%s", strings.TrimSpace(block), count)
+	}
+	// Read only the paragraph that follows the count block, so a phrase
+	// elsewhere in the agents section cannot satisfy an assertion.
+	_, after, _ := strings.Cut(agents, count)
+	_, after, _ = strings.Cut(after, "```")
+	after, _, _ = strings.Cut(strings.TrimLeft(after, "\n "), "\n\n")
+	for want, why := range map[string]string{
+		"expect `0`":             "it does not know which count is a clean body",
+		"gh issue edit <number>": "it cannot repair a body that it finds broken",
+		"the same heredoc":       "it can escape the body again on the repair",
+		"run the count again":    "a repair that is broken too stays filed",
+	} {
+		if !strings.Contains(after, want) {
+			t.Errorf("after the count, the proposer is never told %q, so %s", want, why)
+		}
+	}
+}
+
 // lineContaining returns the first line of src that contains want.
 func lineContaining(src, want string) (string, bool) {
 	for _, line := range strings.Split(src, "\n") {

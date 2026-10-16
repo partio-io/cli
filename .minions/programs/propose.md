@@ -124,7 +124,13 @@ create feature proposals. Work through the steps below in order.
 
      The title is different: it sits inside double quotes, where the shell reads a backtick and a `$`. In the title only, put a backslash in front of each of them.
 
-     Then read the body back: `gh issue view <number> --repo <this-repo> --json body --jq .body`. If a backslash stands in front of a backtick anywhere in it, write the body again, without the backslashes, with `gh issue edit <number> --repo <this-repo> --body-file -` and the same heredoc.
+     Then count the escaped backticks in the whole body:
+
+     ```bash
+     gh issue view <number> --repo <this-repo> --json body --jq '[.body | scan("\\\\`")] | length'
+     ```
+
+     The command prints the count of escaped backticks in the whole body, and you expect `0`. On any other count, write the body again, without the backslashes, with `gh issue edit <number> --repo <this-repo> --body-file -` and the same heredoc. Then run the count again.
 
      The issue is the whole proposal. A build reads the issue and nothing else, so the body carries everything a fresh session needs to build from: what to build, in full, and the acceptance criteria as a `- [ ]` checklist under `## Acceptance Criteria`. Write no file for the proposal. `.minions/programs/` holds the programs the workflows run, and a proposal is not one of them.
 
