@@ -90,14 +90,7 @@ func TestProposeProgramKeepsItsExistingProposalBehaviour(t *testing.T) {
 // each run, so it missed #710 and #736, #714 and #720, #681 and #688 — and it
 // would let the proposer file again every idea the sweep closes.
 func TestProposeProgramChecksDuplicatesBySourceAndTitle(t *testing.T) {
-	raw, err := os.ReadFile(proposeProgram)
-	if err != nil {
-		t.Fatalf("read propose program: %v", err)
-	}
-	agents, ok := section(string(raw), "## Agents")
-	if !ok {
-		t.Fatal("propose program has no agents section")
-	}
+	agents := proposeAgents(t)
 
 	dupes, ok := lineContaining(agents, "minion-review dupes")
 	if !ok {
@@ -139,6 +132,101 @@ func TestProposeProgramChecksDuplicatesBySourceAndTitle(t *testing.T) {
 	if !strings.Contains(agents, "`Source: <owner/repo#N>`") {
 		t.Error("the proposer is never told the form of the source line")
 	}
+}
+
+// TestProposeProgramChecksWithTheIdeaText checks that the duplicate search gets
+// the text of the idea, so that the ranked candidates score its code names too.
+// The check runs before the premise, so the agent has the idea from the ingest
+// step, not the filed body, and the heredoc must not end on the terminator of
+// the gh issue create body.
+func TestProposeProgramChecksWithTheIdeaText(t *testing.T) {
+	agents := proposeAgents(t)
+
+	block, ok := fencedBlockContaining(agents, "minion-review dupes")
+	if !ok {
+		t.Fatal("propose program shows no duplicate search command in a code block")
+	}
+	command, _, _ := strings.Cut(block, "\n")
+	for _, want := range []string{"--source", "--title", "--body-file - <<'"} {
+		if !strings.Contains(command, want) {
+			t.Errorf("the duplicate search command lost %q:\n%s", want, command)
+		}
+	}
+	_, terminator, _ := strings.Cut(command, "--body-file - <<'")
+	terminator, _, _ = strings.Cut(terminator, "'")
+	lines := strings.Split(block, "\n")
+	if last := strings.TrimSpace(lines[len(lines)-1]); terminator == "" || last != terminator {
+		t.Errorf("the heredoc opened with %q is not closed on a line of its own:\n%s", terminator, block)
+	}
+	if terminator == "PROPOSAL_BODY" {
+		t.Error("the idea text ends on PROPOSAL_BODY, the terminator of the issue body")
+	}
+
+	if !strings.Contains(agents, "the description, the acceptance criteria and the premise of the idea") {
+		t.Error("the proposer is never told what the idea text holds")
+	}
+	if !strings.Contains(agents, "from the ingest step") {
+		t.Error("the proposer is never told that the idea text comes from the ingest step")
+	}
+}
+
+// TestProposeProgramJudgesTheRankedCandidates checks what the proposer does with
+// each kind of candidate. A ranked candidate has no strong overlap, so the
+// proposer reads its excerpt before it opens it, and a candidate it cannot
+// judge leaves a visible mark on the issue, not a lost idea.
+func TestProposeProgramJudgesTheRankedCandidates(t *testing.T) {
+	agents := proposeAgents(t)
+
+	for want, why := range map[string]string{
+		"`\"match\": \"source\"`": "it cannot tell a shared source item",
+		"`\"match\": \"title\"`":  "it cannot tell a strong title match",
+		"`\"match\": \"ranked\"`": "it cannot tell a ranked candidate",
+		"`score`":                 "it cannot weigh a ranked candidate",
+		"`shared`":                "it cannot see what a ranked candidate shares",
+		"`excerpt`":               "it opens every candidate to read it",
+	} {
+		if !strings.Contains(agents, want) {
+			t.Errorf("the proposer is never told %s, so %s", want, why)
+		}
+	}
+
+	if !strings.Contains(agents, "Read the title and the excerpt of each candidate") {
+		t.Error("the proposer is never told to judge a candidate by its title and excerpt first")
+	}
+	if !strings.Contains(agents, "Open a candidate with `gh issue view <n>` only when it can be the same idea") {
+		t.Error("the proposer is told to open every candidate, which costs turns it does not have")
+	}
+
+	if !strings.Contains(agents, "A ranked candidate that is the same idea counts as a strong match does") {
+		t.Error("the proposer is never told that a ranked candidate can stop the issue")
+	}
+
+	if !strings.Contains(agents, "A candidate closed as a copy") ||
+		!strings.Contains(agents, "stands for the issue that it names") {
+		t.Error("the proposer is never told that a closed copy stands for the issue that it names")
+	}
+
+	if !strings.Contains(agents, "`Possible duplicate of #<n>: <reason>`") ||
+		!strings.Contains(agents, "above the source line") {
+		t.Error("the proposer is never told how to file an idea when it is not sure of a match")
+	}
+	if !strings.Contains(agents, "The reason names no `owner/repo` item") {
+		t.Error("the proposer is never told to keep source items out of the reason, which SourceRefs reads as a source")
+	}
+}
+
+// proposeAgents returns the ## Agents section of the propose program.
+func proposeAgents(t *testing.T) string {
+	t.Helper()
+	raw, err := os.ReadFile(proposeProgram)
+	if err != nil {
+		t.Fatalf("read propose program: %v", err)
+	}
+	agents, ok := section(string(raw), "## Agents")
+	if !ok {
+		t.Fatal("propose program has no agents section")
+	}
+	return agents
 }
 
 // TestProposeProgramMarksItsIssuesReviewed checks that each issue the proposer
@@ -205,14 +293,7 @@ func TestProposeWorkflowCreatesTheReviewedLabel(t *testing.T) {
 // leaves no second issue behind, and no rejection either: the matched issue is
 // its record, and the rejection log is for ideas this repository contradicted.
 func TestProposeProgramFilesNoDuplicate(t *testing.T) {
-	raw, err := os.ReadFile(proposeProgram)
-	if err != nil {
-		t.Fatalf("read propose program: %v", err)
-	}
-	agents, ok := section(string(raw), "## Agents")
-	if !ok {
-		t.Fatal("propose program has no agents section")
-	}
+	agents := proposeAgents(t)
 
 	at := strings.Index(agents, "is the same idea, file no issue")
 	if at < 0 {
@@ -239,14 +320,7 @@ func TestProposeProgramFilesNoDuplicate(t *testing.T) {
 // already filed and the operator is already reading it. The check has to come
 // first, and a failed check has to leave no issue behind.
 func TestProposeProgramDropsAnIdeaWhosePremiseFails(t *testing.T) {
-	raw, err := os.ReadFile(proposeProgram)
-	if err != nil {
-		t.Fatalf("read propose program: %v", err)
-	}
-	agents, ok := section(string(raw), "## Agents")
-	if !ok {
-		t.Fatal("propose program has no agents section")
-	}
+	agents := proposeAgents(t)
 
 	steps := []struct {
 		what  string
@@ -312,14 +386,7 @@ func TestProposeProgramGrantsTheToolsVerificationNeeds(t *testing.T) {
 // cursor has already advanced past both — so the run output is the only place
 // the difference survives.
 func TestProposeProgramSeparatesSkippedFromDropped(t *testing.T) {
-	raw, err := os.ReadFile(proposeProgram)
-	if err != nil {
-		t.Fatalf("read propose program: %v", err)
-	}
-	agents, ok := section(string(raw), "## Agents")
-	if !ok {
-		t.Fatal("propose program has no agents section")
-	}
+	agents := proposeAgents(t)
 
 	at := strings.Index(agents, "Print summary")
 	if at < 0 {
@@ -383,14 +450,7 @@ func TestProposeProgramFilesTheEvidenceItGathered(t *testing.T) {
 // linked to did not exist on main, and 171 of those proposals carried no
 // acceptance criteria in the issue.
 func TestProposeProgramKeepsTheWholeProposalInTheIssue(t *testing.T) {
-	raw, err := os.ReadFile(proposeProgram)
-	if err != nil {
-		t.Fatalf("read propose program: %v", err)
-	}
-	agents, ok := section(string(raw), "## Agents")
-	if !ok {
-		t.Fatal("propose program has no agents section")
-	}
+	agents := proposeAgents(t)
 
 	create, ok := fencedBlockContaining(agents, "gh issue create")
 	if !ok {
@@ -423,14 +483,7 @@ func TestProposeProgramKeepsTheWholeProposalInTheIssue(t *testing.T) {
 // shell keeps the backslash: on 2026-10-11, #767, #768 and #769 reached GitHub
 // with 254 escaped backticks, and none of their code rendered.
 func TestProposeProgramFilesTheBodyAsWritten(t *testing.T) {
-	raw, err := os.ReadFile(proposeProgram)
-	if err != nil {
-		t.Fatalf("read propose program: %v", err)
-	}
-	agents, ok := section(string(raw), "## Agents")
-	if !ok {
-		t.Fatal("propose program has no agents section")
-	}
+	agents := proposeAgents(t)
 
 	create, ok := fencedBlockContaining(agents, "gh issue create")
 	if !ok {
