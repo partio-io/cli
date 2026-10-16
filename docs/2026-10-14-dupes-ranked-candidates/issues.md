@@ -9,4 +9,4 @@ Source: [prd.md](./prd.md)
 | [x]  | 3 | [Code names in the score](./issues/03-code-names-in-the-score.md) | [#2](./issues/02-review-checks-by-issue-number.md) |
 | [x]  | 4 | [The proposer checks with the text of its idea](./issues/04-proposer-checks-with-its-idea-text.md) | [#3](./issues/03-code-names-in-the-score.md) |
 | [x]  | 5 | [Escaped backticks in the whole body](./issues/05-escaped-backticks-in-the-whole-body.md) | None |
-| [ ]  | 6 | [Recall test and the count after the merge](./issues/06-recall-test-and-count-after-merge.md) | [#3](./issues/03-code-names-in-the-score.md) |
+| [x]  | 6 | [Recall test and the count after the merge](./issues/06-recall-test-and-count-after-merge.md) | [#3](./issues/03-code-names-in-the-score.md) |
