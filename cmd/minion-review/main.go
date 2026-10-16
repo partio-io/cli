@@ -15,8 +15,10 @@
 // Its dupes subcommand lists the minion-proposal issues that may hold
 // the same idea as one issue, by source item or by title, then up to 10
 // ranked candidates by title score, and prints them as JSON with a
-// score and an excerpt of each body. The review program calls it; it
-// changes nothing.
+// score and an excerpt of each body. With --issue it reads the title,
+// body and source items of that issue itself and leaves the issue out;
+// --issue takes no --title, --source or --exclude. The review program
+// calls it with --issue; it changes nothing.
 //
 // Its check subcommand runs the checks of the gate on one verdict file
 // and prints "no verdict" with the cause when the gate would refuse it.
@@ -50,7 +52,8 @@ import (
 
 const (
 	gateUsage  = "usage: minion-review gate --issue <number> --verdict <path> [--mode sweep|build] [--dry-run] [--night YYYY-MM-DD]"
-	dupesUsage = "usage: minion-review dupes --title <title> [--source <ref>]... [--exclude <number>]"
+	dupesUsage = "usage: minion-review dupes --issue <number>\n" +
+		"       minion-review dupes --title <title> [--source <ref>]... [--exclude <number>]"
 	checkUsage = "usage: minion-review check --issue <number> --verdict <path>"
 	nextUsage  = "usage: minion-review next [--sample <n>]"
 	usage      = gateUsage + "\n" + checkUsage + "\n" + dupesUsage + "\n" + nextUsage
@@ -208,13 +211,27 @@ func dupes(args []string, stdout io.Writer) int {
 	var sources sourceFlags
 	fs.Var(&sources, "source", "a source reference of the issue, in any form: owner/repo#N, a URL, an Origin: line (repeatable)")
 	var (
-		title   = fs.String("title", "", "title of the issue (required)")
+		title   = fs.String("title", "", "title of the issue (required without --issue)")
 		exclude = fs.Int("exclude", 0, "the issue under review, left out of the candidates")
+		issue   = fs.Int("issue", 0, "the issue under review: its title, body and source items are the query")
 	)
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	if strings.TrimSpace(*title) == "" || fs.NArg() > 0 {
+	if *issue != 0 {
+		var mixed []string
+		fs.Visit(func(f *flag.Flag) {
+			if f.Name != "issue" {
+				mixed = append(mixed, "--"+f.Name)
+			}
+		})
+		if len(mixed) > 0 {
+			fmt.Fprintf(os.Stderr, "minion-review: --issue takes no %s; it reads them from the issue\n", strings.Join(mixed, ", "))
+			fmt.Fprintln(os.Stderr, dupesUsage)
+			return 2
+		}
+	}
+	if *issue < 0 || (*issue == 0 && strings.TrimSpace(*title) == "") || fs.NArg() > 0 {
 		fmt.Fprintln(os.Stderr, dupesUsage)
 		return 2
 	}
@@ -229,7 +246,7 @@ func dupes(args []string, stdout io.Writer) int {
 	}
 
 	found, err := review.FindDupes(github.Client{BaseURL: api, Token: token}, review.DupesQuery{
-		Repo: repo, Sources: sources, Title: *title, Exclude: *exclude,
+		Repo: repo, Sources: sources, Title: *title, Exclude: *exclude, Issue: *issue,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "minion-review: %v\n", err)

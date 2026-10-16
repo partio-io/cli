@@ -9,8 +9,8 @@ const reviewDupesRun = "go run ./cmd/minion-review dupes"
 
 // TestReviewSearchesForDuplicates checks that the review finds the same idea
 // in the backlog with the deterministic search, not with its own idea of a
-// search, and before it decides. It passes the issue's sources and title, and
-// leaves the issue itself out.
+// search, and before it decides. It passes only the issue number: the tool
+// reads the title, body and source items of the issue itself.
 func TestReviewSearchesForDuplicates(t *testing.T) {
 	agent := reviewer(t)
 
@@ -18,9 +18,16 @@ func TestReviewSearchesForDuplicates(t *testing.T) {
 	if run < 0 {
 		t.Fatalf("%s does not run %q", reviewAgentH3, reviewDupesRun)
 	}
+	line := agent[run:]
+	if end := strings.Index(line, "\n"); end >= 0 {
+		line = line[:end]
+	}
+	if want := reviewDupesRun + " --issue <issue number>"; strings.TrimSpace(line) != want {
+		t.Errorf("%s runs %q, want %q", reviewAgentH3, strings.TrimSpace(line), want)
+	}
 	for _, flag := range []string{"--source", "--title", "--exclude"} {
-		if !strings.Contains(agent[run:], flag) {
-			t.Errorf("%s runs the search without %s", reviewAgentH3, flag)
+		if strings.Contains(agent, flag) {
+			t.Errorf("%s still names %s: --issue replaces it", reviewAgentH3, flag)
 		}
 	}
 	if decide := strings.Index(agent, "**Decide.**"); decide < 0 || decide < run {
@@ -72,6 +79,33 @@ func TestReviewAppliesTheDuplicateRules(t *testing.T) {
 	} {
 		if !strings.Contains(agent, want) {
 			t.Errorf("%s does not carry the duplicate rule %q", reviewAgentH3, want)
+		}
+	}
+}
+
+// TestReviewReadsTheRankedCandidates checks that the review knows the three
+// kinds of match and the fields of a candidate, reads each title and excerpt
+// before it opens an issue, and keeps the issue when it is not sure.
+func TestReviewReadsTheRankedCandidates(t *testing.T) {
+	agent := flat(reviewer(t))
+
+	for _, want := range []string{
+		`"match": "source"`,
+		`"match": "title"`,
+		`"match": "ranked"`,
+		"is one of the 10 other proposals with the best score",
+		"`title`, `state`, `state_reason`, `labels`, `score`, `shared` and `excerpt`",
+		"read the title and the excerpt of each candidate",
+		"open a candidate with `gh issue view <n>` only when it can be the same idea",
+		"judge a ranked candidate that is the same idea as a strong match",
+		"when you are not sure that a candidate is the same idea, keep the issue",
+		`"same": false`,
+		"the reason in `why`",
+		"no issue closes on a weak guess",
+		"the list is the backlog you judge against",
+	} {
+		if !strings.Contains(strings.ToLower(agent), strings.ToLower(want)) {
+			t.Errorf("%s does not carry %q", reviewAgentH3, want)
 		}
 	}
 }

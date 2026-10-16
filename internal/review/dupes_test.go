@@ -51,6 +51,10 @@ func fillers(from, n int) []fakeIssue {
 type fakeBacklog struct {
 	srv     *httptest.Server
 	queries []string
+	reads   []string // the issue numbers read one by one
+	// unlisted are issues the issue endpoint serves but the list
+	// endpoint leaves out, as an issue without the proposal label.
+	unlisted []fakeIssue
 }
 
 func newFakeBacklog(t *testing.T, issues []fakeIssue) *fakeBacklog {
@@ -69,6 +73,17 @@ func newFakeBacklog(t *testing.T, issues []fakeIssue) *fakeBacklog {
 		lo := min((page-1)*per, len(issues))
 		hi := min(lo+per, len(issues))
 		_ = json.NewEncoder(w).Encode(issues[lo:hi])
+	})
+	mux.HandleFunc("GET /repos/partio-io/cli/issues/{n}", func(w http.ResponseWriter, r *http.Request) {
+		f.reads = append(f.reads, r.PathValue("n"))
+		n, _ := strconv.Atoi(r.PathValue("n"))
+		for _, is := range append(issues, f.unlisted...) {
+			if is.Number == n {
+				_ = json.NewEncoder(w).Encode(is)
+				return
+			}
+		}
+		http.NotFound(w, r)
 	})
 	f.srv = httptest.NewServer(mux)
 	t.Cleanup(f.srv.Close)
@@ -277,5 +292,56 @@ func TestFindDupesFindsConfirmedBacklogPairs(t *testing.T) {
 				t.Errorf("#%d: FindDupes = %+v, want #%d first by %s", tt.issue, got, tt.twin, tt.match)
 			}
 		})
+	}
+}
+
+func TestFindDupesByIssueTakesTheIssueFromTheListing(t *testing.T) {
+	f := newFakeBacklog(t, []fakeIssue{
+		fakeProposal(758, "Cache the session parser", "## Source\n\n**Origin:** entireio/cli#3001\n", "open", ""),
+		fakeProposal(710, "Speed up the hook installer", "Ported from entireio/cli#3001.", "closed", "completed"),
+		fakeProposal(712, "Unrelated filler", "Origin: elsewhere/other#1", "open", ""),
+	})
+	got, err := FindDupes(f.client(), DupesQuery{Repo: "partio-io/cli", Issue: 758})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.reads) != 0 {
+		t.Errorf("read issues %v one by one, want none: the listing holds 758", f.reads)
+	}
+	if len(got) != 1 || got[0].Number != 710 || got[0].Match != MatchSource {
+		t.Fatalf("FindDupes = %+v, want only #710 by source", got)
+	}
+	if fmt.Sprint(got[0].Shared) != "[entireio/cli#3001]" {
+		t.Errorf("shared = %v, want [entireio/cli#3001]", got[0].Shared)
+	}
+}
+
+func TestFindDupesByIssueReadsAnUnlistedIssueOnce(t *testing.T) {
+	f := newFakeBacklog(t, []fakeIssue{
+		fakeProposal(710, "Speed up the hook installer", "Ported from entireio/cli#3001.", "closed", "completed"),
+		fakeProposal(711, "Cache the session parser output", "Origin: elsewhere/other#1", "open", ""),
+	})
+	f.unlisted = []fakeIssue{{Number: 800, Title: "Cache the session parser", Body: "Origin: entireio/cli#3001", State: "open"}}
+	got, err := FindDupes(f.client(), DupesQuery{Repo: "partio-io/cli", Issue: 800})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(f.reads) != "[800]" {
+		t.Errorf("read issues %v, want [800]", f.reads)
+	}
+	if len(got) != 2 || got[0].Number != 710 || got[0].Match != MatchSource || got[1].Number != 711 {
+		t.Errorf("FindDupes = %+v, want #710 by source, then #711 by title", got)
+	}
+}
+
+func TestWithIssueKeepsTheBodyOnTheQuery(t *testing.T) {
+	body := "Origin: entireio/cli#3001\n\nCache `ParseJSONL`."
+	q, err := withIssue(github.Client{}, DupesQuery{Repo: "partio-io/cli", Issue: 758},
+		[]proposal{{Number: 758, Title: "Cache the session parser", Body: body}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q.Body != body || q.Title != "Cache the session parser" || q.Exclude != 758 {
+		t.Errorf("withIssue = %+v, want the title, the body and the exclusion of #758", q)
 	}
 }
