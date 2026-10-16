@@ -46,6 +46,17 @@ func TestDupesPrintsTheCandidatesAsJSON(t *testing.T) {
 		got[0]["state_reason"] != "completed" {
 		t.Errorf("dupes printed %s", out.String())
 	}
+	for _, field := range []string{"number", "title", "state", "state_reason", "labels", "match", "shared", "score", "excerpt"} {
+		if _, ok := got[0][field]; !ok {
+			t.Errorf("dupes printed no %q field: %s", field, out.String())
+		}
+	}
+	if _, ok := got[0]["score"].(float64); !ok {
+		t.Errorf("score = %#v, want a number", got[0]["score"])
+	}
+	if got[0]["excerpt"] != "Inspired by entireio/cli PR #2075, #2077" {
+		t.Errorf("excerpt = %#v, want the body as plain text", got[0]["excerpt"])
+	}
 }
 
 func TestDupesWithoutAMatchPrintsAnEmptyList(t *testing.T) {
