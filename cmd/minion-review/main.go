@@ -13,8 +13,14 @@
 // changed step outputs to the file GITHUB_OUTPUT names.
 //
 // Its dupes subcommand lists the minion-proposal issues that may hold
-// the same idea as one issue, by source item or by title, and prints
-// them as JSON. The review program calls it; it changes nothing.
+// the same idea as one issue, by source item or by title, then up to 10
+// ranked candidates by title and code-name score, and prints them as
+// JSON with a score and an excerpt of each body. --body-file reads the
+// text of the idea from a file, or from standard input with "-", for its
+// code names. With --issue it reads the title, body and source items of
+// that issue itself and leaves the issue out; --issue takes no --title,
+// --source, --exclude or --body-file. The review program
+// calls it with --issue; it changes nothing.
 //
 // Its check subcommand runs the checks of the gate on one verdict file
 // and prints "no verdict" with the cause when the gate would refuse it.
@@ -48,7 +54,8 @@ import (
 
 const (
 	gateUsage  = "usage: minion-review gate --issue <number> --verdict <path> [--mode sweep|build] [--dry-run] [--night YYYY-MM-DD]"
-	dupesUsage = "usage: minion-review dupes --title <title> [--source <ref>]... [--exclude <number>]"
+	dupesUsage = "usage: minion-review dupes --issue <number>\n" +
+		"       minion-review dupes --title <title> [--source <ref>]... [--exclude <number>] [--body-file <path>|-]"
 	checkUsage = "usage: minion-review check --issue <number> --verdict <path>"
 	nextUsage  = "usage: minion-review next [--sample <n>]"
 	usage      = gateUsage + "\n" + checkUsage + "\n" + dupesUsage + "\n" + nextUsage
@@ -65,7 +72,7 @@ func main() {
 	case "check":
 		os.Exit(check(os.Args[2:], os.Stdout))
 	case "dupes":
-		os.Exit(dupes(os.Args[2:], os.Stdout))
+		os.Exit(dupes(os.Args[2:], os.Stdin, os.Stdout))
 	case "next":
 		os.Exit(next(os.Args[2:], os.Stdout))
 	default:
@@ -201,18 +208,33 @@ type sourceFlags []string
 func (s *sourceFlags) String() string     { return strings.Join(*s, " ") }
 func (s *sourceFlags) Set(v string) error { *s = append(*s, v); return nil }
 
-func dupes(args []string, stdout io.Writer) int {
+func dupes(args []string, stdin io.Reader, stdout io.Writer) int {
 	fs := flag.NewFlagSet("dupes", flag.ContinueOnError)
 	var sources sourceFlags
 	fs.Var(&sources, "source", "a source reference of the issue, in any form: owner/repo#N, a URL, an Origin: line (repeatable)")
 	var (
-		title   = fs.String("title", "", "title of the issue (required)")
-		exclude = fs.Int("exclude", 0, "the issue under review, left out of the candidates")
+		title    = fs.String("title", "", "title of the issue (required without --issue)")
+		exclude  = fs.Int("exclude", 0, "the issue under review, left out of the candidates")
+		issue    = fs.Int("issue", 0, "the issue under review: its title, body and source items are the query")
+		bodyFile = fs.String("body-file", "", "a file with the text of the idea, or - for standard input; it gives code names only")
 	)
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	if strings.TrimSpace(*title) == "" || fs.NArg() > 0 {
+	if *issue != 0 {
+		var mixed []string
+		fs.Visit(func(f *flag.Flag) {
+			if f.Name != "issue" {
+				mixed = append(mixed, "--"+f.Name)
+			}
+		})
+		if len(mixed) > 0 {
+			fmt.Fprintf(os.Stderr, "minion-review: --issue takes no %s; it reads them from the issue\n", strings.Join(mixed, ", "))
+			fmt.Fprintln(os.Stderr, dupesUsage)
+			return 2
+		}
+	}
+	if *issue < 0 || (*issue == 0 && strings.TrimSpace(*title) == "") || fs.NArg() > 0 {
 		fmt.Fprintln(os.Stderr, dupesUsage)
 		return 2
 	}
@@ -221,13 +243,28 @@ func dupes(args []string, stdout io.Writer) int {
 			fmt.Fprintf(os.Stderr, "minion-review: --source %q names no owner/repo#N item; it matches nothing\n", src)
 		}
 	}
+	var body string
+	if *bodyFile != "" {
+		var b []byte
+		var err error
+		if *bodyFile == "-" {
+			b, err = io.ReadAll(stdin)
+		} else {
+			b, err = os.ReadFile(*bodyFile)
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "minion-review: --body-file %s: %v\n", *bodyFile, err)
+			return 2
+		}
+		body = string(b)
+	}
 	repo, token, api, ok := githubEnv()
 	if !ok {
 		return 2
 	}
 
 	found, err := review.FindDupes(github.Client{BaseURL: api, Token: token}, review.DupesQuery{
-		Repo: repo, Sources: sources, Title: *title, Exclude: *exclude,
+		Repo: repo, Sources: sources, Title: *title, Exclude: *exclude, Issue: *issue, Body: body,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "minion-review: %v\n", err)

@@ -85,25 +85,32 @@ and do not decide it from memory of how similar projects work.
    what you searched when you found nothing.
 
 5. **Look for duplicates.** Run the duplicate search in your working
-   directory. Pass each source reference the issue cites, as written
-   (`owner/repo#N`, a URL, or the text of its `Origin:` line), its
-   title, and its number:
+   directory, with the issue number and no other flag. The command
+   reads the title, the body and the source items of the issue itself,
+   and leaves the issue out:
 
    ```bash
-   go run ./cmd/minion-review dupes --source "entireio/cli#2075" --title "<issue title>" --exclude <issue number>
+   go run ./cmd/minion-review dupes --issue <issue number>
    ```
 
-   Repeat `--source` for each reference. The command prints a JSON list
-   of candidates: other `minion-proposal` issues, open and closed, that
-   cite the same source item (`"match": "source"`) or have a strongly
-   overlapping title (`"match": "title"`). Source matches come first.
-   Each candidate carries its `state`, `state_reason` and `labels`. The
-   list is the backlog you judge against: do not look for duplicates in
+   The command prints a JSON list of candidates: other `minion-proposal`
+   issues, open and closed, of three kinds. `"match": "source"` cites
+   the same source item. `"match": "title"` has a title overlap of 0.6
+   or more. `"match": "ranked"` is one of the 10 other proposals with
+   the best score. Source matches come first, then title matches,
+   then ranked ones. Each candidate carries its `title`, `state`,
+   `state_reason`, `labels`, `score`, `shared` and `excerpt`. The list
+   is the backlog you judge against: do not look for duplicates in
    another way.
 
-   A shared source or title does not make the same idea. Read each
-   candidate with `gh issue view <n>`, and decide whether it asks for
-   the same change. Then apply these rules to each candidate that is
+   A shared source or title does not make the same idea. Read the title
+   and the excerpt of each candidate. Open a candidate with
+   `gh issue view <n>` only when it can be the same idea, and decide
+   whether it asks for the same change. Judge a ranked candidate that is
+   the same idea as a strong match. When you are not sure that a
+   candidate is the same idea, keep the issue: record the candidate with
+   `"same": false` and the reason in `why`. No issue closes on a weak
+   guess. Then apply these rules to each candidate that is
    the same idea. The first issue reviewed stays:
    - An open candidate that carries `minion-reviewed` stays, and this
      issue closes as its duplicate.
