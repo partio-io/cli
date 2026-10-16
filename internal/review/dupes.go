@@ -11,7 +11,7 @@ import (
 const (
 	MatchSource = "source" // cites the same source item
 	MatchTitle  = "title"  // has a strongly overlapping title
-	MatchRanked = "ranked" // has one of the best title scores below a strong match
+	MatchRanked = "ranked" // has one of the best scores below a strong match
 )
 
 // maxRanked is the most ranked candidates the search returns after the
@@ -39,14 +39,14 @@ type Dupe struct {
 	StateReason string   `json:"state_reason"`
 	Labels      []string `json:"labels"`
 	Match       string   `json:"match"`
-	Shared      []string `json:"shared"` // the source items or title words both share
-	Score       float64  `json:"score"`  // the title score, from 0 to 1
+	Shared      []string `json:"shared"` // the source items, or the title words then the code names, both share
+	Score       float64  `json:"score"`  // the title score plus the code-name score, each from 0 to 1
 	Excerpt     string   `json:"excerpt"`
 }
 
 // FindDupes lists every minion-proposal issue in q.Repo, open and
 // closed, and returns those that match q by source item or by title,
-// then the best of the rest by title score.
+// then the best of the rest by title and code-name score.
 func FindDupes(gh github.Client, q DupesQuery) ([]Dupe, error) {
 	proposals, err := listProposals(gh, q.Repo)
 	if err != nil {
@@ -61,11 +61,18 @@ func FindDupes(gh github.Client, q DupesQuery) ([]Dupe, error) {
 	for _, s := range q.Sources {
 		want = append(want, SourceRefs(s)...)
 	}
+	// The code names of the proposals count only when the query has
+	// some, so the bodies are scanned only then.
+	queryCodes := codeNames(q.Body)
 	titles := make([]map[string]bool, len(proposals))
+	codes := make([]map[string]bool, len(proposals))
 	for i, p := range proposals {
 		titles[i] = titleWords(p.Title)
+		if len(queryCodes) > 0 {
+			codes[i] = codeNames(p.Body)
+		}
 	}
-	weights := newWordWeights(titles)
+	weights, codeWeights := newWordWeights(titles), newWordWeights(codes)
 	query := titleWords(q.Title)
 
 	// A ranked hit becomes a Dupe only when it makes the cut, so that
@@ -81,7 +88,10 @@ func FindDupes(gh github.Client, q DupesQuery) ([]Dupe, error) {
 		if p.Number == q.Exclude {
 			continue
 		}
-		score, words := weights.overlap(query, titles[i])
+		titleScore, words := weights.overlap(query, titles[i])
+		codeScore, names := codeWeights.overlap(queryCodes, codes[i])
+		score := titleScore + codeScore
+		words = append(words, names...)
 		var shared []string
 		for _, ref := range SourceRefs(p.Body) {
 			if slices.Contains(want, ref) {
@@ -91,7 +101,7 @@ func FindDupes(gh github.Client, q DupesQuery) ([]Dupe, error) {
 		switch {
 		case len(shared) > 0:
 			bySource = append(bySource, dupe(p, MatchSource, shared, score))
-		case score >= titleMatch:
+		case titleScore >= titleMatch:
 			byTitle = append(byTitle, dupe(p, MatchTitle, words, score))
 		case score > 0:
 			ranked = append(ranked, hit{p, words, score})

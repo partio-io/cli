@@ -63,18 +63,18 @@ the live backlog of 2026-10-14 put #750 first for `--issue 771` (score
 
 ## Acceptance criteria
 
-- [ ] The score of a candidate is its title overlap plus its code-name overlap, with one weight table for each, built once for each search from the listed proposals. A strong title match still needs a title overlap of 0.6 or more.
-- [ ] For a ranked candidate, `shared` holds the shared title words and the shared code names, in a stable order.
-- [ ] A query or a proposal with no code names is ranked by its title overlap alone.
-- [ ] A rare shared code name ranks a candidate above a candidate with a common shared code name.
-- [ ] A span in escaped backticks still counts, and a name inside a fenced block does not count.
-- [ ] A path counts by its base name, and a `()` at the end is cut.
-- [ ] Spans under 3 bytes, spans of digits only and the common names do not count. A span with spaces stays whole.
-- [ ] Each code-name case above shows in `shared` of a ranked candidate, through `FindDupes` and the fake server.
-- [ ] The body of an `--issue` query gives its code names.
-- [ ] `--body-file <path>` and `--body-file -` give the text of the query, and the command test covers both. A file that does not exist exits 2 with its path. `--issue` with `--body-file` exits 2.
-- [ ] Live check, read-only: `GH_TOKEN=$(gh auth token) GITHUB_REPOSITORY=partio-io/cli go run ./cmd/minion-review dupes --issue 771` prints #750 as the first ranked candidate, with `claude_config_dir` in its `shared`.
-- [ ] `make test` and `make lint` pass.
+- [x] The score of a candidate is its title overlap plus its code-name overlap, with one weight table for each, built once for each search from the listed proposals. A strong title match still needs a title overlap of 0.6 or more.
+- [x] For a ranked candidate, `shared` holds the shared title words and the shared code names, in a stable order.
+- [x] A query or a proposal with no code names is ranked by its title overlap alone.
+- [x] A rare shared code name ranks a candidate above a candidate with a common shared code name.
+- [x] A span in escaped backticks still counts, and a name inside a fenced block does not count.
+- [x] A path counts by its base name, and a `()` at the end is cut.
+- [x] Spans under 3 bytes, spans of digits only and the common names do not count. A span with spaces stays whole.
+- [x] Each code-name case above shows in `shared` of a ranked candidate, through `FindDupes` and the fake server.
+- [x] The body of an `--issue` query gives its code names.
+- [x] `--body-file <path>` and `--body-file -` give the text of the query, and the command test covers both. A file that does not exist exits 2 with its path. `--issue` with `--body-file` exits 2.
+- [x] Live check, read-only: `GH_TOKEN=$(gh auth token) GITHUB_REPOSITORY=partio-io/cli go run ./cmd/minion-review dupes --issue 771` prints #750 as the first ranked candidate, with `claude_config_dir` in its `shared`.
+- [x] `make test` and `make lint` pass.
 
 ## Modules touched
 
@@ -95,3 +95,64 @@ the live backlog of 2026-10-14 put #750 first for `--issue 771` (score
 - The recall test: [06 — Recall test and the count after the merge](./06-recall-test-and-count-after-merge.md).
 - Body words that are not code names: the score uses only titles and code names (PRD).
 - A match by equal proposal id (PRD, Out of Scope).
+
+## Evidence
+
+- 1 red: TestFindDupesAddsTheCodeNameOverlapToTheScore — code_names_test.go:38: code-name part of the score = 0, want 1
+- 1 green: TestFindDupesAddsTheCodeNameOverlapToTheScore — --- PASS: TestFindDupesAddsTheCodeNameOverlapToTheScore (0.00s)
+- 2 red: TestFindDupesAddsTheCodeNameOverlapToTheScore — code_names_test.go:41: shared = [claude], want [claude claude_config_dir]
+- 2 green: TestFindDupesAddsTheCodeNameOverlapToTheScore — --- PASS: TestFindDupesAddsTheCodeNameOverlapToTheScore (0.00s)
+- 3 red: TestFindDupesRanksByTitleAloneWithNoCodeNames — code_names_test.go:78: #760 1, #761 1 [faster upload], want #761 one lower with [faster upload]
+- 4 red: TestFindDupesRanksARareCodeNameAboveACommonOne — code_names_test.go:101: rare score 1, common score 1, want rare higher
+- 5 red: TestFindDupesSharesEachCodeNameCase/escaped_backticks_count — code_names_test.go:134: shared = [tweak], want [tweak escaped_name]
+- 6 red: TestFindDupesSharesEachCodeNameCase/path_counts_by_its_base_name — code_names_test.go:134: shared = [tweak], want [tweak post_commit.go]
+- 7 red: TestFindDupesSharesEachCodeNameCase/a_span_with_spaces_stays_whole — code_names_test.go:134: shared = [tweak], want [tweak git commit --amend]
+- 8 red: TestFindDupesSharesEachCodeNameCase — code_names_test.go:134: shared = [tweak], want [tweak kept_name]
+- 3 green: TestFindDupesRanksByTitleAloneWithNoCodeNames — PASS TestFindDupesRanksByTitleAloneWithNoCodeNames (0.00s)
+- 4 green: TestFindDupesRanksARareCodeNameAboveACommonOne — PASS TestFindDupesRanksARareCodeNameAboveACommonOne (0.00s)
+- 5 green: TestFindDupesSharesEachCodeNameCase — PASS TestFindDupesSharesEachCodeNameCase (0.00s)
+- 6 green: TestFindDupesSharesEachCodeNameCase — PASS TestFindDupesSharesEachCodeNameCase (0.00s)
+- 7 green: TestFindDupesSharesEachCodeNameCase — PASS TestFindDupesSharesEachCodeNameCase (0.00s)
+- 8 green: TestFindDupesSharesEachCodeNameCase — PASS TestFindDupesSharesEachCodeNameCase (0.00s)
+- 9 green: TestFindDupesByIssueTakesTheCodeNamesOfItsBody — PASS TestFindDupesByIssueTakesTheCodeNamesOfItsBody (0.00s)
+- 9 red: TestFindDupesByIssueTakesTheCodeNamesOfItsBody — code_names_test.go:149: #750 not in []
+- 10 red: TestDupesTakesTheQueryTextFromABodyFile — cmd/minion-review/main_test.go:38:28: too many arguments in call to dupes
+- 10 green: TestDupesTakesTheQueryTextFromABodyFile — --- PASS: TestDupesTakesTheQueryTextFromABodyFile (0.00s)
+- 11 smoke: dupes --issue 771 (live, read-only) — first ranked #750 score 1.08, shared has claude_config_dir
+- 12 smoke: make test && make lint — make test exit 0; golangci-lint 0 issues
+
+## Report
+
+**What changed**
+- New `internal/review/code_names.go`: `codeNames(body)`, with the seven rules of the analysis of 2026-10-13.
+- `internal/review/dupes.go`: one weight table for code names next to the table for titles. The score is the title overlap plus the code-name overlap. A strong match still needs a title overlap of 0.6 or more. `shared` holds the title words, then the code names, each sorted. The query body comes from `--issue` or from `Body`.
+- `cmd/minion-review/main.go`: `--body-file <path>` and `--body-file -`. `dupes` takes standard input as a parameter. A file that the command cannot read exits 2 with the path and the cause. `--issue` refuses `--body-file`.
+- Tests: new `internal/review/code_names_test.go` (5 tests, 11 code-name cases). `cmd/minion-review/main_test.go`: 2 new tests, and `--body-file` added to the `--issue` rule test.
+- `title_words.go` did not change: `wordWeights` serves both tables as it is.
+
+**Suite.** `make test` and `make lint`: green at step 1 and at step 5 (lint: 0 issues). No repair outside "Modules touched".
+
+**Live check** (read-only, run again after the review fixes): `dupes --issue 771` gives #750 first, score 1.08, with `claude_config_dir` in `shared`.
+
+**Evidence records:** 10 red, 10 green, 2 smoke, 0 prefactor, 0 screenshot. I wrote `codeNames` in full for the tracer test. So the red runs of criteria 3 to 9 come from the new tests against the `dupes.go` of `HEAD`, which I restored for that run.
+
+**Review findings** (`code-review medium --fix`)
+1. Escapes in names: other backslash escapes stayed in a name. The review fixed it, and undid every Markdown escape. Removed: rule 1 asks only for escaped backticks, and the spec check flagged it. Ask item.
+2. Body scans: the code names of the proposals are now built only when the query has code names. Kept: the result does not change, and the table is still built once for each search.
+3. Evidence lines: the masker had changed three `--- PASS:` lines. The review restored them. Kept.
+4. Score formula: one common shared code name, on a side with one code name only, gives the full code-name score of 1. Skipped by the review: criterion 1 sets the formula. Ask item.
+5. Fence pairing: an unclosed fence or a `~~~` fence lets code count. Skipped. Ask item.
+6. Slash rule: `owner/repo#12` gives `repo#12`, and two `main.go` files share a name. Skipped. Ask item.
+7. `--body-file -` waits on a terminal when nothing is piped in. Skipped: most CLIs do the same. Ask item.
+
+**Spec findings**
+- (a) none. (c) none.
+- (b) The review fix that undid every backslash escape. Removed, see review finding 1.
+
+**Marked with `git add -N`:** `internal/review/code_names.go`, `internal/review/code_names_test.go`.
+
+**Check time:** about 2 minutes for the one parallel wait (08:09:35 to 08:11:53 CEST, which includes the removal of the spec finding).
+
+**Against the PRD**
+- A name can show twice in `shared`: once as a title word and once as a code name. For example, the live #750 has `claude` twice. This shows which part matched, but a reader can think it is a fault.
+- The live `shared` lists are long, with up to 13 items. The proposer of slice 04 reads them.

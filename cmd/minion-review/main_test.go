@@ -35,7 +35,7 @@ func TestDupesPrintsTheCandidatesAsJSON(t *testing.T) {
 	code := dupes([]string{
 		"--source", "entireio/cli#2075", "--source", "https://github.com/entireio/cli/pull/2077",
 		"--title", "Add Goose coding agent integration", "--exclude", "681",
-	}, &out)
+	}, strings.NewReader(""), &out)
 	if code != 0 {
 		t.Fatalf("dupes exit %d, output %q", code, out.String())
 	}
@@ -70,7 +70,7 @@ func TestDupesWithoutAMatchPrintsAnEmptyList(t *testing.T) {
 	t.Setenv("GITHUB_API_URL", srv.URL)
 
 	var out bytes.Buffer
-	if code := dupes([]string{"--title", "Anything"}, &out); code != 0 {
+	if code := dupes([]string{"--title", "Anything"}, strings.NewReader(""), &out); code != 0 {
 		t.Fatalf("dupes exit %d", code)
 	}
 	if strings.TrimSpace(out.String()) != "[]" {
@@ -82,7 +82,7 @@ func TestDupesNeedsATitle(t *testing.T) {
 	t.Setenv("GITHUB_REPOSITORY", "partio-io/cli")
 	t.Setenv("GH_TOKEN", "tok")
 	var out bytes.Buffer
-	if code := dupes([]string{"--source", "entireio/cli#1"}, &out); code != 2 {
+	if code := dupes([]string{"--source", "entireio/cli#1"}, strings.NewReader(""), &out); code != 2 {
 		t.Errorf("dupes without --title exit %d, want 2", code)
 	}
 }
@@ -396,7 +396,7 @@ func TestDupesByIssuePrintsTheCandidatesOfThatIssue(t *testing.T) {
 	t.Setenv("GITHUB_API_URL", srv.URL)
 
 	var out bytes.Buffer
-	if code := dupes([]string{"--issue", "681"}, &out); code != 0 {
+	if code := dupes([]string{"--issue", "681"}, strings.NewReader(""), &out); code != 0 {
 		t.Fatalf("dupes exit %d, output %q", code, out.String())
 	}
 	var got []map[string]any
@@ -412,10 +412,10 @@ func TestDupesByIssueRefusesTheOtherFlags(t *testing.T) {
 	t.Setenv("GITHUB_REPOSITORY", "partio-io/cli")
 	t.Setenv("GH_TOKEN", "tok")
 	for _, extra := range [][]string{
-		{"--title", "Anything"}, {"--source", "entireio/cli#1"}, {"--exclude", "5"},
+		{"--title", "Anything"}, {"--source", "entireio/cli#1"}, {"--exclude", "5"}, {"--body-file", "-"},
 	} {
 		code, msg := captureStderr(t, func() int {
-			return dupes(append([]string{"--issue", "7"}, extra...), &bytes.Buffer{})
+			return dupes(append([]string{"--issue", "7"}, extra...), strings.NewReader(""), &bytes.Buffer{})
 		})
 		if code != 2 {
 			t.Errorf("dupes --issue with %s exit %d, want 2", extra[0], code)
@@ -423,6 +423,64 @@ func TestDupesByIssueRefusesTheOtherFlags(t *testing.T) {
 		if !strings.Contains(msg, "--issue") || !strings.Contains(msg, extra[0]) {
 			t.Errorf("dupes --issue with %s said %q, want it to name both flags", extra[0], msg)
 		}
+	}
+}
+
+func TestDupesTakesTheQueryTextFromABodyFile(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`[
+			{"number": 750, "title": "Respect the config dir", "state": "open",
+			 "body": "Read ` + "`CLAUDE_CONFIG_DIR`" + ` first.", "labels": [{"name": "minion-proposal"}]}
+		]`))
+	}))
+	defer srv.Close()
+	t.Setenv("GITHUB_REPOSITORY", "partio-io/cli")
+	t.Setenv("GH_TOKEN", "tok")
+	t.Setenv("GITHUB_API_URL", srv.URL)
+	body := "Honour `claude_config_dir`, and \\`$HOME\\` stays as written."
+	file := filepath.Join(t.TempDir(), "idea.md")
+	if err := os.WriteFile(file, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		name, path string
+		stdin      string
+	}{
+		{"a file", file, ""},
+		{"standard input", "-", body},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var out bytes.Buffer
+			code := dupes([]string{"--title", "Claude sessions path", "--body-file", tt.path}, strings.NewReader(tt.stdin), &out)
+			if code != 0 {
+				t.Fatalf("dupes exit %d, output %q", code, out.String())
+			}
+			var got []struct {
+				Number int      `json:"number"`
+				Shared []string `json:"shared"`
+			}
+			if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+				t.Fatalf("output is not a JSON list: %v\n%s", err, out.String())
+			}
+			if len(got) != 1 || got[0].Number != 750 || !slices.Contains(got[0].Shared, "claude_config_dir") {
+				t.Errorf("dupes = %s, want #750 with claude_config_dir shared", out.String())
+			}
+		})
+	}
+}
+
+func TestDupesRefusesABodyFileItCannotRead(t *testing.T) {
+	t.Setenv("GITHUB_REPOSITORY", "partio-io/cli")
+	t.Setenv("GH_TOKEN", "tok")
+	missing := filepath.Join(t.TempDir(), "no-such-idea.md")
+	code, msg := captureStderr(t, func() int {
+		return dupes([]string{"--title", "Anything", "--body-file", missing}, strings.NewReader(""), &bytes.Buffer{})
+	})
+	if code != 2 {
+		t.Errorf("dupes with a missing body file exit %d, want 2", code)
+	}
+	if !strings.Contains(msg, missing) || !strings.Contains(msg, "no such file") {
+		t.Errorf("dupes said %q, want the path and the cause", msg)
 	}
 }
 
