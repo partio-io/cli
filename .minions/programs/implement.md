@@ -39,6 +39,7 @@ started. You do not check it again — build what the issue describes.
 
 - The acceptance criteria above apply to your slice's changes, not the whole issue at once.
 - Leave the tree green at your boundary: checks (`make test`, `make lint`) run after every slice.
+- By the end of your slice, code outside tests calls every function and type that you add. A test alone is not a caller. Do not add code for a later slice unless the plan text of your slice names it for that slice.
 - Commit your work with the same message quality as below; anything left uncommitted is swept into a generic `slice N/M` commit by the runtime.
 - The runtime pushes each slice and opens the single PR after the final slice — never open a PR yourself.
 
