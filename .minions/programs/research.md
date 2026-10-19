@@ -413,6 +413,22 @@ first slice is a walking skeleton — the smallest change that proves the
 whole path works; later slices add behavior. Each slice must be
 independently shippable and reviewable on its own.
 
+**The vertical rule.** Code outside tests calls every function and type
+that a slice adds, in that same slice. A test alone is not a caller.
+The PRD groups its Implementation Decisions by module; do not copy that
+grouping into slices, because one slice per module is a horizontal cut.
+For example, for WSL support the first slice adds the WSL check together
+with its use in process detection; it does not add a WSL package that
+nothing calls yet. In particular:
+
+- Never plan a slice that only adds a package, a helper or a type for a
+  later slice to call. An `Out of scope` line that defers the first call
+  of the slice's own code to a later slice is the sign of that cut. Put
+  each helper in the first slice that calls it, beside its caller.
+- When a merge would make a slice too large, keep the split, and name
+  the helper in the text of both slices: the slice that adds it and the
+  slice that calls it. The build fails when no slice calls it.
+
 Slice protocol:
 
 1. Compute the shared paths:
@@ -451,6 +467,12 @@ Slice protocol:
    Description, and a non-empty Acceptance criteria checklist; fill in
    Modules touched and Out of scope whenever the PRD gives you the
    material.
+
+4. Read `$SLICES` back and check each slice against the vertical rule.
+   For each slice, list the functions and types that it adds, and for
+   each one the code of the same slice that calls it. When a slice adds
+   code that only a later slice calls, merge the two slices, or name the
+   helper in both as the vertical rule allows, and rewrite `$SLICES`.
 
 Write only `$SLICES`. Do not create or modify any file in the working
 directory, do not run `git`, do not call `gh`, and do not open a PR.
