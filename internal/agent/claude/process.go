@@ -49,9 +49,6 @@ func parseTasklistOutput(csv string) bool {
 			continue
 		}
 		fields := strings.Split(line, ",")
-		if len(fields) == 0 {
-			continue
-		}
 		imageName := strings.Trim(fields[0], `"`)
 		if strings.Contains(strings.ToLower(imageName), "claude") {
 			return true
