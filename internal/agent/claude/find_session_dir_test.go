@@ -135,3 +135,24 @@ type fileAge struct {
 	name string
 	age  time.Duration
 }
+
+func TestSanitizeWindowsPath(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{`C:\Users\foo\project`, "C--Users-foo-project"},
+		{`C:\Users\foo\AppData\Roaming`, "C--Users-foo-AppData-Roaming"},
+		{`C:\`, "C--"},
+		{`D:\work\repo`, "D--work-repo"},
+		{`/mnt/c/Users/foo`, "-mnt-c-Users-foo"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := sanitizeWindowsPath(tt.input)
+			if got != tt.want {
+				t.Errorf("sanitizeWindowsPath(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}

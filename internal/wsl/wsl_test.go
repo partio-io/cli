@@ -2,6 +2,7 @@ package wsl
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -27,5 +28,22 @@ func TestIsWSL_MissingInteropFile(t *testing.T) {
 	}
 	if got := IsWSL(); got {
 		t.Errorf("IsWSL() = true, want false when WSLInterop is absent")
+	}
+}
+
+func TestWindowsAppDataPath_Integration(t *testing.T) {
+	if !IsWSL() {
+		t.Skip("requires WSL environment with Windows interop enabled")
+	}
+	path, err := WindowsAppDataPath()
+	if err != nil {
+		t.Fatalf("WindowsAppDataPath() error = %v", err)
+	}
+	if path == "" {
+		t.Error("WindowsAppDataPath() returned empty string")
+	}
+	// The path should start with /mnt/ in a typical WSL setup.
+	if !strings.HasPrefix(path, "/mnt/") {
+		t.Logf("WindowsAppDataPath() = %q (not under /mnt/, may still be valid)", path)
 	}
 }
