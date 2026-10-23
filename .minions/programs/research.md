@@ -218,6 +218,27 @@ the `cli` codebase, explore the codebase instead of asking. For every
 question, also state your own recommended answer — the persona phase
 decides, but it needs your recommendation as the default.
 
+**Facts about outside tools.** The issue text and the `cli` code are
+claims about other programs, not evidence. The `cli` code shows what
+partio does today, not what the other program does. Before a question
+or a recommendation depends on a fact about a program outside this
+repo — where it stores files, how it names them, what a command
+prints, a file format, an environment variable — find evidence for
+that fact. Look in this order:
+
+- A source that the issue links. Read it with `gh`, for example
+  `gh pr diff <n> --repo <owner>/<repo>` for a linked pull request.
+- The program on this machine. Claude Code runs here, so
+  `ls ~/.claude/projects` shows where Claude Code stores sessions and
+  how it names their folders. List names only; never read a session
+  file.
+- The program's own docs or source on GitHub, read with `gh api`.
+
+When the evidence contradicts the issue text, the evidence wins: ask a
+question that names the conflict and recommend the evidence. When you
+find no evidence, say so in the question; never present the fact as
+settled.
+
 You do NOT answer the questions yourself, and you do NOT interact with
 any human — this is a fully autonomous run. Produce the questions
 only.
@@ -236,7 +257,10 @@ Transcript protocol:
 
 3. For each question, append a block to `$TRANSCRIPT` consisting of a
    line that reads exactly `## Q<n>` (sequential, starting at 1), the
-   question text on the following lines, and a final line
+   question text on the following lines, one line
+   `Evidence: <source or command> — <what it shows>` for each fact
+   about an outside program that the question depends on (or
+   `Evidence: none found — <the fact>`), and a final line
    `Recommended: <your recommended answer>`. One block per question.
    Ask one question at a time, in dependency order, the way
    `/code-research` would.
@@ -366,7 +390,10 @@ Transcript-to-PRD protocol:
    followed by an `## Answer` block, ending with a `RESEARCH_COMPLETE`
    line. Treat the persona's `## Answer` blocks as the authoritative
    decisions; the researcher's `Recommended:` line is context, not a
-   binding choice.
+   binding choice. An `Evidence:` line is a checked fact about an
+   outside program: where it contradicts the parent issue, the PRD
+   follows the evidence. A fact marked `Evidence: none found` goes into
+   `## Further Notes` as an unchecked risk.
 
 3. Synthesize the PRD. Cover every decision recorded in the
    transcript. Use the same domain vocabulary the parent issue and
