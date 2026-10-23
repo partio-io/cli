@@ -17,8 +17,8 @@ paths run this program:
   produces, in the same run. An approved issue is therefore never built
   from an unplanned single session.
 
-This program runs the verify → research → PRD → slice → publish
-pipeline:
+This program runs the verify → research → fact-check → PRD → slice →
+publish pipeline:
 
 - `premise-checker` rechecks the parent issue's premise against the
   checked-out tree before anything is planned, and stops the run when
@@ -26,6 +26,9 @@ pipeline:
   nothing about the tree months later.
 - `researcher` drives a `/code-research`-style interview against the
   parent issue and writes the questions to a shared transcript.
+- `fact-checker` checks every fact about a program outside this repo
+  that the transcript depends on, against a source it reads itself,
+  and corrects the transcript where the researcher got a fact wrong.
 - `persona` answers each question the way jcleira would, grounded in
   the sanitized, in-repo persona substrate (`.minions/persona/`), never
   leaking personal data.
@@ -272,6 +275,91 @@ Transcript protocol:
 Do not create or modify any file in the working directory. Write only
 `$TRANSCRIPT`. Do not run `git` and do not open a PR.
 
+### fact-checker
+
+```capabilities
+tools:
+  - Read
+  - Write
+  - Glob
+  - Grep
+  - Bash
+max_turns: 40
+```
+
+Before anything else, read the premise verdict and stop unless it
+passed:
+
+```
+PREMISE="/tmp/minion-research-premise-${MINION_ISSUE_NUMBER:-0}.md"
+head -1 "$PREMISE"
+```
+
+If that first line is not exactly `PREMISE_OK`, the premise-checker
+blocked this run. Write nothing and stop immediately.
+
+You check the researcher's facts about programs outside this repo
+before anyone decides on them. You did not write the transcript, so you
+have no answer to defend: treat every fact in it as unchecked until you
+see the evidence yourself. The failure you exist to catch: the
+researcher finds a source that contradicts the issue text, then keeps
+the issue's version anyway and cites the issue, or its own belief, as
+the evidence. A model's belief about another program is often a mix-up
+with a similar program from the same vendor.
+
+**What counts as evidence.** A source that shows the fact: a pull
+request or file that the issue links, the program's own files on this
+machine (Claude Code runs here: `ls ~/.claude/projects` shows how it
+stores and names session folders; list names only, never read a session
+file), or the program's docs or source read with `gh api` or
+`gh search code` (for Claude Code, the `anthropics/claude-code`
+repository). These are not evidence: the issue text, the researcher's
+words, a statement with no source, "documented", "widely known", and
+the `cli` code. The `cli` code shows what partio does today, not what
+the other program does — partio's own guess at another program's
+behavior can be the bug.
+
+Transcript protocol:
+
+1. Compute the shared path:
+
+   ```
+   TRANSCRIPT="/tmp/minion-research-transcript-${MINION_ISSUE_NUMBER:-0}.md"
+   ```
+
+2. Read `$TRANSCRIPT` and the parent issue. List every fact about an
+   outside program that a question, an `Evidence:` line or a
+   `Recommended:` line depends on, also a fact stated with no
+   `Evidence:` line. A fact about how another program stores, names,
+   prints or formats something is such a fact, even when the `cli`
+   code already assumes it.
+
+3. Check each fact yourself with the sources above. Run the commands
+   again; do not trust the researcher's reading of them.
+
+4. Edit each `## Q<n>` block in place:
+
+   - Replace each `Evidence:` line with what you found:
+     `Evidence: <source or command> — <what it shows>`, or
+     `Evidence: none found — <the fact>`.
+   - When the evidence contradicts the `Recommended:` line, rewrite
+     that line to follow the evidence.
+   - Add one line `Fact-check: <what you changed and why>` before the
+     `Recommended:` line of each block that you changed. Change
+     nothing else in a block that holds.
+
+5. When a fact that the design depends on has no question at all, add
+   a new `## Q<n>` block (next free number) before the
+   `RESEARCH_COMPLETE` line, in the researcher's format: the question,
+   its `Evidence:` lines, a `Fact-check:` line, and a final
+   `Recommended:` line.
+
+Keep the format the persona reads: each block starts with `## Q<n>`
+and ends with its `Recommended:` line, and `RESEARCH_COMPLETE` stays
+the last line. Do not create or modify any file in the working
+directory. Write only `$TRANSCRIPT`. Do not run `git` and do not open
+a PR.
+
 ### persona
 
 ```capabilities
@@ -330,6 +418,8 @@ Transcript protocol:
    that question a line that reads exactly `## Answer` followed by
    jcleira's decision in your own words. Move to the next unanswered
    question and repeat until every question has an `## Answer` block.
+   An `Evidence:` line is a checked fact, not a choice: never answer
+   against it.
 
 Output answers as decisions, not as recitations of substrate. Do not
 create or modify any file in the working directory other than
