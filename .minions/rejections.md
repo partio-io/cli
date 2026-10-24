@@ -349,3 +349,83 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #1882–#2073 (dependency updates, CI hang fix, trail backend retirement, dispatch routing, telemetry, release channel, OpenCode plugin, Cursor/Codex subagent fixes, search TUI changes, changelog PRs)`
 - reason: `irrelevant`
 - note: The bulk of PRs in this range are dependency version bumps, CI configuration fixes (e.g. #2072 apt hang), platform routing changes (e.g. #2046–#2051 cell targets, dispatch), telemetry (#2023–#2024), trail backend retirement (#2021, #2037), OpenCode plugin changes (#2018, #2027, #2053), Cursor/Codex subagent bug fixes (#2066–#2071), search TUI updates (#2022, #2044), and changelog/credit PRs (#2039, #2050, #2073). None of these map to Partio's domain of git hook-based session capture and checkpoint storage.
+
+## changelog 0.10.3–0.12.0: cloud infrastructure, trail management, and auth features
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.10.3–0.12.0 (trail merge, project trails, trail request-changes, trail assignee, trail create --repo, trail show, review profiles, repo mirror detach, repo delete --cascade, repo protection, repo clone --nearest, repo grant list, org invite, cluster list, auth switch, auth status, dispatch, native repos /et/<project>/<repo>, JWT, OPF writers, git-remote-entire, Windows installer, install.entire.com, etc.)`
+- reason: `irrelevant`
+- note: Partio has no trail, review, project, mirror, cluster, dispatch, auth, or git-remote commands. Partio stores checkpoints on a local orphan branch using git plumbing; it has no cloud control-plane infrastructure.
+
+## changelog 0.10.3–0.12.0: non-supported agent integrations (Pi, Antigravity, OpenCode 2, Cursor subagents, Codex subagents)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.10.3–0.12.0 (Pi agent integration, Antigravity CLI agent preview, OpenCode 2 text generation and session capture, Cursor subagent SubagentStart/SubagentStop, Codex subagent tracking, cross-repo subagent commits, Codex per-call usage, Pi per-call usage)`
+- reason: `irrelevant`
+- note: Partio supports only claude-code and codex. Pi, Antigravity, and Cursor are not implemented. OpenCode 2 is not implemented. Subagent tracking is not implemented in Partio's architecture (no Tasks directory, no SubagentStart/Stop hooks).
+
+## changelog 0.10.3–0.12.0: redaction pipeline improvements (OPF, betterleaks, PII categories, IP redaction)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.10.3–0.12.0 (OPF 9th layer on git-refs backend, betterleaks 1.8.0 update, Authorization header redaction, PII ip category, PII phone NANP qualifier, redact Authorization header credentials, record redaction counts per checkpoint, concurrent OPF rewrites fix, redaction diagnostics to .entire/logs)`
+- reason: `irrelevant`
+- note: Partio uses its own entropy-based and pattern-based redaction in internal/redact/. It has no OPF (OpenAI Privacy Filter) pipeline, no betterleaks integration, and no PII category system.
+
+## changelog 0.10.3–0.12.0: shadow branches and session sweep features
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.10.3–0.12.0 (shadow branches entire/<base>-<worktree> removed in 0.11.5, session sweep condenses zombie sessions, session salvage fallback for unusable worktrees, post-push cleanup deletes uncondensed shadow refs, finalizeAllTurnCheckpoints total deadline, session attach decision based on checkpoint/push status)`
+- reason: `irrelevant`
+- note: Partio has no shadow branches, no session sweep, no session condensation pipeline, and no attach command. Checkpoint data is written directly from git hooks at commit time.
+
+## changelog 0.10.3–0.12.0: UI, web app, docs, and release management features
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.10.3–0.12.0 (agent picker scrolling, entire.com web app links, Windows PE metadata, changelog PRs, search TUI, agent-help plugin on-demand install, brain plugin on-demand install, review profiles, experimental visibility from build version, release notes automation, docs pages for auth/repo/search/lifecycle/checkpoint-signing/agent-guide)`
+- reason: `irrelevant`
+- note: Partio has no UI, web app, docs site, or plugin system. These are Entire-specific features.
+
+## issues 2087–2812: OPF, semantic search, session sweep, and cloud-backend items
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2087–#2812 (OPF layers: #2087, #2204; checkpoint explain search: #2089; semantic search EU 401: #2121; MigrateBranchToRefs: #2196; persistent-ref lock files: #2197; auth-go lock dir: #2201; OPF CAS race: #2204; Windows PE metadata: #2218; stale configure --agent hints: #2249; forged trailer security: #2255; AppendCheckpointTrailer malformed: #2256; settings merge scope: #2257; Read deny rule approval: #2260; session state mutation in status: #2362; checkpoint_push_remote pushurl: #2360; post-push cleanup deletes uncondensed shadow ref: #2350; git-refs durable bookkeeping: #2393; ULID case-collision: #2402; repo grant mirror: #2518)`
+- reason: `irrelevant`
+- note: All these items are specific to Entire's OPF pipeline, git-refs checkpoint backend, cloud mirror infrastructure, ULID ref format, or auth system. None exist in Partio's architecture.
+
+## issues 2087–2812: non-supported agents and subagent tracking
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2087–#2812 (OpenCode Desktop: #2137; agent picker: #2126; Pi session dir: #2626; Antigravity nightly: mentioned in changelog; OpenCode 2 broken: #2588; Claude Code SubagentStop dropped: #2215; Workflow-spawned agents no task record: #2685; subagent backgrounded by default: #2556; background subagent attribution: #2653; Codex commit linking two worktrees: #2612; Claude Code Workflow tool subagents: #2685)`
+- reason: `irrelevant`
+- note: Partio does not support Pi, OpenCode, or Antigravity. Partio has no subagent tracking (no Tasks directory, no SubagentStart/Stop hooks). Codex multi-worktree daemon sharing does not apply to Partio's CWD-based session discovery.
+
+## issues 2087–2812: hook latency, Windows-specific, and CI-only bugs
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2087–#2812 (hook latency: #2091, #2115; CLI performance regression: #2098; index emptied by staging+commit: #2111; finalizeAllTurnCheckpoints deadline: #2148; Windows prepare-commit-msg hang: #2725, #2726; OPF CRLF batching: #2806; Codex hook trust TOML: #2606; auth-go test isolation: #2201; shellcheck lint: #2203; git test isolation: #2202)`
+- reason: `irrelevant`
+- note: The hook latency issues are specific to Entire's Codex hook timeout system. The index-emptied bug is caused by Entire's .entire/ directory being written during user-prompt-submit, which Partio does not have. The Windows hang is in prepare-commit-msg, which Partio does not install. OPF CRLF and Codex TOML trust are Entire-specific.
+
+## issues 2087–2812: cloud/auth/install/docs items
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2087–#2812 (Homebrew tap trust: #2394; docs security page: #2271; Windows install URL: #2276; install script rate-limit errors: #2318; control-plane HTTP_PROXY: #2686; remote helper JWT fallback: #2748; session resume overwrites ignored files: #2604; Read deny rule breaks auto-permission: #2260; Lefthook overwrite classification: #2263; status reports sync without hooks: #2264; disable not reaching worktrees: #2274; shadow branch cleanup: #2350; redaction Grok reasoning: #2157; Devin agent: #2328; Qwen Code: #2160 [Goose already filed]; bare AWS key standalone: #2808; short sk- keys: #2728)`
+- reason: `irrelevant`
+- note: These cover Homebrew 6 tap trust (Partio's install docs may differ), cloud HTTP proxies and JWT (Partio has no control-plane), git remote helper (Partio has none), OPF CRLF, session resume architecture differences, Lefthook detection, Devin and Qwen agents (not supported), Grok redaction (no Grok support). Bare AWS key standalone: Partio's aws-access-key-id pattern already matches standalone keys without requiring a paired secret (internal/redact/patterns.go:17). Short sk- keys: Partio's entropy scanner (threshold 4.5, min length 20) would catch a 22-char random sk- key.
+
+## PRs 2074–2883: dependency bumps, cloud backend, trail management, non-supported agents, and redaction pipeline
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #2074–#2883 (dependency bumps; CI/CD workflows; git-remote-entire protocol: #2869; trail merge, project trails, change selection: #2840, #2835, #2836; checkpoint backend push queue: #2876; transcript JSONL adapter export: #2848; trail show project link: #2877; brain plugin on-demand: #2883; enable callback removal: #2881; test isolation: #2874, #2880, #2879; redaction Authorization header: #2837; redact narrow allowlist: #2846; IP PII redaction: #2861; redaction counts: #2850; Windows installer origins: #2845; fix double-counting tokens mid-turn: #2856; OpenCode 2 text generation: #2843; OpenCode 2 session capture: #2854; Codex per-call usage: #2859; Pi per-call usage: #2862; Claude Code per-call usage: #2858 [duplicate of #703/#223]; session salvage: #2863; experimental visibility: #2860; finalize cross-repo checkpoints: #2872; checkpoint remote timeout: #2875; stop transcript-less checkpoints: #2867; privacy notice on enable: #2865; GitHub installation sync: #2870; honour protocol.version: #2869; show enabled external agents: #2868; changelog 0.11.6: #2842; 0.12.0: #2852; drop ci plugin: #2864; trail request-changes removal: #2838; project trail default: #2840; select trail change by count: #2835; allow writers to create trails: #2836; read optional v1 usage: #2834; record session branch on condense: #2833; link agent commit in another repo: #2844; find session after worktree move: #2855 [duplicate of #787]; pass pre-push ref list: #2878 [related to duplicate #469]; checkpoint list remote timeout: #2875; name entire.com: #2851; point web links at entire.com: #2849)`
+- reason: `irrelevant`
+- note: The bulk of these PRs cover dependency updates, CI changes, Entire's cloud backend (trails, reviews, project trails, mirrors, git-remote-entire), non-supported agent integrations (OpenCode 2, Pi, Codex subagents), redaction pipeline improvements not present in Partio (OPF, betterleaks, Authorization header, IP PII), or ideas that duplicate existing Partio proposals. Per-call Claude Code usage (#2858) is already filed as Partio issues #703 and #223. Session after worktree move (#2855) is already filed as Partio issue #787. Pre-push ref list (#2878) is related to already-filed Partio issue #469.
