@@ -621,3 +621,115 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #2914–#2987 (credential root fix, mirror test, race-condition sharding, Windows canary, subagent store fix, checkpoint fetch restart fix, manual push policy, hook shim warning, commit linking, manual push hold, Claude turn baseline, installer path fix, dial latency fix, consistent flag resolve, push policy prompt, config JSON fail-early, squash strategy trailers, review snippet limit, default-branch naming, checkpoint trailer parsing, transcript images, trail runner replacement, remote checkpoint filter, file runner removal, Pi lifecycle fix, Cursor naming, Codex streaming adapter, trail 401 hint, trail Core resolve, trail URL selector, prompt-out-of-commits, doctor Brain wrapper count, finalize failure reporting, git-dir cache, Codex image URI redaction, service-account keys, core.hooksPath in-place edit, trail commands batch, Windows headless workers, Pi transcript decode, import q anchor, commit signature preservation, Claude tool result blocks, trail no-base branch, trail findings cards, git-remote pack hold)`
 - reason: `irrelevant`
 - note: The bulk of PRs in this range are CI fixes, trail command additions, Codex/Pi/Cursor-specific session handling, Brain integration, auth improvements, and Entire-specific feature work. The two PRs implementing ideas already captured as Partio proposals (#2966 for core.hooksPath → Partio #797; #2978 for commit signature preservation → Partio #801) are recorded as duplicates, not rejections.
+
+## PRs #2074–#2913: dependency bumps, trail features, cloud infrastructure, platform-specific
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #2074–#2913 (dependency updates, trail gate management, cloud native repos, shadow branch GC, session cache memory diagnostics, Windows-specific hook wrappers, Pi/OpenCode/Cursor plugin changes, ULID shard handling, git-remote-entire memory cache, auth improvements, CI fixes)`
+- reason: `irrelevant`
+- note: PRs in this range are cloud infrastructure (native repos, dispatch routing, EU mirrors), trail gate features, session cache and memory diagnostics, Windows hook wrappers, Pi/OpenCode/Cursor/Codex plugin changes, shadow branch GC and ULID sharding, git-remote-entire memory cache, and a large volume of dependency bumps and CI fixes. None are applicable to Partio's git-hook + orphan-branch checkpoint architecture. Captured as a batch alongside the #2914–#2987 batch above.
+
+## `--author` / `--branch` filters for checkpoint list
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2718 (add --author and --branch flags to checkpoint list output)`
+- reason: `irrelevant`
+- note: Partio has no checkpoint list command. Checkpoint data is stored on the orphan branch and accessible only via raw git commands or `partio rewind`.
+
+## UserPromptSubmit hook timeouts under per-session flock contention
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2689 (UserPromptSubmit hook blocks ~30s and times out due to per-session flock contention)`
+- reason: `irrelevant`
+- note: Partio has no UserPromptSubmit hook. Its hooks are standard git lifecycle hooks without per-session file locking.
+
+## Shadow branches quadratic storage growth
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2663 (shadow branches accumulate quadratic storage as commit history grows)`
+- reason: `irrelevant`
+- note: Partio has no shadow branches. Checkpoints are stored on a single orphan branch (`partio/checkpoints/v1`) without per-commit branch proliferation.
+
+## Background subagent commits attributed to wrong session
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2653 (background subagent commits attributed to the wrong session / wrong agent percentage)`
+- reason: `irrelevant`
+- note: Partio has no background subagent concept. Attribution is calculated per-commit by `attribution.Calculate()` based on the single active session detected at commit time.
+
+## Native repos as primary host
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2623 (native repos as primary host — move git storage from git-remote-entire to native git server)`
+- reason: `irrelevant`
+- note: Partio stores data on a local orphan branch using git plumbing. There is no cloud host, git-remote-entire backend, or remote storage migration path.
+
+## Session resume overwrites untracked files
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2604 (session resume overwrites user's untracked files when restoring to a checkpoint)`
+- reason: `irrelevant`
+- note: Partio's `partio rewind` creates a new branch from the checkpoint commit rather than switching the working tree in place. Untracked files in the current worktree are not touched.
+
+## Session resume Unicode NFC/NFD branch name mismatch
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2551 (session resume fails to find the branch when the name contains Unicode composed/decomposed differently on macOS vs Linux)`
+- reason: `irrelevant`
+- note: Partio's rewind command looks up checkpoints by ID or by branch name from `git rev-parse --abbrev-ref HEAD`; there is no user-supplied Unicode branch name comparison.
+
+## `entire enable --force` exits 0 without a TTY
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2535 (entire enable --force silently exits 0 when no TTY is available, skipping agent selection prompt)`
+- reason: `irrelevant`
+- note: Partio's `partio enable` has no `--force` flag and no interactive agent selection prompt. The agent is set via config or environment variable.
+
+## ULID checkpoint refs unreadable due to shard case-collision
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2401 (ULID-based checkpoint refs become unreadable on case-insensitive filesystems due to shard path collision)`
+- reason: `irrelevant`
+- note: Partio uses a single orphan branch (`partio/checkpoints/v1`) rather than per-checkpoint git refs with ULID sharding. The case-collision problem does not exist in Partio's storage model.
+
+## git-refs writes return success without durable push bookkeeping
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2393 (git-refs backend acknowledges writes before confirming durable push, risking silent data loss)`
+- reason: `irrelevant`
+- note: Partio uses local git plumbing (`hash-object`, `mktree`, `commit-tree`, `update-ref`) with no git-refs backend or async push acknowledgement. The durability model is standard git object storage.
+
+## `partio clean` makes uncondensed checkpoints unreachable
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2378 (partio clean removes checkpoint refs before sessions are condensed, making them unreachable)`
+- reason: `irrelevant`
+- note: Partio's `clean` command (`cmd/partio/clean.go`) is a stub that lists entries and tells the user to run `partio reset`. It performs no actual cleanup, so the described data-loss scenario cannot occur yet.
+
+## Post-push cleanup deletes uncondensed shadow ref
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2350 (post-push cleanup hook deletes the shadow ref for a session that hasn't been condensed yet)`
+- reason: `irrelevant`
+- note: Partio has no shadow refs and no post-push cleanup hook. The pre-push hook only pushes the checkpoint branch; it does not delete any refs.
+
+## Owner access required for auto-created organisations
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2989 (auto-created orgs require owner access for admin/billing setup)`
+- reason: `irrelevant`
+- note: Partio has no organisation creation, billing, or cloud account management. Checkpoints are stored on a local orphan branch; there is no Entire cloud backend.
