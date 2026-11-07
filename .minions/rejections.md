@@ -349,3 +349,427 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #1882–#2073 (dependency updates, CI hang fix, trail backend retirement, dispatch routing, telemetry, release channel, OpenCode plugin, Cursor/Codex subagent fixes, search TUI changes, changelog PRs)`
 - reason: `irrelevant`
 - note: The bulk of PRs in this range are dependency version bumps, CI configuration fixes (e.g. #2072 apt hang), platform routing changes (e.g. #2046–#2051 cell targets, dispatch), telemetry (#2023–#2024), trail backend retirement (#2021, #2037), OpenCode plugin changes (#2018, #2027, #2053), Cursor/Codex subagent bug fixes (#2066–#2071), search TUI updates (#2022, #2044), and changelog/credit PRs (#2039, #2050, #2073). None of these map to Partio's domain of git hook-based session capture and checkpoint storage.
+
+## Case-insensitive filesystem: session stays pending when agent spells path in another case
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3054 (On macOS and Windows, a session stays pending after its commit when the agent spells a tracked path in another case)`
+- reason: `irrelevant`
+- note: Partio does not track which files an agent touched between commits. The post-commit hook captures the session JSONL and git diff; it does not maintain a per-session file list that is compared against commit contents. The pending-session / carry-forward mechanism that caused this bug does not exist in Partio's architecture.
+
+## Windows: track agent process liveness (proclive)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3053 (Track agent process liveness on Windows (proclive))`
+- reason: `irrelevant`
+- note: Partio's pre-commit hook detects agent presence by scanning running processes (pgrep-style) at hook time. It does not keep a live session ownership record that requires OS-specific liveness polling between hooks. The absence of a Windows liveness implementation does not block Partio's simpler detection model.
+
+## Windows: cancelling a subprocess at deadline leaves child processes running
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3052 (Windows: cancelling a subprocess at its deadline leaves its child processes running)`
+- reason: `irrelevant`
+- note: Partio does not launch or manage agent subprocesses. Hooks call `partio _hook <name>` synchronously; there is no deadline-driven cancellation of agent processes in Partio's codebase.
+
+## Hook state reads Current while a moved copy of Entire's hook is stale
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3050 (Hook state reads Current while a moved copy of Entire's hook is stale, so agent turns never refresh it)`
+- reason: `irrelevant`
+- note: Partio has no "Current" live hook state channel. The only hook state is the pre-commit.json file written by pre-commit and deleted by post-commit. A stale hook script can call a stale binary, but there is no equivalent to Entire's real-time session-state socket that this issue describes.
+
+## Hook backup copies always set 0755 on no-hard-link filesystems
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3049 (Backing up a hook without hard links makes it executable (0755), so a hook switched off with chmod -x runs again)`
+- reason: `irrelevant`
+- note: Partio backs up existing hooks via `os.Rename` (`internal/git/hooks/install.go:41`), not via a file copy. A rename is an atomic inode move that preserves the original permissions. The 0755 copy-permissions bug only arises on the copy path; Partio does not use that path.
+
+## Web app: default Markdown files to Preview in Trails → Changed Files
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3032 (Web app: default Markdown files to Preview in Trails → Changed Files)`
+- reason: `irrelevant`
+- note: Partio has no web app.
+
+## Overlapping commits in one worktree can consume each other's stamp records
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3030 (Overlapping commits in one worktree can consume each other's stamp records)`
+- reason: `irrelevant`
+- note: Partio has no stamp-record mechanism for commits. The pre-commit state file is keyed to a single concurrent operation and is deleted immediately by post-commit. Multiple simultaneous commits in one worktree are not a scenario Partio's architecture creates.
+
+## Commit keeps trailer naming unwritten checkpoint when subagent finishes during commit
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3029 (Commit keeps a trailer naming an unwritten checkpoint when a session's subagent finishes, or its turn ends, during the commit)`
+- reason: `irrelevant`
+- note: Partio has no subagent tracking and no mechanism for injecting trailers for in-progress sub-sessions. Partio's trailer is written by post-commit for the commit that just finished; there is no background subagent path.
+
+## `entire enable` hangs after agreeing to commit when a pre-commit hook opens less
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3025 (entire enable hangs after agreeing to commit when a pre-commit hook opens less)`
+- reason: `irrelevant`
+- note: Partio's `enable` command creates the checkpoint branch using git plumbing commands (`hash-object`, `mktree`, `commit-tree`, `update-ref`) that bypass hooks entirely (`cmd/partio/enable.go:192–214`). No `git commit` is run, so no pre-commit hook fires and no pager can open.
+
+## Checkpoint replay reports success after dropping another clone's session
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3014 (Checkpoint replay reports success after dropping another clone's session)`
+- reason: `irrelevant`
+- note: Partio has no server-side checkpoint replay. Checkpoints are written locally by the post-commit hook; replay is not a Partio concept.
+
+## Sessions in a shared checkout claim every dirty tracked file
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3011 (Sessions in a shared checkout claim every dirty tracked file, so idle and ended sessions land on unrelated commits)`
+- reason: `irrelevant`
+- note: Partio does not maintain a per-session file list. It detects agent presence at pre-commit time and links the whole commit to the session. There is no cross-session dirty-file tracking or contention.
+
+## Pushing to the default branch through a GitHub mirror fails with remote rejected
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3000 (Pushing to the default branch through a GitHub mirror fails with remote rejected (protected branch))`
+- reason: `irrelevant`
+- note: Partio has no GitHub mirror infrastructure. Checkpoints are pushed to whatever `origin` the repo already has.
+
+## `entire review` from a git worktree: "worktree path mismatch"
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2990 (entire review (output: local) does not persist findings when run from a git worktree)`
+- reason: `irrelevant`
+- note: Partio has no review command.
+
+## Owner access for auto-created orgs
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2989 (Owner access for auto-created orgs misty-step and r90group)`
+- reason: `irrelevant`
+- note: Administrative/billing issue unrelated to Partio's domain.
+
+## Windows: batch checkpoint ref push fails once queue exceeds ~340 refs
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2986 (Windows: the batch checkpoint ref push fails once the queue passes ~340 refs)`
+- reason: `irrelevant`
+- note: Partio pushes a single checkpoint branch (`partio/checkpoints/v1`) with one `git push` call. It has no batch ref push queue or Windows-specific push path.
+
+## git-remote-entire: push uses ~4× pack size in memory; replica cache grows without bound
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2985 (git-remote-entire: push uses ~4× the pack size in memory; replica cache grows without bound)`
+- reason: `irrelevant`
+- note: Partio has no git remote helper. Checkpoints are pushed with a plain `git push` call.
+
+## First preset Agent run completed but no promotional credit was granted
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2981 (First preset Agent run completed but no $100 promotional credit was granted)`
+- reason: `irrelevant`
+- note: Billing/promotional issue unrelated to Partio.
+
+## Post-push session attach publishes linked_commits but checkpoint remains absent
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2980 (Post-push session attach publishes linked_commits but checkpoint remains absent from activity and Dispatch)`
+- reason: `irrelevant`
+- note: Partio has no session attach command and no cloud activity/dispatch system.
+
+## Sibling-worktree commit linking picks a session idle for days
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2979 (Sibling-worktree commit linking picks a session idle for days; every commit from another worktree then condenses its multi-GB transcript)`
+- reason: `irrelevant`
+- note: Partio's session-to-commit linking is based on detecting any running agent process at pre-commit time, not on cross-worktree session ownership records. The idle-session hijacking and transcript condensation described are specific to Entire's complex multi-session state machine.
+
+## PII address redaction misses European street addresses
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2977 (PII address redaction misses European street addresses)`
+- reason: `irrelevant`
+- note: Partio has no address PII redaction. The `internal/redact/` package uses entropy-based heuristics and known secret patterns; it has no PII address detection at all.
+
+## PII phone redaction misses every non-North American number
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2976 (PII phone redaction misses every non-North American number)`
+- reason: `irrelevant`
+- note: Partio has no phone PII redaction. The `internal/redact/` package uses entropy and known secret patterns; it has no phone number detection.
+
+## `session attach` drops the signature of every commit it rewrites
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2974 (session attach drops the signature of every commit it rewrites)`
+- reason: `irrelevant`
+- note: Partio has no session attach command.
+
+## Re-wrapping a pre-push hook that chains through Entire's moved copy rotates the user's hook out
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2960 (Re-wrapping a pre-push hook that chains through Entire's moved copy rotates the user's own hook out of the chain)`
+- reason: `irrelevant`
+- note: Partio's hook installation backs up the original hook with `os.Rename` and writes a Partio wrapper. There is no second-level re-wrap cycle or entire-brain style chaining. The re-wrapping race condition described does not exist in Partio's simpler install model.
+
+## `entire disable --uninstall` leaves Entire's pre-push hook running behind entire-brain's wrapper
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2957 (\`entire disable --uninstall\` leaves Entire's pre-push hook running behind entire-brain's wrapper)`
+- reason: `irrelevant`
+- note: Partio has no entire-brain plugin. `partio disable` uninstalls Partio's hooks and restores backups directly; there is no secondary wrapper layer to leave behind.
+
+## Safer defaults for public remotes: checkpoint push on by default; redaction gaps
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2951 (Safer defaults for public remotes: checkpoint push is on by default; Bearer headers and binary transcripts slip past redaction)`
+- reason: `irrelevant`
+- note: Partio's `push_sessions` defaults to `true` and the concern about public remotes is already filed as Partio issue #802. The Bearer-header and binary-transcript redaction gaps are specific to Entire's backend transport; Partio has no Bearer-authenticated remote helper or binary transcript format.
+
+## Doctor conflict with entire-brain setup
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2949 (Entite doctor conflict with brain setup)`
+- reason: `irrelevant`
+- note: Partio has no entire-brain plugin. `partio doctor` checks hook installation and settings; there is no brain-integration path to conflict with.
+
+## Show transcript images (screenshots) in the entire.com session timeline
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2942 (Show transcript images (screenshots) in the entire.com session timeline)`
+- reason: `irrelevant`
+- note: Partio has no web timeline or image display. Session transcripts are stored as JSONL on the orphan branch; there is no rendering layer.
+
+## Windows: large Codex transcript saturates CPU during post-commit (12m43s)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2933 (Windows: large Codex transcript saturates CPU during post-commit (12m43s), interrupted capture leaves checkpoint trailer without remote data)`
+- reason: `irrelevant`
+- note: Partio's Codex session parser is simpler than Entire's. The 12-minute CPU saturation was caused by Entire's transcript condensation pipeline, which Partio does not have. Partio reads and redacts the JSONL once per commit; it has no condensation or multi-pass rewriting step.
+
+## Configure Trail gates as code (per repository and per organization)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2932 (Configure Trail gates as code (per repository and per organization))`
+- reason: `irrelevant`
+- note: Partio has no trails or gates.
+
+## Docs: Show Bash and PowerShell install commands on the CLI feature page
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2931 (docs: Show Bash and PowerShell install commands on the CLI feature page)`
+- reason: `irrelevant`
+- note: Documentation update for Entire's website; not applicable to Partio.
+
+## Pi extension: `ENTIRE_PI_NESTED` survives /reload, /new and /resume
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2930 (Pi extension: \`ENTIRE_PI_NESTED\` survives /reload, /new and /resume; unhandled stdin \`error\` can crash Pi)`
+- reason: `irrelevant`
+- note: Partio has no Pi agent support.
+
+## OpenCode v2 fails to load the Entire plugin: v1 plugin format
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2928 (OpenCode v2 fails to load the Entire plugin: v1 plugin format (no default export))`
+- reason: `irrelevant`
+- note: Partio has no OpenCode support.
+
+## Windows: background Entire hooks repeatedly flash black windows and steal focus
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2926 (Windows: background Entire hooks repeatedly flash black windows and steal focus, blocking IDE use)`
+- reason: `irrelevant`
+- note: Partio's hooks are synchronous shell scripts that run in the terminal where git was invoked. Partio has no background hook infrastructure on Windows that would open separate windows.
+
+## No CLI command returns why an Entire Gates check failed
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2924 (No CLI command returns why an Entire Gates check failed (trail show omits gate data))`
+- reason: `irrelevant`
+- note: Partio has no trails or gates.
+
+## Capture every agent session without agent hooks
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2918 (Capture every agent session without agent hooks)`
+- reason: `irrelevant`
+- note: Partio's capture model is git-hook-based: pre-commit detects the agent, post-commit writes the checkpoint. Capturing sessions without git hooks would require a background daemon or agent-specific integration point that does not exist in Partio's codebase.
+
+## `import claude-code`: turns that commit with "git commit -q" are anchored to the branch tip
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2908 (import claude-code: turns that commit with "git commit -q" are anchored to the branch tip)`
+- reason: `irrelevant`
+- note: Partio has no session import command.
+
+## Subagent task record skipped when the subagent commits its own work
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2903 (Subagent task record skipped when the subagent commits its own work ("no file changes detected"))`
+- reason: `irrelevant`
+- note: Partio has no subagent tracking.
+
+## `checkpoint explain`: 120s foreground fetch timeout turns sidecar fetch into infinitely repeated work
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2902 (checkpoint explain: 120s foreground fetch timeout turns the sidecar metadata fetch into infinitely repeated discarded work)`
+- reason: `irrelevant`
+- note: Partio's `partio explain` command calls an external LLM API; it does not perform git fetches or sidecar metadata lookups. There is no equivalent foreground-fetch timeout path.
+
+## Post-commit background fetch leaves a 115 MB `tmp_pack_*` file after every commit
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2895 (Post-commit background fetch leaves a 115 MB \`tmp_pack_*\` file after every commit)`
+- reason: `irrelevant`
+- note: Partio's post-commit hook does not perform any git fetch operations. There is no background fetch and no partial pack file left behind.
+
+## Documented way to create service accounts / API keys for non-interactive CLI auth
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2894 (Documented way to create service accounts / API keys for non-interactive CLI auth)`
+- reason: `irrelevant`
+- note: Partio has no cloud authentication. It operates entirely locally.
+
+## Codex Windows hooks: emit native commandWindows and preserve it across managed rewrites
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2884 (Codex Windows hooks: emit native commandWindows and preserve it across managed rewrites)`
+- reason: `irrelevant`
+- note: Partio's Codex support uses standard git hooks (`pre-commit`, `post-commit`, `pre-push`), not Codex's own hook configuration system. Partio does not write to `.codex/hooks.json` or manage Windows-specific command formats.
+
+## Add goose support
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2812 (Add goose support)`
+- reason: `irrelevant`
+- note: Partio supports Claude Code and Codex. Adding goose would require a new agent detector and JSONL parser for goose's transcript format. No goose session format is documented in this codebase to base a premise on; this would be a wholly new integration, not an adaptation of an existing feature.
+
+## Support OpenCode 2.0
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2810 (Support OpenCode 2.0)`
+- reason: `irrelevant`
+- note: Partio has no OpenCode support. Adding it would require a new agent detector and session parser; nothing in the codebase handles OpenCode sessions.
+
+## Bare AWS access key IDs are not redacted without a paired secret
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2808 (Bare AWS access key IDs are not redacted without a paired secret)`
+- reason: `irrelevant`
+- note: Partio's `aws-access-key-id` pattern in `internal/redact/patterns.go` matches the key-ID prefix (`AKIA|ASIA|AROA|AIDA|ANPA|ANVA|APKA`) followed by 16 uppercase base-32 characters, with no requirement for a paired secret access key. A bare key ID is caught by Partio's pattern without needing Entire's betterleaks component rule.
+
+## OPF pre-push batching leaves CR intact, causing multiple JSON documents for CRLF input
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2806 (OPF pre-push batching leaves CR intact, causing multiple JSON documents for CRLF input)`
+- reason: `irrelevant`
+- note: Partio has no OPF (Off-Platform Federation) infrastructure.
+
+## Remote helper: fall back to login when a credential helper returns a non-Entire JWT
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2748 (Remote helper: fall back to login when a credential helper returns a non-Entire JWT)`
+- reason: `irrelevant`
+- note: Partio has no git remote helper. Checkpoint pushes use a plain `git push` call without custom credential handling.
+
+## Changelog 0.10.3–0.10.6: subagents, identity-based linking, search, telemetry, cloud repo commands, Windows installer
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.10.3–0.10.6 (subagent checkpoint durable storage, identity-based commit linking via process ancestry, zombie session self-heal, redaction engine configuration, doctor trace summary, search TUI, telemetry signals, git-status --no-optional-locks, entire repo clone, dispatch jurisdiction, Windows PowerShell installer, runner setup, trail create pre-push hooks)`
+- reason: `irrelevant`
+- note: Subagent durable checkpoints, zombie-session healing, and identity-based commit linking via process fingerprinting are all specific to Entire's multi-session state machine; Partio has no equivalent. Redaction engine selection (betterleaks/goredact flags) requires a pluggable engine architecture not present in Partio. The search TUI, telemetry, cloud repo commands, Windows installer, and runner setup are Entire-specific features with no analogue in Partio's local-only CLI. The git-status --no-optional-locks fix applies to Entire's internal git-status calls; Partio does not call `git status` in its hooks.
+
+## Changelog 0.11.0–0.11.6: control-plane rename, trails, shadow-branch removal, Gemini removal, Antigravity, checkpoint delete, attribution removal, review profiles, OpenCode session edits
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.11.0–0.11.6 (control-plane command renames, enable no longer creates GitHub remote, trail commands, shadow-branch removal, Gemini CLI removal, Antigravity CLI integration, checkpoint delete command, line attribution removal, review profile per-reviewer config, OpenCode subagents as sub-sessions, session edits in another worktree, Claude Code StopFailure hook)`
+- reason: `irrelevant`
+- note: Control-plane commands and cloud-remote management are Entire-specific. Shadow branches are an Entire concept Partio never had. Gemini/Antigravity/OpenCode/Pi are agents Partio does not support. Checkpoint delete, the cloud-side review profile system, and the trail command suite have no equivalent in Partio's local orphan-branch storage model. Claude Code StopFailure hook is an Entire-specific agent hook event type that Partio's hook configuration does not use.
+
+## Changelog 0.12.0: trails as default, checkpoint delete, attribution removal, session resume, session ID validation
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.12.0 (project trails as default, checkpoint delete with --dry-run, line attribution removed, session resume across agent homes, session ID path validation, concurrent OPF ref update fix, squashed commit trailer inheritance, \`entire enable\` no longer pushes GitHub remote)`
+- reason: `irrelevant`
+- note: Project trails, checkpoint delete, and cloud session resume are Entire-specific. Line attribution removal affects a data model (AI/Human/Mixed labels) that Partio replaced with binary 0%/100% attribution from the start. Session ID path validation is specific to Entire's server-side session store. Squashed commit trailer inheritance and concurrent OPF ref fixes depend on Entire's OPF backend.
+
+## Changelog 0.12.1: checkpoint list --outgoing, PII IP redaction, redaction of *_API_KEY env vars, checkpoint explain shows redaction counts
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.12.1 (\`entire checkpoint list --outgoing\`, IP address PII redaction category, redaction of *_CLIENT_SECRET/*_API_KEY/*_TOKEN env var assignments and piped credential commands, checkpoint explain shows redaction counts, checkpoint_ref_list_timeout_seconds, Factory AI Droid token usage, entire brain install prompt)`
+- reason: `irrelevant`
+- note: `checkpoint list --outgoing` is for Entire's git-refs backend, which tracks per-ref push state. Partio pushes a single orphan branch with no per-ref queue. PII IP address redaction is a new PII category; Partio has no PII redaction at all. Redaction of `*_CLIENT_SECRET`/`*_API_KEY` env var assignments is already filed for Partio as issue #796. Factory AI Droid and entire-brain are agents/plugins Partio does not support. The checkpoint_ref_list_timeout_seconds setting and redaction-count metadata are backend-specific.
+
+## Changelog 0.12.2: OpenCode image externalization, trail/review command changes, first-turn context injection, idle-session commit condensation
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.12.2 (Pi images in assets/, first-turn context injected into every session, trail comment commands refuse agent sessions, idle session condensed at commit for stacked worktrees)`
+- reason: `irrelevant`
+- note: Pi image externalization requires a Pi agent and an image-externalisation pipeline; Partio has neither. First-turn context injection via `entire agent-help` is Entire's cloud-coaching feature; Partio injects nothing at session start. Trail comment restrictions and idle-session stacked-worktree condensation are Entire-specific.
+
+## Changelog 0.13.1: OpenCode 2 support, trail commands, project agent runs, service accounts, checkpoint push policy, partial pack cleanup
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.13.1 (OpenCode 2 plugin, new trail commands, project agent run list/show/cancel/retry, service account management, partial pack cleanup after failed checkpoint fetch, sibling-worktree session ownership fix, case-insensitive path fix, Trunk hook chaining, session liveness on Windows)`
+- reason: `irrelevant`
+- note: OpenCode 2 support, trail commands, and service accounts are Entire-specific. The partial pack cleanup after a failed checkpoint fetch applies to Entire's git-refs remote-fetch infrastructure; Partio has no background fetch. Sibling-worktree session ownership and case-insensitive path fixes address Entire's multi-session state machine. Trunk hook chaining and Windows liveness are Entire-specific infrastructure not present in Partio.
+
+## PRs #2996–#3057: pre-push quarantine fix, case-insensitive path fix, shared-checkout session fix, Trunk chaining, service accounts, trail management, dependency bumps
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #2996–#3057 (fix pre-push quarantine race (#3044, fixes #2794), spell agent-reported paths on case-insensitive filesystems (#3056), stop shared-checkout sessions from claiming each other's files (#3055), fix Trunk launcher hook chaining (#3051), redact passwords on command line (#3048), back off between token refresh retries (#3047), keep user's pre-push hook in entire-brain's chain on re-wrap (#3046), offer to install Codex hooks in linked worktrees (#3045), trail watch (#3043), dependency bumps (#3042, #3041, #3027), fix setup commit hook-opens-pager hang (#3040), changelog PRs (#3039, #3038), git-remote-entire negotiation (#3037), service account management (#3036, #3035, #3022, #3020, #3007), trail and project commands (#3031, #3023, #3016, #3015, #3013, #3012, #3010, #3009, #3002, #3001), fix sibling-worktree idle session (#3005, #3034), fix hooks in entire-brain uninstall (#3003), and infrastructure PRs (#3033, #3028, #3026, #3024, #3021, #3019, #3018, #3006, #3004, #2999, #2998, #2997, #2996))`
+- reason: `irrelevant`
+- note: The pre-push quarantine fix (#3044) addresses the same race as Partio issue #778 (already filed). Password redaction (#3048) addresses the same gap as Partio issue #795 (already filed). The case-insensitive path fix, shared-checkout session fix, entire-brain hook chaining, and Trunk launcher are specific to Entire's multi-session state machine and plugin ecosystem. Service account management, trail commands, project agent commands, and cloud infrastructure PRs have no equivalent in Partio's local-only model. Dependency bumps, changelog PRs, and CI changes are Entire-internal housekeeping.
