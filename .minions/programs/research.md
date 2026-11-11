@@ -463,7 +463,10 @@ be tuned but the general structure must hold):
    interactions. Do NOT include file paths or code snippets that may
    rot.
 5. `## Testing Decisions` — what makes a good test for this work,
-   which modules will be tested, prior art for the tests.
+   which modules will be tested, prior art for the tests. A helper that
+   only tests use, such as a cache reset or a test override, lives in a
+   test file of its package, not in production code: say so, also when
+   the prior art puts it in production code.
 6. `## Out of Scope` — what this PRD explicitly does not cover.
 7. `## Further Notes` — anything else worth recording.
 
@@ -545,6 +548,10 @@ nothing calls yet. In particular:
 - When a merge would make a slice too large, keep the split, and name
   the helper in the text of both slices: the slice that adds it and the
   slice that calls it. The build fails when no slice calls it.
+- A helper that only tests use, such as a cache reset or a test
+  override, goes in a `_test.go` file of the same package. When the PRD
+  puts such a helper in production code, the slice text puts it in the
+  test file.
 
 Slice protocol:
 
