@@ -48,9 +48,6 @@ func parseTasklistOutput(csv string) bool {
 		// Each CSV line looks like: "image.exe","PID","Session","#","Mem Usage"
 		// Split on comma and examine the first field.
 		fields := strings.Split(line, ",")
-		if len(fields) == 0 {
-			continue
-		}
 		imageName := strings.Trim(fields[0], `"`)
 		if strings.Contains(strings.ToLower(imageName), "claude") {
 			return true
