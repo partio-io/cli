@@ -1,7 +1,9 @@
 package wsl
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 )
@@ -35,6 +37,39 @@ func IsWSL() bool {
 		wslCached = true
 	}
 	return wslResult
+}
+
+// WindowsHomeDir returns the Windows user profile directory translated to a WSL
+// Linux mount path (e.g. /mnt/c/Users/username). It first checks the
+// PARTIO_WSL_WIN_HOME environment variable — if set, it is returned directly
+// if it is already a Linux path, or converted via wslpath -u otherwise.
+// Otherwise it runs cmd.exe /C echo %USERPROFILE% and translates the result
+// with wslpath -u. Returns an error if the Windows directory cannot be resolved;
+// callers should treat this as "Windows directory unavailable" and fall back to
+// Linux-only logic.
+func WindowsHomeDir() (string, error) {
+	if override := os.Getenv("PARTIO_WSL_WIN_HOME"); override != "" {
+		if strings.HasPrefix(override, "/") {
+			return override, nil
+		}
+		out, err := exec.Command("wslpath", "-u", override).Output()
+		if err != nil {
+			return "", fmt.Errorf("wslpath -u %q: %w", override, err)
+		}
+		return strings.TrimSpace(string(out)), nil
+	}
+
+	out, err := exec.Command("cmd.exe", "/C", "echo", "%USERPROFILE%").Output()
+	if err != nil {
+		return "", fmt.Errorf("cmd.exe echo %%USERPROFILE%%: %w", err)
+	}
+	winPath := strings.TrimSpace(string(out))
+
+	linuxPath, err := exec.Command("wslpath", "-u", winPath).Output()
+	if err != nil {
+		return "", fmt.Errorf("wslpath -u %q: %w", winPath, err)
+	}
+	return strings.TrimSpace(string(linuxPath)), nil
 }
 
 func detectWSL() bool {

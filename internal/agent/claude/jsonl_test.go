@@ -169,8 +169,14 @@ func TestSanitizePath(t *testing.T) {
 		input    string
 		expected string
 	}{
+		// Linux paths
 		{"/Users/foo/project", "-Users-foo-project"},
 		{"/home/user/code", "-home-user-code"},
+		// Windows paths — backslashes, colons, and underscores become "-"
+		{`C:\Users\user\src\repo`, "C--Users-user-src-repo"},
+		{`C:\Users\user\my_project`, "C--Users-user-my-project"},
+		// Linux paths with underscores (latent bug now fixed)
+		{"/home/user/my_project", "-home-user-my-project"},
 	}
 
 	for _, tt := range tests {

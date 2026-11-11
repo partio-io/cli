@@ -6,6 +6,23 @@ import (
 	"testing"
 )
 
+func TestWindowsHomeDir_Integration(t *testing.T) {
+	if os.Getenv("WSL_DISTRO_NAME") == "" && os.Getenv("WSL_INTEROP") == "" && os.Getenv("WSLENV") == "" {
+		t.Skip("requires WSL environment")
+	}
+	t.Setenv("PARTIO_WSL_WIN_HOME", "")
+	got, err := WindowsHomeDir()
+	if err != nil {
+		t.Fatalf("WindowsHomeDir() error: %v", err)
+	}
+	if got == "" {
+		t.Error("WindowsHomeDir() returned empty string")
+	}
+	if !filepath.IsAbs(got) {
+		t.Errorf("WindowsHomeDir() = %q, want absolute path", got)
+	}
+}
+
 // resetCache resets the IsWSL detection cache so tests can re-run detection
 // with different environment or proc file configurations.
 func resetCache() {
