@@ -242,6 +242,13 @@ question that names the conflict and recommend the evidence. When you
 find no evidence, say so in the question; never present the fact as
 settled.
 
+**Old runs are history.** A comment that starts with `<!-- minion:`
+(a slice failure, a slice plan, a PRD, a completion note) describes an
+earlier run, not the code. A branch that it names may be gone, and its
+work was not merged. Never write that work is "already done" or
+"already shipped" from such a comment. What exists is what the files of
+this checkout show: check them with Glob, Grep and Read.
+
 You do NOT answer the questions yourself, and you do NOT interact with
 any human — this is a fully autonomous run. Produce the questions
 only.
@@ -332,7 +339,12 @@ Transcript protocol:
    `Recommended:` line depends on, also a fact stated with no
    `Evidence:` line. A fact about how another program stores, names,
    prints or formats something is such a fact, even when the `cli`
-   code already assumes it.
+   code already assumes it. Also list each claim that code already
+   exists or that work is already done. An earlier minion comment on
+   the issue (it starts with `<!-- minion:`) is not evidence for such a
+   claim: check it in the files of this checkout with Glob, Grep and
+   Read, and remove the claim from the block when the files do not
+   hold the code.
 
 3. Check each fact yourself with the sources above. Run the commands
    again; do not trust the researcher's reading of them.
