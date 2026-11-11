@@ -243,10 +243,14 @@ jobs:
             gh pr edit "$PR" --repo "$REPO" --body "${BODY}"$'\n\n'"Closes #${ISSUE_NUM}"
           fi
 
+          # The issue stays open: the "Closes #N" reference above closes it
+          # when the PR merges. Closing it here left the issue closed when the
+          # PR was closed unmerged, and the review gate refuses a closed issue,
+          # so the issue could not be built again without a manual reopen.
           gh issue edit "$ISSUE_NUM" --repo "$REPO" \
             --add-label "minion-done" --remove-label "minion-executing"
-          gh issue close "$ISSUE_NUM" --repo "$REPO" \
-            --comment "Minion completed — see PR #${PR}."
+          gh issue comment "$ISSUE_NUM" --repo "$REPO" \
+            --body "Minion completed — see PR #${PR}."
 
       - name: Mark failed
         if: failure() && steps.program.outputs.issue_num != '' && steps.gate.outputs.blocked != 'true' && steps.researched.outputs.blocked != 'true'
