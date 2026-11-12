@@ -104,3 +104,126 @@ func TestSaveRepoSetting_PreservesExisting(t *testing.T) {
 		t.Error("expected enabled to be preserved as true")
 	}
 }
+
+func TestSaveGlobalStrategyOptions(t *testing.T) {
+	stealth := map[string]any{"push_sessions": false, "disable_trailers": true}
+
+	tests := []struct {
+		name     string
+		existing string // empty means no file and no directory
+		wantTop  map[string]string
+		wantOpts map[string]string
+	}{
+		{
+			name:     "creates directory and file",
+			wantOpts: map[string]string{"push_sessions": "false", "disable_trailers": "true"},
+		},
+		{
+			name:     "keeps unrelated keys",
+			existing: `{"agent": "codex", "strategy_options": {"push_sessions": true, "other": "x"}}`,
+			wantTop:  map[string]string{"agent": `"codex"`},
+			wantOpts: map[string]string{"push_sessions": "false", "disable_trailers": "true", "other": `"x"`},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("HOME", home)
+			path := filepath.Join(home, ".config", "partio", "settings.json")
+
+			if tt.existing != "" {
+				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte(tt.existing), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			if err := SaveGlobalStrategyOptions(stealth); err != nil {
+				t.Fatalf("SaveGlobalStrategyOptions: %v", err)
+			}
+			first, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("reading global settings: %v", err)
+			}
+
+			var raw map[string]json.RawMessage
+			if err := json.Unmarshal(first, &raw); err != nil {
+				t.Fatalf("unmarshaling: %v", err)
+			}
+			var opts map[string]json.RawMessage
+			if err := json.Unmarshal(raw["strategy_options"], &opts); err != nil {
+				t.Fatalf("unmarshaling strategy_options: %v", err)
+			}
+			for key, want := range tt.wantTop {
+				if got := string(raw[key]); got != want {
+					t.Errorf("%s = %s, want %s", key, got, want)
+				}
+			}
+			for key, want := range tt.wantOpts {
+				if got := string(opts[key]); got != want {
+					t.Errorf("strategy_options.%s = %s, want %s", key, got, want)
+				}
+			}
+
+			// Idempotent: a second write leaves the file unchanged.
+			if err := SaveGlobalStrategyOptions(stealth); err != nil {
+				t.Fatalf("second SaveGlobalStrategyOptions: %v", err)
+			}
+			second, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(first) != string(second) {
+				t.Errorf("second write changed the file:\nfirst:  %s\nsecond: %s", first, second)
+			}
+
+			// Load reads what the writer wrote.
+			cfg, err := Load("")
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if cfg.StrategyOptions.PushSessions || !cfg.StrategyOptions.DisableTrailers {
+				t.Errorf("Load strategy_options = %+v, want push_sessions=false, disable_trailers=true", cfg.StrategyOptions)
+			}
+		})
+	}
+}
+
+func TestSaveGlobalStrategyOptions_Malformed(t *testing.T) {
+	tests := []struct {
+		name     string
+		existing string
+	}{
+		{name: "invalid JSON", existing: `{"strategy_options": {`},
+		{name: "strategy_options not an object", existing: `{"strategy_options": true}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("HOME", home)
+			path := filepath.Join(home, ".config", "partio", "settings.json")
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(tt.existing), 0o644); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := SaveGlobalStrategyOptions(map[string]any{"push_sessions": false}); err == nil {
+				t.Fatal("expected error for malformed global settings, got nil")
+			}
+
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(data) != tt.existing {
+				t.Errorf("malformed global settings were rewritten: %q", data)
+			}
+		})
+	}
+}

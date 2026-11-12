@@ -50,6 +50,7 @@ partio status
 | Command | Description |
 |---------|-------------|
 | `partio enable` | Set up partio in the current repo |
+| `partio enable --stealth` | Set up partio without pushing checkpoints or adding commit trailers (see [Stealth Mode](#stealth-mode)) |
 | `partio disable` | Remove hooks (preserves data) |
 | `partio status` | Show current status |
 | `partio rewind --list` | List all checkpoints |
@@ -67,6 +68,20 @@ partio status
 4. Checkpoints are stored on an orphan branch (`partio/checkpoints/v1`) using git plumbing
 5. Commits are annotated with `Partio-Checkpoint` and `Partio-Attribution` trailers
 6. On push, the checkpoint branch is pushed alongside your code
+
+## Stealth Mode
+
+`partio enable --stealth` lets you capture sessions without leaving anything your teammates can see:
+
+- **No repository changes.** It does not create or modify `.partio/settings.json` and does not touch `.gitignore`. Instead it hides `.partio/` through git's untracked, per-clone `info/exclude` file (shared by every linked worktree).
+- **No push.** It sets `strategy_options.push_sessions` to `false`, so `partio/checkpoints/v1` is never pushed to `origin`.
+- **No trailers.** It sets `strategy_options.disable_trailers` to `true`, so commits are not amended with `Partio-Checkpoint` or `Partio-Attribution` trailers.
+
+Both settings are written only to the global config, `~/.config/partio/settings.json`, which lives outside every repository. Other keys already in that file are kept. Because the file is machine-wide, stealth applies to **every repository** that does not override these keys in its own `.partio/settings.json` or `.partio/settings.local.json`.
+
+Checkpoints are still written to the local `partio/checkpoints/v1` branch. Without trailers, checkpoint IDs are not visible in `git log`; find them with `partio rewind --list` and inspect one with `partio explain <id>`. `partio status` shows a `Mode: stealth` line while stealth is in effect.
+
+To leave stealth mode, edit `~/.config/partio/settings.json` and remove or change `push_sessions` and `disable_trailers` under `strategy_options`. If the checkpoint branch was pushed to `origin` before you turned stealth on, it stays on the remote until you delete it by hand.
 
 ## Git Worktrees
 

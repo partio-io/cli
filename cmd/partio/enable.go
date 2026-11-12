@@ -19,10 +19,13 @@ func newEnableCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "enable",
 		Short: "Enable partio in the current repository",
-		Long:  `Sets up partio in the current git repository by creating the .partio/ config directory, installing git hooks, and creating the checkpoint orphan branch.`,
+		Long:  `Sets up partio in the current git repository by creating the .partio/ config directory, installing git hooks, and creating the checkpoint orphan branch.
+
+With --stealth, nothing in the working tree changes: the checkpoint branch is never pushed and commits get no Partio trailers. Both settings are written to the global config (~/.config/partio/settings.json), so they apply to every repository that does not override them. Undo stealth by editing that file.`,
 		RunE:  runEnable,
 	}
 	cmd.Flags().Bool("absolute-path", false, "Install hooks using the absolute path to the partio binary (useful when partio is not on PATH in hook execution environments)")
+	cmd.Flags().Bool("stealth", false, "Capture checkpoints locally only: write push_sessions=false and disable_trailers=true to the global config (~/.config/partio/settings.json), leave .partio/settings.json and .gitignore untouched, and hide .partio/ via git's info/exclude. The setting is global and applies to every repository without an override; undo it by editing ~/.config/partio/settings.json")
 	return cmd
 }
 
@@ -31,10 +34,26 @@ func runEnable(cmd *cobra.Command, args []string) error {
 	if flagErr != nil {
 		slog.Debug("could not read --absolute-path flag", "error", flagErr)
 	}
+	stealth, flagErr := cmd.Flags().GetBool("stealth")
+	if flagErr != nil {
+		slog.Debug("could not read --stealth flag", "error", flagErr)
+	}
 
 	repoRoot, err := git.RepoRoot()
 	if err != nil {
 		return fmt.Errorf("must be run inside a git repository")
+	}
+
+	// Stealth settings go to the global config only, which lives outside every
+	// repository. Write them first so a malformed global file stops enable
+	// before anything else is changed.
+	if stealth {
+		if err := config.SaveGlobalStrategyOptions(map[string]any{
+			"push_sessions":    false,
+			"disable_trailers": true,
+		}); err != nil {
+			return fmt.Errorf("writing global stealth settings: %w", err)
+		}
 	}
 
 	partioDir := filepath.Join(repoRoot, config.PartioDir)
@@ -44,16 +63,23 @@ func runEnable(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating .partio directory: %w", err)
 	}
 
-	// Ensure settings.json exists with enabled: true
-	settingsPath := filepath.Join(partioDir, "settings.json")
-	if err := ensureSettingsEnabled(settingsPath); err != nil {
-		return fmt.Errorf("writing settings.json: %w", err)
-	}
+	if stealth {
+		// Leave .partio/settings.json and .gitignore alone so nothing shows up
+		// as a change; enabled already defaults to true. Hide the whole
+		// .partio/ directory through git's untracked, per-clone exclude file.
+		addToGitExclude(".partio/")
+	} else {
+		// Ensure settings.json exists with enabled: true
+		settingsPath := filepath.Join(partioDir, "settings.json")
+		if err := ensureSettingsEnabled(settingsPath); err != nil {
+			return fmt.Errorf("writing settings.json: %w", err)
+		}
 
-	// Add runtime files to .gitignore
-	addToGitignore(repoRoot, ".partio/settings.local.json")
-	addToGitignore(repoRoot, ".partio/sessions/")
-	addToGitignore(repoRoot, ".partio/state/")
+		// Add runtime files to .gitignore
+		addToGitignore(repoRoot, ".partio/settings.local.json")
+		addToGitignore(repoRoot, ".partio/sessions/")
+		addToGitignore(repoRoot, ".partio/state/")
+	}
 
 	// Install git hooks (reinstalls if missing or stale)
 	if absolutePath {
@@ -84,7 +110,24 @@ func runEnable(cmd *cobra.Command, args []string) error {
 	fmt.Println("  - Ensured .partio/ config directory exists")
 	fmt.Println("  - Installed git hooks (pre-commit, post-commit, pre-push)")
 	fmt.Println("  - Ready to capture AI sessions on commit")
+	if stealth {
+		printStealthEnabled()
+	}
 	return nil
+}
+
+// printStealthEnabled tells the user that stealth is on, where it is stored and
+// how to find checkpoints now that commits carry no trailers.
+func printStealthEnabled() {
+	globalPath, err := config.GlobalSettingsPath()
+	if err != nil {
+		globalPath = "~/.config/partio/settings.json"
+	}
+	fmt.Println("\nStealth mode active: checkpoints stay local; the checkpoint branch is not pushed and commits get no trailers.")
+	fmt.Printf("  - Wrote push_sessions=false and disable_trailers=true to %s\n", globalPath)
+	fmt.Println("    This applies to every repository without an override; undo it by editing that file.")
+	fmt.Println("  - Hid .partio/ via git's info/exclude; no repository files were changed")
+	fmt.Println("  - List checkpoints with `partio rewind --list` and inspect one with `partio explain <id>`")
 }
 
 // warnHookManagers detects external git hook managers and prints integration warnings.
@@ -142,41 +185,65 @@ func ensureSettingsEnabled(settingsPath string) error {
 
 func addToGitignore(repoRoot, entry string) {
 	gitignore := filepath.Join(repoRoot, ".gitignore")
-
-	// Read existing content; a missing .gitignore is expected (created below).
-	existing, readErr := os.ReadFile(gitignore)
-	if readErr != nil && !os.IsNotExist(readErr) {
-		slog.Debug("could not read .gitignore", "error", readErr)
+	if err := appendIgnoreLine(gitignore, entry); err != nil {
+		slog.Warn("could not update .gitignore", "entry", entry, "error", err)
 	}
-	content := string(existing)
+}
+
+// addToGitExclude adds entry to the file git resolves for info/exclude. That
+// file is never tracked, and since git 2.5 it lives in the common git dir, so
+// one entry covers every linked worktree of the clone. A failure is a warning:
+// enable continues without it.
+func addToGitExclude(entry string) {
+	excludePath, err := git.ExecGit("rev-parse", "--git-path", "info/exclude")
+	if err != nil {
+		slog.Warn("could not locate git info/exclude", "error", err)
+		return
+	}
+	// --git-path may print a path relative to the current directory.
+	if abs, absErr := filepath.Abs(excludePath); absErr == nil {
+		excludePath = abs
+	}
+	if err := os.MkdirAll(filepath.Dir(excludePath), 0o755); err != nil {
+		slog.Warn("could not update git info/exclude", "path", excludePath, "error", err)
+		return
+	}
+	if err := appendIgnoreLine(excludePath, entry); err != nil {
+		slog.Warn("could not update git info/exclude", "path", excludePath, "entry", entry, "error", err)
+	}
+}
+
+// appendIgnoreLine appends entry as its own line to the ignore file at path,
+// creating the file if needed. It does nothing if the line is already there.
+func appendIgnoreLine(path, entry string) error {
+	// Read existing content; a missing file is expected (created below).
+	existing, readErr := os.ReadFile(path)
+	if readErr != nil && !os.IsNotExist(readErr) {
+		slog.Debug("could not read ignore file", "path", path, "error", readErr)
+	}
 
 	// Check if already present
-	for _, line := range strings.Split(content, "\n") {
+	for _, line := range strings.Split(string(existing), "\n") {
 		if strings.TrimSpace(line) == entry {
-			return
+			return nil
 		}
 	}
 
 	// Append
-	f, err := os.OpenFile(gitignore, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
-		slog.Warn("could not update .gitignore", "error", err)
-		return
+		return err
 	}
-	defer func() {
-		if closeErr := f.Close(); closeErr != nil {
-			slog.Warn("could not update .gitignore", "error", closeErr)
-		}
-	}()
 
 	if len(existing) > 0 && existing[len(existing)-1] != '\n' {
-		if _, writeErr := f.WriteString("\n"); writeErr != nil {
-			slog.Warn("could not write to .gitignore", "error", writeErr)
-		}
+		entry = "\n" + entry
 	}
-	if _, writeErr := f.WriteString(entry + "\n"); writeErr != nil {
-		slog.Warn("could not write to .gitignore", "entry", entry, "error", writeErr)
+	_, writeErr := f.WriteString(entry + "\n")
+	closeErr := f.Close()
+	if writeErr != nil {
+		return writeErr
 	}
+	return closeErr
 }
 
 func createCheckpointBranch() error {
