@@ -122,8 +122,21 @@ Config files (highest priority wins):
   "strategy": "manual-commit",
   "agent": "claude-code",
   "log_level": "info",
-  "strategy_options": { "push_sessions": true }
+  "strategy_options": { "push_sessions": true, "disable_trailers": false }
 }
+```
+
+`strategy_options` fields:
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `push_sessions` | `true` | Push the `partio/checkpoints/v1` branch to `origin` on `git push` |
+| `disable_trailers` | `false` | Skip adding `Partio-Checkpoint` and `Partio-Attribution` trailers to commits. The commit is not amended, so its hash and message stay as you made them; checkpoints are still written locally and can be found with `partio rewind --list` and `partio explain <id>` |
+
+When the effective config has `push_sessions: false` and `disable_trailers: true`, `partio status` reports stealth mode:
+
+```
+Mode:       stealth (checkpoints local only; not pushed, no commit trailers)
 ```
 
 Supported `agent` values:

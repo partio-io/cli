@@ -60,6 +60,9 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Strategy:   %s\n", cfg.Strategy)
 	fmt.Printf("Linking:    %s\n", cfg.CommitLinking)
 	fmt.Printf("Agent:      %s\n", cfg.Agent)
+	if stealthMode(cfg) {
+		fmt.Println(stealthModeLine)
+	}
 
 	// Check hooks
 	hooksDir, hooksErr := git.HooksDir(repoRoot)
