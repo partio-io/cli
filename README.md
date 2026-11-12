@@ -81,6 +81,8 @@ Both settings are written only to the global config, `~/.config/partio/settings.
 
 Checkpoints are still written to the local `partio/checkpoints/v1` branch. Without trailers, checkpoint IDs are not visible in `git log`; find them with `partio rewind --list` and inspect one with `partio explain <id>`. `partio status` shows a `Mode: stealth` line while stealth is in effect.
 
+Repository settings outrank the global config, so a repository whose `.partio/settings.json` or `.partio/settings.local.json` sets `strategy_options.push_sessions: true` or `strategy_options.disable_trailers: false` is not in stealth mode. `partio enable --stealth` checks the effective config after writing the global file and prints a warning naming the file and key that override stealth, for example `.partio/settings.json sets strategy_options.push_sessions=true; stealth is not in effect in this repo`. It never edits repository settings to force stealth; change them yourself if you want stealth in that repository. `partio status` shows no `Mode:` line there.
+
 To leave stealth mode, edit `~/.config/partio/settings.json` and remove or change `push_sessions` and `disable_trailers` under `strategy_options`. If the checkpoint branch was pushed to `origin` before you turned stealth on, it stays on the remote until you delete it by hand.
 
 ## Git Worktrees

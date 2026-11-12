@@ -112,6 +112,7 @@ func runEnable(cmd *cobra.Command, args []string) error {
 	fmt.Println("  - Ready to capture AI sessions on commit")
 	if stealth {
 		printStealthEnabled()
+		warnStealthOverrides(repoRoot)
 	}
 	return nil
 }
