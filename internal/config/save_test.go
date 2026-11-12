@@ -141,7 +141,7 @@ func TestSaveGlobalStrategyOptions(t *testing.T) {
 				}
 			}
 
-			if err := SaveGlobalStrategyOptions(stealth); err != nil {
+			if _, err := SaveGlobalStrategyOptions(stealth); err != nil {
 				t.Fatalf("SaveGlobalStrategyOptions: %v", err)
 			}
 			first, err := os.ReadFile(path)
@@ -169,7 +169,7 @@ func TestSaveGlobalStrategyOptions(t *testing.T) {
 			}
 
 			// Idempotent: a second write leaves the file unchanged.
-			if err := SaveGlobalStrategyOptions(stealth); err != nil {
+			if _, err := SaveGlobalStrategyOptions(stealth); err != nil {
 				t.Fatalf("second SaveGlobalStrategyOptions: %v", err)
 			}
 			second, err := os.ReadFile(path)
@@ -213,7 +213,7 @@ func TestSaveGlobalStrategyOptions_Malformed(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := SaveGlobalStrategyOptions(map[string]any{"push_sessions": false}); err == nil {
+			if _, err := SaveGlobalStrategyOptions(map[string]any{"push_sessions": false}); err == nil {
 				t.Fatal("expected error for malformed global settings, got nil")
 			}
 

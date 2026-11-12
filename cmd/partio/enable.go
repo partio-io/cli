@@ -47,11 +47,13 @@ func runEnable(cmd *cobra.Command, args []string) error {
 	// Stealth settings go to the global config only, which lives outside every
 	// repository. Write them first so a malformed global file stops enable
 	// before anything else is changed.
+	var globalPath string
 	if stealth {
-		if err := config.SaveGlobalStrategyOptions(map[string]any{
+		globalPath, err = config.SaveGlobalStrategyOptions(map[string]any{
 			"push_sessions":    false,
 			"disable_trailers": true,
-		}); err != nil {
+		})
+		if err != nil {
 			return fmt.Errorf("writing global stealth settings: %w", err)
 		}
 	}
@@ -111,19 +113,16 @@ func runEnable(cmd *cobra.Command, args []string) error {
 	fmt.Println("  - Installed git hooks (pre-commit, post-commit, pre-push)")
 	fmt.Println("  - Ready to capture AI sessions on commit")
 	if stealth {
-		printStealthEnabled()
+		printStealthEnabled(globalPath)
 		warnStealthOverrides(repoRoot)
 	}
 	return nil
 }
 
 // printStealthEnabled tells the user that stealth is on, where it is stored and
-// how to find checkpoints now that commits carry no trailers.
-func printStealthEnabled() {
-	globalPath, err := config.GlobalSettingsPath()
-	if err != nil {
-		globalPath = "~/.config/partio/settings.json"
-	}
+// how to find checkpoints now that commits carry no trailers. globalPath is
+// the global settings file the stealth options were written to.
+func printStealthEnabled(globalPath string) {
 	fmt.Println("\nStealth mode active: checkpoints stay local; the checkpoint branch is not pushed and commits get no trailers.")
 	fmt.Printf("  - Wrote push_sessions=false and disable_trailers=true to %s\n", globalPath)
 	fmt.Println("    This applies to every repository without an override; undo it by editing that file.")

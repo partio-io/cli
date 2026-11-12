@@ -25,14 +25,15 @@ func SaveRepoSetting(repoRoot, key string, value any) error {
 // SaveGlobalStrategyOptions merges the given strategy_options keys into the
 // global settings file (see GlobalSettingsPath). Every other top-level key and
 // every other strategy_options key already in the file is kept. The file and
-// its directory are created if they do not exist.
-func SaveGlobalStrategyOptions(opts map[string]any) error {
+// its directory are created if they do not exist. It returns the path of the
+// file it wrote.
+func SaveGlobalStrategyOptions(opts map[string]any) (string, error) {
 	settingsPath, err := GlobalSettingsPath()
 	if err != nil {
-		return fmt.Errorf("resolving global settings path: %w", err)
+		return "", fmt.Errorf("resolving global settings path: %w", err)
 	}
 
-	return updateSettingsFile(settingsPath, func(raw map[string]json.RawMessage) error {
+	return settingsPath, updateSettingsFile(settingsPath, func(raw map[string]json.RawMessage) error {
 		strategyOptions := make(map[string]json.RawMessage)
 		if existing, ok := raw["strategy_options"]; ok {
 			if err := json.Unmarshal(existing, &strategyOptions); err != nil {
