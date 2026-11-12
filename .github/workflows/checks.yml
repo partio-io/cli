@@ -19,6 +19,13 @@ permissions:
 # they must never queue behind a model session; only the job that
 # pushes joins the gate group. See the note on that job.
 
+# Each minion agent call runs Claude Code on the runner VM. These two
+# values choose its model and its effort. Opus 5.5 needs Claude Code
+# 2.1.280 or newer on the runner.
+env:
+  ANTHROPIC_MODEL: claude-opus-5-5
+  CLAUDE_CODE_EFFORT_LEVEL: high
+
 jobs:
   # Everything the repair path needs to know, decided before either of
   # the jobs below starts, and decided in Go: whether this pull request

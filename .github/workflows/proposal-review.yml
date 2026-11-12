@@ -44,6 +44,13 @@ concurrency:
   group: proposal-review
   cancel-in-progress: false
 
+# Each minion agent call runs Claude Code on the runner VM. These two
+# values choose its model and its effort. Opus 5.5 needs Claude Code
+# 2.1.280 or newer on the runner.
+env:
+  ANTHROPIC_MODEL: claude-opus-5-5
+  CLAUDE_CODE_EFFORT_LEVEL: high
+
 jobs:
   review:
     # A scheduled run is skipped, and so ends at once, unless the

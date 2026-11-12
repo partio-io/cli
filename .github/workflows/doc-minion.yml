@@ -26,6 +26,13 @@ permissions:
   contents: write
   pull-requests: write
 
+# Each minion agent call runs Claude Code on the runner VM. These two
+# values choose its model and its effort. Opus 5.5 needs Claude Code
+# 2.1.280 or newer on the runner.
+env:
+  ANTHROPIC_MODEL: claude-opus-5-5
+  CLAUDE_CODE_EFFORT_LEVEL: high
+
 jobs:
   update-docs:
     # Run on manual dispatch, or on a PR that actually merged (closed != merged).
