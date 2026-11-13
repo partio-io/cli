@@ -12,7 +12,7 @@ const maxSignatureLen = 100
 
 // printChangedEntities prints the "Changed entities:" section for a
 // checkpoint diff. It prints nothing when no supported file has an
-// entity-level change.
+// entity-level change. A renamed entity prints as "<kind> old → new".
 func printChangedEntities(diff string) {
 	files := entitydiff.Analyze(diff)
 	if len(files) == 0 {
@@ -23,8 +23,11 @@ func printChangedEntities(diff string) {
 		fmt.Printf("  %s\n", f.DisplayPath())
 		for _, c := range f.Changes {
 			sig := c.New.Signature
-			if c.Kind == entitydiff.Removed {
+			switch c.Kind {
+			case entitydiff.Removed:
 				sig = c.Old.Signature
+			case entitydiff.Renamed:
+				sig = fmt.Sprintf("%s %s → %s", c.New.Kind, c.Old.Name, c.New.Name)
 			}
 			fmt.Printf("    %-17s  %s\n", c.Kind, truncateSignature(sig))
 		}

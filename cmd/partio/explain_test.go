@@ -57,6 +57,19 @@ func TestRunExplainChangedEntities(t *testing.T) {
 			},
 		},
 		{
+			name: "renamed entity prints old and new names",
+			diff: strings.Join([]string{
+				"diff --git a/a.go b/a.go",
+				"--- a/a.go",
+				"+++ b/a.go",
+				"@@ -1,1 +1,1 @@",
+				"-func oldName(id string) error {",
+				"+func newName(id string) error {",
+			}, "\n"),
+			wantInOutput:    []string{"\nChanged entities:\n  a.go\n    renamed            func oldName → newName\n"},
+			wantNotInOutput: []string{"removed", "added"},
+		},
+		{
 			name: "long signature is cut",
 			diff: strings.Join([]string{
 				"diff --git a/a.go b/a.go",

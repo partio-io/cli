@@ -22,7 +22,8 @@ type positionedChange struct {
 // For each key, entities with an identical signature on both sides cancel
 // out: they are unchanged or had body-only edits. One remaining entity on
 // each side is a signature change; anything else remaining is removed or
-// added.
+// added. A removed and an added entity that differ only in their name
+// are then paired as renamed.
 func classify(oldEnts, newEnts []sideEntity, partial map[entityKey]bool) []Change {
 	var order []entityKey
 	oldBy := map[entityKey][]sideEntity{}
@@ -67,6 +68,7 @@ func classify(oldEnts, newEnts []sideEntity, partial map[entityKey]bool) []Chang
 		}
 	}
 
+	changes = pairRenames(changes)
 	sort.SliceStable(changes, func(i, j int) bool { return changes[i].pos < changes[j].pos })
 	out := make([]Change, len(changes))
 	for i, c := range changes {

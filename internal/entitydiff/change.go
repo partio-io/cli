@@ -11,10 +11,14 @@ const (
 	// SignatureChanged means the entity exists on both sides with a
 	// different declaration header.
 	SignatureChanged ChangeKind = "signature changed"
+	// Renamed means an entity was removed and another of the same kind was
+	// added with a signature that is identical apart from the name.
+	Renamed ChangeKind = "renamed"
 )
 
 // Change is one entity-level change. Old is the zero Entity for Added and
-// New is the zero Entity for Removed.
+// New is the zero Entity for Removed; Renamed and SignatureChanged carry
+// both.
 type Change struct {
 	Kind ChangeKind
 	Old  Entity

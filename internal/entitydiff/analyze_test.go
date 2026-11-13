@@ -23,6 +23,8 @@ func render(files []FileChanges) string {
 				b.WriteString("  added " + c.New.Name + ": " + c.New.Signature + "\n")
 			case Removed:
 				b.WriteString("  removed " + c.Old.Name + ": " + c.Old.Signature + "\n")
+			case Renamed:
+				b.WriteString("  renamed " + c.Old.Name + " → " + c.New.Name + ": " + c.New.Signature + "\n")
 			case SignatureChanged:
 				b.WriteString("  signature changed " + c.New.Name + ": " + c.Old.Signature + " => " + c.New.Signature + "\n")
 			}
