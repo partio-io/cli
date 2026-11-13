@@ -349,3 +349,51 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #1882–#2073 (dependency updates, CI hang fix, trail backend retirement, dispatch routing, telemetry, release channel, OpenCode plugin, Cursor/Codex subagent fixes, search TUI changes, changelog PRs)`
 - reason: `irrelevant`
 - note: The bulk of PRs in this range are dependency version bumps, CI configuration fixes (e.g. #2072 apt hang), platform routing changes (e.g. #2046–#2051 cell targets, dispatch), telemetry (#2023–#2024), trail backend retirement (#2021, #2037), OpenCode plugin changes (#2018, #2027, #2053), Cursor/Codex subagent bug fixes (#2066–#2071), search TUI updates (#2022, #2044), and changelog/credit PRs (#2039, #2050, #2073). None of these map to Partio's domain of git hook-based session capture and checkpoint storage.
+
+## changelog 0.10.3–0.13.4: Entire forge and platform commands
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.10.3–0.13.4 (trails, project agents, service accounts, repo/mirror/clone/cluster/org/grant commands, git-remote-entire, dispatch, search, recap, activity, review, plugins such as graph/brain/rsl/investigate/stream, auth/login/logout/contexts/keyring, install.sh/install.ps1/release mirror, telemetry)`
+- reason: `irrelevant`
+- note: These are features of Entire's hosted forge and its control plane. Partio has no server, login, review, search or plugin system, and nothing in cmd/partio maps to them. They make up most of the changelog lines in this range.
+
+## changelog 0.10.3–0.13.4: agent integrations Partio does not have
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.10.3–0.13.4 (OpenCode 1/2, Pi, Antigravity, Factory Droid, Copilot CLI, Cursor, Gemini removal; Codex tool-result fields; subagent task records and SubagentStart/SubagentStop/StopFailure Claude hooks; Claude Code hook timeouts and ${CLAUDE_PROJECT_DIR} quoting; agent homes such as CLAUDE_CONFIG_DIR)`
+- reason: `irrelevant`
+- note: Partio registers only claude-code and codex (internal/agent/claude/register.go, internal/agent/codex/register.go). It installs no agent-side hooks, only git hooks, and has no subagent model. These fixes all assume agent-hook capture and transcript conversion that Partio does not do.
+
+## changelog 0.10.3–0.13.4: Entire storage backend and session-engine internals
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.10.3–0.13.4 (git-refs backend push chunking/queues, manual push policy, shadow-branch removal, legacy v1 migration, case-folded shard refs, partial-clone lazy fetch, per-ref locks, --no-optional-locks on git status, zombie-session sweep, write-ahead checkpoint IDs, full.jsonl staging release, prefix-reuse redaction, line attribution removal, session_token_usage)`
+- reason: `irrelevant`
+- note: Partio writes one orphan branch with plumbing in post-commit only. It has no per-checkpoint refs, shadow branches, turn-end writes, background sweeper or staging buffer, and it runs no git status. The overlapping ideas (outgoing checkpoints, checkpoint delete, redone-commit links, no-change sessions, token usage, enable commit listing, dangling trailer) are already proposed (#598, #461, #266, #753, #223, #808, #793, #815).
+
+## changelog 0.11.0–0.13.4: Entire PII, OPF and engine-specific redaction fixes
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.11.0–0.13.4 (PII ip/phone/address categories, OpenAI Privacy Filter, betterleaks engine bumps and multi-part rules, image data URI rule, blanking of injected system prompts, instruction files and session_context attachments)`
+- reason: `irrelevant`
+- note: Partio's redaction is the two layers in internal/redact (regex patterns plus entropy). It has no PII layer, OPF or betterleaks engine to fix. The new-pattern ideas from this range are already open (#784, #790, #805, #711, #796, #816, #830, #803). Blanking injected Claude context depends on Claude JSONL record types that no fixture or parser in this tree covers.
+
+## issues #2932–#3143: Entire forge, Windows test and agent-specific bugs
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2932–#3143 (#2932, #2942, #2949, #2957, #2960, #2981, #2989, #2990, #3000, #3032 forge/plugins/web app; #3090–#3100 Windows test isolation; #3052, #3053 Windows process trees; #3058 keyring; #3059, #3128 OpenCode; #3121 MCP; #3130, #3132 token ledger; #3134 git-remote-entire; #2933, #2979, #3011, #3014, #3025, #3030, #3050, #3054, #3069, #3079, #3142 Entire session engine; #3081, #3111, #3126, #3139, #3143, #2976, #2977 Entire PII and redaction internals)`
+- reason: `irrelevant`
+- note: Each of these is a bug in a subsystem Partio does not have: the forge, plugins, Windows test harness, OpenCode, MCP, the token ledger, the remote helper, process-identity linking, stamp records, the session sweeper or the PII layer. Partio lists no untracked files and keeps one pre-commit state file per worktree. The items in this range with a Partio analog (#3029, #3120, #3138, #3077, #2951, #2965) matched existing proposals (#815, #711, #796, #786, #811).
+
+## pulls #3045–#3160: fixes for the issues above, Entire tests and dependency bumps
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3045–#3160 (fixes for the issues above in redact, strategy, hooks, opencode, codex, copilot, proclive, execx, osroot, git-remote-entire; trail/finding UI; e2e and Windows test fixes; betterleaks bump)`
+- reason: `irrelevant`
+- note: These PRs implement Entire's fixes for issues #2932–#3143 and changelog 0.13.x. Partio either lacks the subsystem, or the idea was already proposed or filed in this run: #3048 password flags (#711), #3046 hook chain re-wrap (#810), #3073/#3110/#3051 moved hook copies and Trunk launchers (no Partio counterpart), #3045 Codex worktree hook location (Partio installs no Codex hooks).
