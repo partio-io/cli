@@ -3,7 +3,6 @@ package entitydiff
 import (
 	"strings"
 	"unicode"
-	"unicode/utf8"
 )
 
 // goExtractor finds Go declarations: top-level functions, methods and
@@ -167,7 +166,7 @@ func leadingIdent(s string) string {
 
 func isIdentRune(r rune, first bool) bool {
 	if r == '_' || unicode.IsLetter(r) {
-		return r != utf8.RuneError
+		return true
 	}
 	return !first && unicode.IsDigit(r)
 }

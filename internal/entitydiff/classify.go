@@ -31,9 +31,7 @@ func classify(oldEnts, newEnts []sideEntity, partial map[entityKey]bool) []Chang
 	for _, e := range oldEnts {
 		k := e.key()
 		if _, seen := oldBy[k]; !seen {
-			if _, seenNew := newBy[k]; !seenNew {
-				order = append(order, k)
-			}
+			order = append(order, k)
 		}
 		oldBy[k] = append(oldBy[k], e)
 	}
