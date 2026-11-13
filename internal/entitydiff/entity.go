@@ -8,8 +8,14 @@ const (
 	KindFunction EntityKind = "func"
 	// KindMethod is a function with a receiver.
 	KindMethod EntityKind = "method"
-	// KindType is a named type declaration.
+	// KindType is a named type declaration or type alias.
 	KindType EntityKind = "type"
+	// KindClass is a class declaration.
+	KindClass EntityKind = "class"
+	// KindInterface is a TypeScript interface declaration.
+	KindInterface EntityKind = "interface"
+	// KindEnum is a TypeScript enum declaration.
+	KindEnum EntityKind = "enum"
 )
 
 // Entity is one declaration seen in a diff.

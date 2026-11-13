@@ -1,6 +1,9 @@
 package entitydiff
 
-import "strings"
+import (
+	"path"
+	"strings"
+)
 
 // extractor finds the declarations in a run of source lines: one rebuilt
 // side of a hunk. A whole-file parser could replace a scanner behind this
@@ -22,11 +25,27 @@ type extraction struct {
 	partial  []entityKey
 }
 
-// extractorFor returns the extractor for path's language, or nil when the
-// language is not supported.
-func extractorFor(path string) extractor {
-	if strings.HasSuffix(path, ".go") {
-		return goExtractor{}
+// extractors maps a file extension to the extractor for its language.
+// TypeScript declaration files (.d.ts, .d.mts, .d.cts) end in a supported
+// extension and are analysed like any other TypeScript file.
+var extractors = map[string]extractor{
+	".go":  goExtractor{},
+	".ts":  jsExtractor{},
+	".tsx": jsExtractor{},
+	".mts": jsExtractor{},
+	".cts": jsExtractor{},
+	".js":  jsExtractor{},
+	".jsx": jsExtractor{},
+	".mjs": jsExtractor{},
+	".cjs": jsExtractor{},
+}
+
+// extractorFor returns the extractor for p's language, or nil when the
+// language is not supported. Minified JavaScript is generated code and is
+// not analysed.
+func extractorFor(p string) extractor {
+	if strings.HasSuffix(p, ".min.js") {
+		return nil
 	}
-	return nil
+	return extractors[path.Ext(p)]
 }

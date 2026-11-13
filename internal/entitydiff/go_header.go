@@ -72,11 +72,14 @@ func goHeader(lines []string, start int, isFunc bool) (header string, end int, o
 }
 
 // closingQuote returns the index just past the string or rune literal
-// that opens at line[j], or len(line) when it does not close on this line.
+// that opens at line[j], or the index of the line's end when it does not
+// close on this line.
 func closingQuote(line string, j int) int {
 	q := line[j]
 	for k := j + 1; k < len(line); k++ {
 		switch {
+		case line[k] == '\n':
+			return k
 		case line[k] == '\\' && q != '`':
 			k++
 		case line[k] == q:

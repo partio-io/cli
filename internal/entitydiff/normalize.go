@@ -4,9 +4,11 @@ import "strings"
 
 // normalizeSignature makes a declaration header comparable across
 // formatting: whitespace runs collapse to one space, no space follows an
-// opening bracket or precedes a closing bracket or comma, every comma is
+// opening bracket or precedes a closing bracket or comma (angle brackets
+// count, for TypeScript type parameters), every comma is
 // followed by one space, and a trailing comma before a closing bracket is
-// dropped. A gofmt reflow of a multi-line parameter list therefore
+// dropped, including the one in a TSX type parameter list such as "<T,>".
+// A gofmt or Prettier reflow of a multi-line parameter list therefore
 // normalizes to the same text as the one-line form.
 func normalizeSignature(s string) string {
 	fields := strings.Fields(s)
@@ -23,11 +25,12 @@ func normalizeSignature(s string) string {
 			if b.Len() > 0 {
 				prev = b.String()[b.Len()-1]
 			}
-			if prev == '(' || prev == '[' || prev == ' ' || next == ')' || next == ']' || next == ',' || next == 0 {
+			if prev == '(' || prev == '[' || prev == '<' || prev == ' ' ||
+				next == ')' || next == ']' || next == '>' || next == ',' || next == 0 {
 				continue
 			}
 		case ',':
-			if next == ')' || next == ']' {
+			if next == ')' || next == ']' || next == '>' {
 				continue
 			}
 			b.WriteString(", ")

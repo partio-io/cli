@@ -38,6 +38,25 @@ func TestRunExplainChangedEntities(t *testing.T) {
 			},
 		},
 		{
+			name: "typescript diff lists entity changes",
+			diff: strings.Join([]string{
+				"diff --git a/web/api.ts b/web/api.ts",
+				"index 1111111..2222222 100644",
+				"--- a/web/api.ts",
+				"+++ b/web/api.ts",
+				"@@ -1,2 +1,3 @@",
+				"-export function load(id: string) {",
+				"+export function load(id: string, opts?: Options) {",
+				"+export interface Options {",
+				" if (id) {",
+			}, "\n"),
+			wantInOutput: []string{
+				"\nChanged entities:\n  web/api.ts\n",
+				"    signature changed  export function load(id: string, opts?: Options)\n",
+				"    added              export interface Options\n",
+			},
+		},
+		{
 			name: "long signature is cut",
 			diff: strings.Join([]string{
 				"diff --git a/a.go b/a.go",
