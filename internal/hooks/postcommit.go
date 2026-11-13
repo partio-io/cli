@@ -114,25 +114,31 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 	}
 
 	// Generate checkpoint ID and amend commit with trailers BEFORE writing
-	// the checkpoint, so we capture the post-amend commit hash.
+	// the checkpoint, so we capture the post-amend commit hash. With trailers
+	// disabled the commit is left untouched and the checkpoint records the
+	// unchanged HEAD hash.
 	cpID := checkpoint.NewID()
 
-	trailers := map[string]string{
-		"Partio-Checkpoint":  cpID,
-		"Partio-Attribution": fmt.Sprintf("%d%% agent", attr.AgentPercent),
+	if cfg.StrategyOptions.DisableTrailers {
+		slog.Debug("post-commit: disable_trailers set, skipping commit amend", "commit", commitHash)
+	} else {
+		trailers := map[string]string{
+			"Partio-Checkpoint":  cpID,
+			"Partio-Attribution": fmt.Sprintf("%d%% agent", attr.AgentPercent),
+		}
+
+		if err := git.AmendTrailers(trailers); err != nil {
+			slog.Warn("post-commit: could not add trailers to commit", "commit", commitHash, "error", err)
+		}
+
+		// Get the post-amend commit hash (this is the hash that gets pushed)
+		commitHash, err = git.CurrentCommit()
+		if err != nil {
+			return fmt.Errorf("getting post-amend commit: %w", err)
+		}
 	}
 
-	if err := git.AmendTrailers(trailers); err != nil {
-		slog.Warn("post-commit: could not add trailers to commit", "commit", commitHash, "error", err)
-	}
-
-	// Get the post-amend commit hash (this is the hash that gets pushed)
-	commitHash, err = git.CurrentCommit()
-	if err != nil {
-		return fmt.Errorf("getting post-amend commit: %w", err)
-	}
-
-	// Create checkpoint with the post-amend hash
+	// Create checkpoint with the final commit hash
 	cp := &checkpoint.Checkpoint{
 		ID:          cpID,
 		CommitHash:  commitHash,
@@ -211,7 +217,7 @@ func runPostCommit(repoRoot string, cfg config.Config) error {
 		}
 	}
 
-	// Record the post-amend commit hash so duplicate hook invocations are no-ops.
+	// Record the final commit hash so duplicate hook invocations are no-ops.
 	cache.add(commitHash)
 	if saveErr := saveCommitCache(partioDir, cache); saveErr != nil {
 		slog.Debug("could not save commit cache", "error", saveErr)

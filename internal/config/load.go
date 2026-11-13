@@ -17,9 +17,8 @@ func Load(repoRoot string) (Config, error) {
 	cfg := Defaults()
 
 	// Global config
-	home, err := os.UserHomeDir()
-	if err == nil {
-		mergeFromFile(&cfg, filepath.Join(home, ".config", "partio", "settings.json"))
+	if globalPath, err := GlobalSettingsPath(); err == nil {
+		mergeFromFile(&cfg, globalPath)
 	}
 
 	// Repo config

@@ -53,6 +53,10 @@ const (
 // StrategyOptions holds strategy-specific options.
 type StrategyOptions struct {
 	PushSessions bool `json:"push_sessions"`
+	// DisableTrailers stops the post-commit hook from amending commits with
+	// Partio-Checkpoint and Partio-Attribution trailers. Checkpoints are still
+	// written to the checkpoint branch. Defaults to false.
+	DisableTrailers bool `json:"disable_trailers"`
 }
 
 // RedactOptions controls secret redaction in checkpoint data.

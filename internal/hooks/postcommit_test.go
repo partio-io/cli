@@ -92,6 +92,89 @@ func TestPostCommitFirstCommitStoresDiff(t *testing.T) {
 	}
 }
 
+// TestPostCommitTrailers covers the disable_trailers option: with it on the
+// hook leaves the commit untouched and records the unchanged HEAD in the
+// checkpoint; with the default config it still adds both trailers.
+func TestPostCommitTrailers(t *testing.T) {
+	tests := []struct {
+		name            string
+		disableTrailers bool
+	}{
+		{name: "default adds trailers", disableTrailers: false},
+		{name: "disable_trailers skips amend", disableTrailers: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir, run := newPostCommitRepo(t)
+			enableCheckpointBranch(t, run)
+
+			if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("one\n"), 0o644); err != nil {
+				t.Fatalf("write a.txt: %v", err)
+			}
+			run("git", "add", ".")
+			run("git", "commit", "-m", "first")
+
+			before := run("git", "rev-parse", "HEAD")
+			beforeMsg := run("git", "log", "-1", "--format=%B")
+			branch := run("git", "rev-parse", "--abbrev-ref", "HEAD")
+
+			writePreCommitState(t, dir, preCommitState{
+				AgentActive: true,
+				AgentName:   "claude-code",
+				Branch:      branch,
+			})
+
+			cfg := config.Config{Agent: "claude-code"}
+			cfg.StrategyOptions.DisableTrailers = tt.disableTrailers
+			if err := runPostCommit(dir, cfg); err != nil {
+				t.Fatalf("runPostCommit() unexpected error: %v", err)
+			}
+
+			after := run("git", "rev-parse", "HEAD")
+			afterMsg := run("git", "log", "-1", "--format=%B")
+
+			if !tt.disableTrailers {
+				if after == before {
+					t.Errorf("HEAD unchanged, want the commit amended with trailers")
+				}
+				if !strings.Contains(afterMsg, "Partio-Attribution:") {
+					t.Errorf("commit message lacks Partio-Attribution trailer:\n%s", afterMsg)
+				}
+				id := checkpointIDFromTrailers(t, afterMsg)
+				if _, err := checkpoint.Read(id); err != nil {
+					t.Fatalf("checkpoint.Read(%s): %v", id, err)
+				}
+				return
+			}
+
+			if after != before {
+				t.Errorf("HEAD = %s, want unchanged %s", after, before)
+			}
+			if afterMsg != beforeMsg {
+				t.Errorf("commit message = %q, want unchanged %q", afterMsg, beforeMsg)
+			}
+			if strings.Contains(afterMsg, "Partio-") {
+				t.Errorf("commit message holds Partio trailers:\n%s", afterMsg)
+			}
+
+			cps, err := checkpoint.FindByBranch(dir, branch)
+			if err != nil {
+				t.Fatalf("checkpoint.FindByBranch: %v", err)
+			}
+			if len(cps) != 1 {
+				t.Fatalf("got %d checkpoints, want 1", len(cps))
+			}
+			if cps[0].CommitHash != before {
+				t.Errorf("checkpoint CommitHash = %s, want HEAD %s", cps[0].CommitHash, before)
+			}
+			if _, err := checkpoint.Read(cps[0].ID); err != nil {
+				t.Errorf("checkpoint.Read(%s): %v", cps[0].ID, err)
+			}
+		})
+	}
+}
+
 // captureLogs sends the default logger to a buffer for the length of the test
 // and returns the buffer. The hook reports a failed measurement through the
 // default logger, so the buffer is where the warning becomes visible.

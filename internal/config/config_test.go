@@ -27,6 +27,9 @@ func TestDefaults(t *testing.T) {
 	if d.StrategyOptions.PushSessions != true {
 		t.Errorf("expected push_sessions=true, got %v", d.StrategyOptions.PushSessions)
 	}
+	if d.StrategyOptions.DisableTrailers != false {
+		t.Errorf("expected disable_trailers=false, got %v", d.StrategyOptions.DisableTrailers)
+	}
 }
 
 func TestLoadDefaults(t *testing.T) {
@@ -119,5 +122,43 @@ func TestLoadLayered(t *testing.T) {
 	}
 	if cfg.LogLevel != "debug" {
 		t.Errorf("expected log_level=debug, got %s", cfg.LogLevel)
+	}
+}
+
+// TestLoadMergesStrategyOptionsPerField proves that a repo layer setting only
+// push_sessions keeps disable_trailers from the global layer.
+func TestLoadMergesStrategyOptionsPerField(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	globalDir := filepath.Join(home, ".config", "partio")
+	if err := os.MkdirAll(globalDir, 0o755); err != nil {
+		t.Fatalf("creating global dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(globalDir, "settings.json"),
+		[]byte(`{"strategy_options": {"disable_trailers": true}}`), 0o644); err != nil {
+		t.Fatalf("writing global settings: %v", err)
+	}
+
+	repo := t.TempDir()
+	partioDir := filepath.Join(repo, PartioDir)
+	if err := os.MkdirAll(partioDir, 0o755); err != nil {
+		t.Fatalf("creating partio dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(partioDir, "settings.json"),
+		[]byte(`{"strategy_options": {"push_sessions": false}}`), 0o644); err != nil {
+		t.Fatalf("writing repo settings: %v", err)
+	}
+
+	cfg, err := Load(repo)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.StrategyOptions.PushSessions {
+		t.Errorf("expected push_sessions=false from repo layer, got true")
+	}
+	if !cfg.StrategyOptions.DisableTrailers {
+		t.Errorf("expected disable_trailers=true from global layer, got false")
 	}
 }
