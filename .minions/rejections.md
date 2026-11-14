@@ -397,3 +397,11 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3045–#3160 (fixes for the issues above in redact, strategy, hooks, opencode, codex, copilot, proclive, execx, osroot, git-remote-entire; trail/finding UI; e2e and Windows test fixes; betterleaks bump)`
 - reason: `irrelevant`
 - note: These PRs implement Entire's fixes for issues #2932–#3143 and changelog 0.13.x. Partio either lacks the subsystem, or the idea was already proposed or filed in this run: #3048 password flags (#711), #3046 hook chain re-wrap (#810), #3073/#3110/#3051 moved hook copies and Trunk launchers (no Partio counterpart), #3045 Codex worktree hook location (Partio installs no Codex hooks).
+
+## Session author shows 'Unknown author' on Entire-native repos with no GitHub mirror
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3162`
+- reason: `irrelevant`
+- note: The bug is in entire.com's session-summary enrichment, which resolves a forge username and has none to resolve for an Entire-native repository. Partio has no hosted session summary and no forge username lookup, and no command shows an author: grep for author in cmd/partio and internal/checkpoint finds nothing, and review #50 found that partio explain shows no author. Each checkpoint stores commit_hash, so the git author already comes from the commit.
