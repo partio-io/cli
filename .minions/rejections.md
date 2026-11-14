@@ -405,3 +405,11 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-issues #3162`
 - reason: `irrelevant`
 - note: The bug is in entire.com's session-summary enrichment, which resolves a forge username and has none to resolve for an Entire-native repository. Partio has no hosted session summary and no forge username lookup, and no command shows an author: grep for author in cmd/partio and internal/checkpoint finds nothing, and review #50 found that partio explain shows no author. Each checkpoint stores commit_hash, so the git author already comes from the commit.
+
+## Codex hooks: emit native commandWindows and keep user fields in .codex/hooks.json
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3163`
+- reason: `irrelevant`
+- note: The PR changes how Entire writes Codex's agent-side hook file, .codex/hooks.json, for Windows shells, and how it keeps user fields in that file. Partio installs only git hooks and writes no Codex hook file: grep for hooks.json, .codex/ and commandWindows in the Go sources finds nothing, and internal/agent/codex holds only process detection, session discovery and JSONL parsing.
