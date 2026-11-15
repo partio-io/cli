@@ -413,3 +413,11 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3163`
 - reason: `irrelevant`
 - note: The PR changes how Entire writes Codex's agent-side hook file, .codex/hooks.json, for Windows shells, and how it keeps user fields in that file. Partio installs only git hooks and writes no Codex hook file: grep for hooks.json, .codex/ and commandWindows in the Go sources finds nothing, and internal/agent/codex holds only process detection, session discovery and JSONL parsing.
+
+## Resolve repository identity through SSH host aliases (ssh -G) for remotes like git@github-work:owner/repo
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3164`
+- reason: `irrelevant`
+- note: The PR teaches Entire's forge-identity resolver (search, dispatch, trails, mirror inference, checkpoint push matching) to see through custom SSH host aliases. Partio never maps a remote URL to a forge or owner/repo identity: internal/git/has_remote.go only checks that `git remote get-url origin` succeeds, and internal/git/push_branch.go pushes the checkpoint branch by remote name, so git and OpenSSH resolve the alias themselves. A grep of cmd/partio and internal for ParseURL, ssh -G and sshCommand finds nothing. The only URL builder, internal/patchapply/remote.go, is minion tooling that composes an HTTPS URL from config.
