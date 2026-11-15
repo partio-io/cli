@@ -421,3 +421,11 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3164`
 - reason: `irrelevant`
 - note: The PR teaches Entire's forge-identity resolver (search, dispatch, trails, mirror inference, checkpoint push matching) to see through custom SSH host aliases. Partio never maps a remote URL to a forge or owner/repo identity: internal/git/has_remote.go only checks that `git remote get-url origin` succeeds, and internal/git/push_branch.go pushes the checkpoint branch by remote name, so git and OpenSSH resolve the alias themselves. A grep of cmd/partio and internal for ParseURL, ssh -G and sshCommand finds nothing. The only URL builder, internal/patchapply/remote.go, is minion tooling that composes an HTTPS URL from config.
+
+## grant add sends allow_invitation and reports invitations for Entire Core access grants
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3165`
+- reason: `irrelevant`
+- note: The PR changes how Entire's `org|project|repo grant add` commands call Entire Core, its hosted access-control API, so that an account outside the scope gets an invitation instead of direct access. Partio has no hosted service, no accounts and no access grants: cmd/partio holds only local commands (enable, disable, status, explain, rewind, resume, prune, reset, clean, doctor, hook, version), and a grep for grant, invite and invitation in cmd and internal finds only test comments in internal/premise.
