@@ -429,3 +429,11 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3165`
 - reason: `irrelevant`
 - note: The PR changes how Entire's `org|project|repo grant add` commands call Entire Core, its hosted access-control API, so that an account outside the scope gets an invitation instead of direct access. Partio has no hosted service, no accounts and no access grants: cmd/partio holds only local commands (enable, disable, status, explain, rewind, resume, prune, reset, clean, doctor, hook, version), and a grep for grant, invite and invitation in cmd and internal finds only test comments in internal/premise.
+
+## Bump betterleaks, posthog-go and golang.org/x/crypto in the go-dependencies group
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3166`
+- reason: `irrelevant`
+- note: A Dependabot bump of Entire's own dependencies. Partio depends on none of them: go.mod requires only github.com/google/uuid and github.com/spf13/cobra (plus mousetrap and pflag, indirect), so there is no betterleaks, posthog-go or x/crypto to update.
