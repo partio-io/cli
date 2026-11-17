@@ -5,8 +5,12 @@ import (
 	"net/http"
 )
 
+// MaxPullCommits is the most commits the pull request commit listing
+// serves; commits after it are not listed.
+const MaxPullCommits = 250
+
 // maxPullCommitPages bounds the pull request commit listing. The endpoint
-// serves at most 250 commits, so three pages of PerPage cover all of them.
+// serves at most MaxPullCommits, so three pages of PerPage cover all of them.
 const maxPullCommitPages = 3
 
 // PullRepo is the part of a pull request's head or base repository that
@@ -20,7 +24,11 @@ type PullRepo struct {
 // Head.Repo is a pointer because GitHub may report no head repository, which
 // is what a deleted fork looks like.
 type PullHead struct {
-	Head struct {
+	// Commits is the pull request's total commit count. The commit listing
+	// stops at MaxPullCommits, so this is how a caller learns that some were
+	// not listed.
+	Commits int `json:"commits"`
+	Head    struct {
 		SHA  string    `json:"sha"`
 		Repo *PullRepo `json:"repo"`
 	} `json:"head"`
@@ -46,7 +54,7 @@ func (c Client) GetPullHead(repo string, number int) (PullHead, error) {
 		return pr, fmt.Errorf("read pull request: %w", err)
 	}
 	if err := c.Do(req, &pr); err != nil {
-		return pr, fmt.Errorf("read pull request: %w", err)
+		return pr, fmt.Errorf("read pull request: %w", withRateLimitHint(err))
 	}
 	return pr, nil
 }
@@ -61,7 +69,7 @@ func (c Client) ListPullCommits(repo string, number int) ([]PullCommit, error) {
 		return true
 	})
 	if err != nil {
-		return nil, fmt.Errorf("list pull request commits: %w", err)
+		return nil, fmt.Errorf("list pull request commits: %w", withRateLimitHint(err))
 	}
 	return all, nil
 }

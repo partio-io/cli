@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -16,13 +17,24 @@ import (
 )
 
 // syncForkFixture is a fork repository with checkpoints, an upstream
-// repository, and a fake GitHub API describing pull request up/repo#1 from
-// the fork.
+// repository, and a fake GitHub API describing pull requests on up/repo:
+//
+//	#1 from the fork contrib/repo
+//	#3 from a deleted fork (null head repository)
+//	#4 from up/repo itself (not a fork)
+//	#5 from a fork with an empty clone URL
+//	#6 with no head repository field at all
+//
+// Every pull request lists messages as its commits and reports
+// commitCount as its total.
 type syncForkFixture struct {
 	fork, upstream string
 	cloneURL       string
 	messages       []string
+	commitCount    int
 }
+
+var syncForkCommitsPath = regexp.MustCompile(`^/repos/up/repo/pulls/[0-9]+/commits$`)
 
 func newSyncForkFixture(t *testing.T, forkIDs []string) *syncForkFixture {
 	t.Helper()
@@ -35,19 +47,7 @@ func newSyncForkFixture(t *testing.T, forkIDs []string) *syncForkFixture {
 	f.cloneURL = "file://" + f.fork
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/repos/up/repo/pulls/1":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"head": map[string]any{"sha": "abc", "repo": map[string]any{"full_name": "contrib/repo", "clone_url": f.cloneURL}},
-				"base": map[string]any{"repo": map[string]any{"full_name": "up/repo"}},
-			})
-		case "/repos/up/repo/pulls/3":
-			// A deleted fork: GitHub reports no head repository.
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"head": map[string]any{"sha": "abc", "repo": nil},
-				"base": map[string]any{"repo": map[string]any{"full_name": "up/repo"}},
-			})
-		case "/repos/up/repo/pulls/1/commits":
+		if syncForkCommitsPath.MatchString(r.URL.Path) {
 			var commits []map[string]any
 			if r.URL.Query().Get("page") == "1" {
 				for i, m := range f.messages {
@@ -55,9 +55,29 @@ func newSyncForkFixture(t *testing.T, forkIDs []string) *syncForkFixture {
 				}
 			}
 			_ = json.NewEncoder(w).Encode(commits)
+			return
+		}
+		head := map[string]any{"sha": "abc"}
+		switch r.URL.Path {
+		case "/repos/up/repo/pulls/1":
+			head["repo"] = map[string]any{"full_name": "contrib/repo", "clone_url": f.cloneURL}
+		case "/repos/up/repo/pulls/3":
+			head["repo"] = nil
+		case "/repos/up/repo/pulls/4":
+			// The clone URL leads nowhere, so any fetch would fail.
+			head["repo"] = map[string]any{"full_name": "up/repo", "clone_url": "file://" + f.upstream + "/missing"}
+		case "/repos/up/repo/pulls/5":
+			head["repo"] = map[string]any{"full_name": "contrib/repo", "clone_url": ""}
+		case "/repos/up/repo/pulls/6":
 		default:
 			http.NotFound(w, r)
+			return
 		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"commits": f.commitCount,
+			"head":    head,
+			"base":    map[string]any{"repo": map[string]any{"full_name": "up/repo"}},
+		})
 	}))
 	t.Cleanup(srv.Close)
 
@@ -231,21 +251,25 @@ func TestSyncForkFailures(t *testing.T) {
 	}{
 		{name: "unparseable reference", ref: "not-a-pr", wantErr: "invalid pull request reference"},
 		{name: "pull request not found", ref: "up/repo#2", wantErr: "404"},
-		{name: "deleted fork", ref: "up/repo#3", wantErr: "no head repository"},
-		{
-			name:    "fork has no checkpoint branch",
-			ref:     "up/repo#1",
-			wantErr: "fetching",
-			setup: func(t *testing.T, f *syncForkFixture) {
-				gitOut(t, f.fork, "update-ref", "-d", "refs/heads/partio/checkpoints/v1")
-			},
-		},
 		{
 			name:    "fork is unreachable",
 			ref:     "up/repo#1",
-			wantErr: "fetching",
+			wantErr: "checking partio/checkpoints/v1",
 			setup: func(t *testing.T, f *syncForkFixture) {
 				f.cloneURL = "file://" + t.TempDir() + "/missing"
+			},
+		},
+		{
+			// ls-remote sees the branch, but the fetch cannot send the
+			// tip's tree: a real fetch error, not an absent branch.
+			name:    "fetch fails on a corrupt fork",
+			ref:     "up/repo#1",
+			wantErr: "fetching",
+			setup: func(t *testing.T, f *syncForkFixture) {
+				tree := gitOut(t, f.fork, "rev-parse", "partio/checkpoints/v1^{tree}")
+				if err := os.Remove(filepath.Join(f.fork, ".git", "objects", tree[:2], tree[2:])); err != nil {
+					t.Fatal(err)
+				}
 			},
 		},
 		{
@@ -281,6 +305,129 @@ func TestSyncForkFailures(t *testing.T) {
 				t.Error("failed run moved the checkpoint branch")
 			}
 			assertNoSyncForkRefs(t, f.upstream)
+		})
+	}
+}
+
+func TestSyncForkNothingToDo(t *testing.T) {
+	tests := []struct {
+		name       string
+		ref        string
+		messages   []string
+		setup      func(t *testing.T, f *syncForkFixture)
+		wantReason string
+	}{
+		{name: "same-repo pull request", ref: "up/repo#4", wantReason: "is not from a fork"},
+		{name: "deleted fork", ref: "up/repo#3", wantReason: "fork was deleted"},
+		{name: "empty clone URL", ref: "up/repo#5", wantReason: "fork was deleted"},
+		{name: "missing head repository", ref: "up/repo#6", wantReason: "fork was deleted"},
+		{
+			name:       "fork has no checkpoint branch",
+			ref:        "up/repo#1",
+			wantReason: "fork contrib/repo has no partio/checkpoints/v1 branch",
+			setup: func(t *testing.T, f *syncForkFixture) {
+				gitOut(t, f.fork, "update-ref", "-d", "refs/heads/partio/checkpoints/v1")
+			},
+		},
+		{
+			name:       "no trailers",
+			ref:        "up/repo#1",
+			messages:   []string{"feat: one\n\nSigned-off-by: A <a@example.com>\n"},
+			wantReason: "carries a valid Partio-Checkpoint trailer",
+		},
+		{
+			name:       "only invalid trailers",
+			ref:        "up/repo#1",
+			messages:   []string{"feat: one\n\nPartio-Checkpoint: ../../etc\n"},
+			wantReason: "carries a valid Partio-Checkpoint trailer",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newSyncForkFixture(t, []string{"aabbccddeeff"})
+			f.messages = []string{"feat: one\n\nPartio-Checkpoint: aabbccddeeff\n"}
+			if tt.messages != nil {
+				f.messages = tt.messages
+			}
+			if tt.setup != nil {
+				tt.setup(t, f)
+			}
+			tip := gitOut(t, f.upstream, "rev-parse", "refs/heads/partio/checkpoints/v1")
+
+			out, err := runSyncForkCmd(t, tt.ref)
+			if err != nil {
+				t.Fatalf("sync-fork: %v", err)
+			}
+			out = strings.TrimSpace(out)
+			if strings.Count(out, "\n") != 0 || !strings.HasPrefix(out, "nothing to sync: ") || !strings.Contains(out, tt.wantReason) {
+				t.Errorf("output = %q, want one line containing %q", out, tt.wantReason)
+			}
+			if got := gitOut(t, f.upstream, "rev-parse", "refs/heads/partio/checkpoints/v1"); got != tip {
+				t.Error("nothing-to-do run moved the checkpoint branch")
+			}
+			assertNoSyncForkRefs(t, f.upstream)
+		})
+	}
+}
+
+func TestSyncForkSummaryWarnings(t *testing.T) {
+	tests := []struct {
+		name        string
+		origin      string
+		commitCount int
+		want        []string
+		notWant     []string
+	}{
+		{
+			name:    "origin matches base",
+			origin:  "git@github.com:up/repo.git",
+			want:    []string{"base repository: up/repo\n"},
+			notWant: []string{"origin is", "not scanned"},
+		},
+		{
+			name:   "origin differs from base",
+			origin: "https://github.com/me/repo.git",
+			want:   []string{"base repository: up/repo (origin is me/repo)"},
+		},
+		{
+			name:        "exactly 250 commits",
+			commitCount: 250,
+			notWant:     []string{"not scanned"},
+		},
+		{
+			name:        "more than 250 commits",
+			commitCount: 300,
+			want:        []string{"not scanned: commits 251-300"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newSyncForkFixture(t, []string{"aabbccddeeff"})
+			f.messages = []string{"feat: one\n\nPartio-Checkpoint: aabbccddeeff\n"}
+			f.commitCount = tt.commitCount
+			if tt.origin != "" {
+				gitOut(t, f.upstream, "remote", "add", "origin", tt.origin)
+			}
+
+			out, err := runSyncForkCmd(t, "up/repo#1")
+			if err != nil {
+				t.Fatalf("sync-fork: %v", err)
+			}
+			want := append([]string{"synced 1, already present 0, conflicts 0, missing 0"}, tt.want...)
+			for _, w := range want {
+				if !strings.Contains(out, w) {
+					t.Errorf("output missing %q:\n%s", w, out)
+				}
+			}
+			for _, w := range tt.notWant {
+				if strings.Contains(out, w) {
+					t.Errorf("output unexpectedly contains %q:\n%s", w, out)
+				}
+			}
+			// A warning never stops the sync.
+			if _, err := checkpoint.Read("aabbccddeeff"); err != nil {
+				t.Errorf("checkpoint.Read: %v", err)
+			}
 		})
 	}
 }

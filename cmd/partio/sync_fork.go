@@ -27,6 +27,10 @@ checkpoints into the local ` + git.CheckpointBranch + ` branch in one commit, so
 <pr> is a pull request URL (https://github.com/<owner>/<repo>/pull/<n>) or
 <owner>/<repo>#<n>. The fork is never written to and nothing is pushed.
 
+A pull request with nothing to sync (not from a fork, a deleted fork, a fork
+without a checkpoint branch, or no checkpoint trailers) exits successfully
+with a one-line reason.
+
 The GitHub token is read from GH_TOKEN, then GITHUB_TOKEN; without one, requests
 are unauthenticated. The API root is read from GITHUB_API_URL (default
 ` + defaultGitHubAPIURL + `).`,
@@ -51,11 +55,30 @@ func runSyncFork(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	// A deleted fork shows up as a null or missing head repository, or one
+	// without a clone URL; all are treated alike.
 	if pr.Head.Repo == nil || pr.Head.Repo.CloneURL == "" {
-		return fmt.Errorf("%s has no head repository (the fork may have been deleted)", ref)
+		fmt.Printf("nothing to sync: %s has no head repository (the fork was deleted)\n", ref)
+		return nil
 	}
 	head := *pr.Head.Repo
-	slog.Debug("resolved pull request", "pr", ref.String(), "head_repo", head.FullName, "head_sha", pr.Head.SHA, "base_repo", pr.Base.Repo.FullName)
+	base := pr.Base.Repo.FullName
+	slog.Debug("resolved pull request", "pr", ref.String(), "head_repo", head.FullName, "head_sha", pr.Head.SHA, "base_repo", base, "commits", pr.Commits)
+	if strings.EqualFold(head.FullName, base) {
+		fmt.Printf("nothing to sync: %s is not from a fork (head and base are both %s)\n", ref, base)
+		return nil
+	}
+
+	report := syncForkReport{BaseRepo: base, TotalCommits: pr.Commits}
+	if origin, ok := originRepo(repoRoot); !ok {
+		slog.Debug("origin names no GitHub repository; not comparing it with the pull request's base", "base_repo", base)
+	} else if !strings.EqualFold(origin, base) {
+		report.OriginRepo = origin
+		slog.Warn("the pull request's base repository differs from origin; checkpoints are still synced into the local branch", "base_repo", base, "origin", origin)
+	}
+	if report.truncated() {
+		slog.Warn(fmt.Sprintf("pull request has more than %d commits; commits after the first %d were not scanned", github.MaxPullCommits, github.MaxPullCommits), "commits", pr.Commits)
+	}
 
 	commits, err := client.ListPullCommits(ref.FullName(), ref.Number)
 	if err != nil {
@@ -68,6 +91,19 @@ func runSyncFork(_ *cobra.Command, args []string) error {
 	ids, err := checkpointIDsFromMessages(repoRoot, messages)
 	if err != nil {
 		return err
+	}
+	if len(ids) == 0 {
+		fmt.Printf("nothing to sync: no commit of %s carries a valid %s trailer\n", ref, checkpointTrailerKey)
+		return nil
+	}
+
+	hasBranch, err := forkHasCheckpointBranch(repoRoot, head.CloneURL)
+	if err != nil {
+		return err
+	}
+	if !hasBranch {
+		fmt.Printf("nothing to sync: fork %s has no %s branch\n", head.FullName, git.CheckpointBranch)
+		return nil
 	}
 
 	forkRef, cleanup, err := fetchForkBranch(repoRoot, head.CloneURL)
@@ -83,9 +119,21 @@ func runSyncFork(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("importing checkpoints: %w", err)
 	}
 
-	printSyncForkSummary(results)
+	printSyncForkSummary(results, report)
 	return nil
 }
+
+// syncForkReport is what the sync summary says about the pull request
+// beyond the per-checkpoint outcomes.
+type syncForkReport struct {
+	BaseRepo     string // the pull request's base repository
+	OriginRepo   string // origin's owner/repo when it differs from BaseRepo
+	TotalCommits int    // the pull request's commit count
+}
+
+// truncated reports whether the pull request has commits that the commit
+// listing did not return.
+func (r syncForkReport) truncated() bool { return r.TotalCommits > github.MaxPullCommits }
 
 // newGitHubClientFromEnv builds a GitHub client from GITHUB_API_URL and
 // GH_TOKEN (falling back to GITHUB_TOKEN).
@@ -97,6 +145,9 @@ func newGitHubClientFromEnv() github.Client {
 	token := os.Getenv("GH_TOKEN")
 	if token == "" {
 		token = os.Getenv("GITHUB_TOKEN")
+	}
+	if token == "" {
+		slog.Debug("no GH_TOKEN or GITHUB_TOKEN set; GitHub API requests are unauthenticated (60 per hour)")
 	}
 	return github.Client{BaseURL: baseURL, Token: token}
 }
@@ -114,8 +165,9 @@ func syncForkCommitMessage(ref prRef, headRepo string, synced []string) string {
 }
 
 // printSyncForkSummary warns about every checkpoint that was not synced and
-// prints the per-outcome counts.
-func printSyncForkSummary(results []checkpoint.ImportResult) {
+// prints the per-outcome counts, the base repository, and the commits that
+// were not scanned.
+func printSyncForkSummary(results []checkpoint.ImportResult, report syncForkReport) {
 	var synced, present, conflicts, missing, rejected int
 	for _, r := range results {
 		switch r.Outcome {
@@ -139,4 +191,14 @@ func printSyncForkSummary(results []checkpoint.ImportResult) {
 		summary += fmt.Sprintf(", rejected %d", rejected)
 	}
 	fmt.Println(summary)
+
+	if report.OriginRepo != "" {
+		fmt.Printf("base repository: %s (origin is %s)\n", report.BaseRepo, report.OriginRepo)
+	} else {
+		fmt.Printf("base repository: %s\n", report.BaseRepo)
+	}
+	if report.truncated() {
+		fmt.Printf("not scanned: commits %d-%d (only the first %d commits of a pull request are listed)\n",
+			github.MaxPullCommits+1, report.TotalCommits, github.MaxPullCommits)
+	}
 }

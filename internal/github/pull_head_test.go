@@ -2,10 +2,12 @@ package github
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -16,13 +18,15 @@ func TestGetPullHead(t *testing.T) {
 		wantHead *PullRepo
 		wantSHA  string
 		wantBase string
+		wantN    int
 	}{
 		{
 			name:     "decodes head and base",
-			body:     `{"head":{"sha":"abc","repo":{"full_name":"f/r","clone_url":"https://github.com/f/r.git"}},"base":{"repo":{"full_name":"o/r"}}}`,
+			body:     `{"commits":312,"head":{"sha":"abc","repo":{"full_name":"f/r","clone_url":"https://github.com/f/r.git"}},"base":{"repo":{"full_name":"o/r"}}}`,
 			wantHead: &PullRepo{FullName: "f/r", CloneURL: "https://github.com/f/r.git"},
 			wantSHA:  "abc",
 			wantBase: "o/r",
+			wantN:    312,
 		},
 		{
 			name:     "decodes a null head repository",
@@ -54,6 +58,9 @@ func TestGetPullHead(t *testing.T) {
 			}
 			if pr.Base.Repo.FullName != tt.wantBase {
 				t.Errorf("base repo = %q, want %q", pr.Base.Repo.FullName, tt.wantBase)
+			}
+			if pr.Commits != tt.wantN {
+				t.Errorf("commits = %d, want %d", pr.Commits, tt.wantN)
 			}
 		})
 	}
@@ -89,5 +96,45 @@ func TestListPullCommits(t *testing.T) {
 	}
 	if commits[249].SHA != "sha249" || commits[249].Commit.Message != "msg 249" {
 		t.Errorf("last commit = %+v", commits[249])
+	}
+}
+
+func TestPullCallsRateLimitHint(t *testing.T) {
+	tests := []struct {
+		name     string
+		status   int
+		body     string
+		wantHint bool
+	}{
+		{name: "primary rate limit", status: 403, body: `{"message":"API rate limit exceeded for 192.0.2.1."}`, wantHint: true},
+		{name: "secondary rate limit", status: 403, body: `{"message":"You have exceeded a secondary rate limit."}`, wantHint: true},
+		{name: "too many requests", status: 429, body: `{"message":"slow down"}`, wantHint: true},
+		{name: "plain forbidden", status: 403, body: `{"message":"Resource not accessible by integration"}`},
+		{name: "not found", status: 404, body: `{"message":"Not Found"}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.status)
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			defer srv.Close()
+			c := Client{BaseURL: srv.URL, HTTPClient: srv.Client()}
+
+			_, headErr := c.GetPullHead("o/r", 7)
+			_, listErr := c.ListPullCommits("o/r", 7)
+			for _, err := range []error{headErr, listErr} {
+				if err == nil {
+					t.Fatal("expected an error")
+				}
+				if got := strings.Contains(err.Error(), "set GH_TOKEN"); got != tt.wantHint {
+					t.Errorf("hint present = %v, want %v: %v", got, tt.wantHint, err)
+				}
+				var se *StatusError
+				if !errors.As(err, &se) || se.Code != tt.status {
+					t.Errorf("error does not wrap the %d StatusError: %v", tt.status, err)
+				}
+			}
+		})
 	}
 }

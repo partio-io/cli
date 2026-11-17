@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os/exec"
@@ -41,4 +42,24 @@ func fetchForkBranch(dir, cloneURL string) (ref string, cleanup func(), err erro
 		return ref, cleanup, fmt.Errorf("fetching %s from %s: %w: %s", git.CheckpointBranch, cloneURL, err, strings.TrimSpace(string(out)))
 	}
 	return ref, cleanup, nil
+}
+
+// forkHasCheckpointBranch reports whether the repository at cloneURL has a
+// checkpoint branch, so that an absent branch is told apart from a broken
+// fetch without parsing git's error text. It only reads the fork.
+func forkHasCheckpointBranch(dir, cloneURL string) (bool, error) {
+	// "--" keeps a hostile URL from being read as an option.
+	cmd := exec.Command("git", "ls-remote", "--exit-code", "--", cloneURL, "refs/heads/"+git.CheckpointBranch)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		return true, nil
+	}
+	// ls-remote --exit-code exits 2 when the remote answered but has no
+	// matching ref.
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ExitCode() == 2 {
+		return false, nil
+	}
+	return false, fmt.Errorf("checking %s on %s: %w: %s", git.CheckpointBranch, cloneURL, err, strings.TrimSpace(string(out)))
 }
