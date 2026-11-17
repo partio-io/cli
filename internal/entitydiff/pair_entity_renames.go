@@ -74,9 +74,6 @@ func splitAtName(e Entity) (prefix, suffix string, ok bool) {
 		name = name[i+1:]
 	}
 	sig := e.Signature
-	if name == "" {
-		return "", "", false
-	}
 	depth := 0
 	for i := 0; i < len(sig); i++ {
 		switch sig[i] {
