@@ -18,6 +18,7 @@ internal/
   attribution/       Code attribution calculation (agent vs human line counts)
   checkpoint/        Checkpoint domain type + git plumbing-based storage
   config/            Layered configuration (defaults → global → repo → local → env)
+  entitydiff/        Entity-level summary (added/removed/re-signed declarations) of a stored diff
   git/               Git operations (repo info, diff, branch, hooks/)
     hooks/           Hook script generation, install/uninstall
   hooks/             Git hook implementations (pre-commit, post-commit, pre-push)

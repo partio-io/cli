@@ -46,6 +46,7 @@ func runExplain(cmd *cobra.Command, args []string) error {
 	if meta.PlanSlug != "" {
 		fmt.Printf("  Plan:       %s\n", meta.PlanSlug)
 	}
+	printChangedEntities(data.Diff)
 	if data.Prompt != "" {
 		fmt.Printf("\nPrompt:\n%s\n", data.Prompt)
 	}

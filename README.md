@@ -55,6 +55,7 @@ partio status
 | `partio status` | Show current status |
 | `partio rewind --list` | List all checkpoints |
 | `partio rewind --to <id>` | Restore to a checkpoint |
+| `partio explain <id>` | Show a checkpoint's details, including the functions, types and classes its diff added, removed, renamed or re-signed (Go and TypeScript/JavaScript) |
 | `partio doctor` | Check installation health |
 | `partio reset` | Reset the checkpoint branch |
 | `partio clean` | Remove orphaned data |

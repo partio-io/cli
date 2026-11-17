@@ -2,3 +2,4 @@
 /partio
 .minion-audit/
 .minion-review/
+*.test
