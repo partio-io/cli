@@ -437,3 +437,19 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3166`
 - reason: `irrelevant`
 - note: A Dependabot bump of Entire's own dependencies. Partio depends on none of them: go.mod requires only github.com/google/uuid and github.com/spf13/cobra (plus mousetrap and pflag, indirect), so there is no betterleaks, posthog-go or x/crypto to update.
+
+## pulls #3168–#3171, #3176–#3178: client-side chunking of large blobs in git-remote-entire (CDC chunker, xorb store, upload, dedup and fetch rebuild)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3168, #3169, #3170, #3171, #3176, #3177, #3178`
+- reason: `irrelevant`
+- note: The PRs build Entire's git remote helper, git-remote-entire. It splits large blobs into content-defined chunks, packs them into xorbs, uploads and dedups them against entiredb, and rebuilds blobs from recipes on fetch. Partio has no remote helper and no hosted git server: cmd/ holds only partio and the minion-* tools, and a grep of the Go sources for xorb and remotehelper finds nothing. Partio pushes its checkpoint branch with a plain `git push --no-verify` (internal/git/push_branch.go) and leaves transport to git.
+
+## Reference external agent plugin for hummin, a fork of the pi coding agent
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3173`
+- reason: `irrelevant`
+- note: The PR adds a Node script that implements Entire's external agent protocol for hummin, a personal fork of pi, and changes no Go code. Partio has no external agent protocol and no pi agent: internal/agent/registry.go registers only the compiled-in detectors claude-code and codex, and a grep for hummin and opencode in the Go sources finds nothing. The one PR in this batch with a Partio counterpart, entireio-cli-pulls #3174 (a Wait that blocks on stderr held by a grandchild), was filed as #841.
