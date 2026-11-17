@@ -85,3 +85,40 @@ func TestDoUsesDefaultClient(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestDoAuthorization(t *testing.T) {
+	tests := []struct {
+		name     string
+		token    string
+		wantAuth string
+		wantSent bool
+	}{
+		{name: "sends a bearer token when set", token: "tok", wantAuth: "Bearer tok", wantSent: true},
+		{name: "omits the header without a token", token: "", wantSent: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var auth string
+			var sent bool
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, sent = r.Header["Authorization"]
+				auth = r.Header.Get("Authorization")
+			}))
+			defer srv.Close()
+
+			req, err := http.NewRequest(http.MethodGet, srv.URL, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := (Client{Token: tt.token, HTTPClient: srv.Client()}).Do(req, nil); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if sent != tt.wantSent {
+				t.Errorf("Authorization sent = %v, want %v", sent, tt.wantSent)
+			}
+			if auth != tt.wantAuth {
+				t.Errorf("Authorization = %q, want %q", auth, tt.wantAuth)
+			}
+		})
+	}
+}
