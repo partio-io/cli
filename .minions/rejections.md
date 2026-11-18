@@ -453,3 +453,11 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3173`
 - reason: `irrelevant`
 - note: The PR adds a Node script that implements Entire's external agent protocol for hummin, a personal fork of pi, and changes no Go code. Partio has no external agent protocol and no pi agent: internal/agent/registry.go registers only the compiled-in detectors claude-code and codex, and a grep for hummin and opencode in the Go sources finds nothing. The one PR in this batch with a Partio counterpart, entireio-cli-pulls #3174 (a Wait that blocks on stderr held by a grandchild), was filed as #841.
+
+## Bump betterleaks, ogen, posthog-go and golang.org/x/crypto in the go-dependencies group
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3179`
+- reason: `irrelevant`
+- note: A Dependabot bump of Entire's own dependencies (betterleaks 1.10.1 for a brotli CVE, ogen 1.25.0, posthog-go, x/crypto). Partio depends on none of them: go.mod requires only github.com/google/uuid and github.com/spf13/cobra (plus mousetrap and pflag, indirect), and a grep of the Go sources for betterleaks, ogen-go, posthog and x/crypto finds nothing.
