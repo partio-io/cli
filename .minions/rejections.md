@@ -461,3 +461,19 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3179`
 - reason: `irrelevant`
 - note: A Dependabot bump of Entire's own dependencies (betterleaks 1.10.1 for a brotli CVE, ogen 1.25.0, posthog-go, x/crypto). Partio depends on none of them: go.mod requires only github.com/google/uuid and github.com/spf13/cobra (plus mousetrap and pflag, indirect), and a grep of the Go sources for betterleaks, ogen-go, posthog and x/crypto finds nothing.
+
+## hooks claude-code stop should exit 0, not 1, when a hook-compat runtime sends no transcript_path
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3181`
+- reason: `irrelevant`
+- note: The bug is in Entire's Claude Code agent-side Stop hook, which reads `transcript_path` from the payload that runtimes such as Devin send on stdin. Partio installs no agent-side hooks and reads no hook payload: `partio _hook` (cmd/partio/hook.go) dispatches only the git hooks pre-commit, post-commit and pre-push, and a grep of cmd and internal for transcript_path and a Stop hook finds nothing. Partio finds the session itself under ~/.claude/projects (internal/agent/claude/find_session_dir.go), and post-commit already logs a warning and returns nil when no session can be read (internal/hooks/postcommit.go).
+
+## agent-help lists installed plugins and points at those that declare agent_help
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3180`
+- reason: `irrelevant`
+- note: The PR extends Entire's `entire agent-help` command to list the plugins in its managed plugin dir and to record `description` and `agent_help` from each plugin's `entire-plugin.yml` at install. Partio has no plugin system and no agent-help command: cmd/partio holds only local commands (enable, disable, status, explain, rewind, resume, prune, reset, clean, doctor, hook, version), and a grep of cmd and internal for plugin and agent_help finds nothing.
