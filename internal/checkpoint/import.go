@@ -33,10 +33,10 @@ type ImportResult struct {
 
 // Import copies the checkpoints named by ids from the checkpoint tree at
 // sourceRef (for example a fetched fork branch) into the local checkpoint
-// branch. Each source checkpoint must be a tree of regular-file blobs and
-// trees whose metadata.json carries the same ID; it is grafted unchanged, so
-// its tree hash is identical to the source's. Checkpoints already present
-// locally are never overwritten.
+// branch. ids must be distinct, valid checkpoint IDs. Each source checkpoint
+// must be a tree of regular-file blobs and trees whose metadata.json carries
+// the same ID; it is grafted unchanged, so its tree hash is identical to the
+// source's. Checkpoints already present locally are never overwritten.
 //
 // All new checkpoints land in one commit parented only on the current local
 // tip, with the message message(synced). No commit is written when nothing
@@ -62,13 +62,7 @@ func (s *Store) Import(sourceRef string, ids []string, message func(synced []str
 	type graft struct{ id, tree string }
 	var grafts []graft
 	var results []ImportResult
-	seen := map[string]bool{}
 	for _, id := range ids {
-		if seen[id] {
-			continue
-		}
-		seen[id] = true
-
 		res, tree, err := s.classify(sourceTree, localTree, id)
 		if err != nil {
 			return nil, err
@@ -123,10 +117,6 @@ func (s *Store) Import(sourceRef string, ids []string, message func(synced []str
 // branch does not exist yet.
 func (s *Store) classify(sourceTree, localTree, id string) (ImportResult, string, error) {
 	res := ImportResult{ID: id}
-	if !ValidID(id) {
-		res.Outcome, res.Reason = ImportRejected, "not a 12-character lowercase hex ID"
-		return res, "", nil
-	}
 	path := Shard(id) + "/" + Rest(id)
 
 	srcMode, srcType, srcHash, found, err := s.lookupEntry(sourceTree, path)
