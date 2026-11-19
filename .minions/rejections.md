@@ -493,3 +493,11 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3183`
 - reason: `irrelevant`
 - note: The PR fixes entireio-cli-issues #3181, already logged above as irrelevant: Entire's agent-side Stop/stop-failure hook failed when a Claude-compatible runtime such as Devin sent an empty `transcript_path`. Partio installs no agent-side hooks and has no lifecycle events: `partio _hook` (cmd/partio/hook.go) dispatches only pre-commit, post-commit and pre-push, and a grep of cmd and internal for transcript_path and TurnEnd finds nothing. Partio discovers the session itself, and when no session can be read post-commit logs a warning and goes on without failing the commit (internal/hooks/postcommit.go, the FindLatestSession call).
+
+## entire mcp answers the MCP server/discover probe with versions, capabilities and server identity
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3184`
+- reason: `irrelevant`
+- note: The PR fixes entireio-cli-issues #3121, which an earlier run already logged as irrelevant (see "issues #2932–#3143" above). It adds a `server/discover` handler to Entire's `entire mcp` server. Partio has no MCP server: cmd/partio holds only local commands (enable, disable, status, explain, rewind, resume, prune, reset, clean, doctor, hook, version), and a grep of cmd and internal for mcp and server/discover finds nothing.
