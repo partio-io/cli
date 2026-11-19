@@ -21,6 +21,8 @@ Follow existing code patterns and conventions. Read the relevant code before mak
 
 After implementation, run the appropriate checks (`make test`, `make lint`) and fix any failures.
 
+Never add, change or delete a file under `.github/workflows/`. GitHub refuses to take that push from the build token, also for a `.yml.example` file, and the whole build fails at the push. Put a workflow template under `docs/workflows/`, for example `docs/workflows/<name>.yml`, also when the issue or the slice plan names a path under `.github/workflows/`. Say in the PR description where the template is and that a maintainer copies it to `.github/workflows/` to use it.
+
 ## Agents
 
 ### implement

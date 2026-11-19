@@ -473,7 +473,11 @@ be tuned but the general structure must hold):
 4. `## Implementation Decisions` — modules built or modified, module
    interfaces, architectural decisions, schema/API contracts, specific
    interactions. Do NOT include file paths or code snippets that may
-   rot.
+   rot. The build cannot push a file under `.github/workflows/`: GitHub
+   refuses it from the build token, also a `.yml.example` file. A
+   workflow template or example therefore lives under
+   `docs/workflows/`; say so, and never plan a change to a live
+   workflow file.
 5. `## Testing Decisions` — what makes a good test for this work,
    which modules will be tested, prior art for the tests. A helper that
    only tests use, such as a cache reset or a test override, lives in a
@@ -564,6 +568,11 @@ nothing calls yet. In particular:
   override, goes in a `_test.go` file of the same package. When the PRD
   puts such a helper in production code, the slice text puts it in the
   test file.
+- No slice adds, changes or deletes a file under `.github/workflows/`:
+  GitHub refuses the push of the build, also for a `.yml.example` file.
+  A workflow template goes under `docs/workflows/`, for example
+  `docs/workflows/<name>.yml`. When the PRD puts it under
+  `.github/workflows/`, the slice text puts it under `docs/workflows/`.
 
 Slice protocol:
 
