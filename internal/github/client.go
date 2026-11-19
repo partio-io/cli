@@ -12,7 +12,7 @@ import (
 // Client holds what every GitHub request needs.
 type Client struct {
 	BaseURL    string       // GitHub API root, e.g. https://api.github.com
-	Token      string       // sent as a bearer token
+	Token      string       // sent as a bearer token; empty sends no Authorization header
 	HTTPClient *http.Client // nil means http.DefaultClient
 }
 
@@ -35,7 +35,11 @@ func (e *StatusError) Error() string {
 // the method, the path, the status and up to 512 bytes of the body.
 func (c Client) Do(req *http.Request, out any) error {
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("Authorization", "Bearer "+c.Token)
+	// GitHub answers an empty bearer token with 401 even on public
+	// repositories, so an unauthenticated client sends no header at all.
+	if c.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+	}
 	client := c.HTTPClient
 	if client == nil {
 		client = http.DefaultClient

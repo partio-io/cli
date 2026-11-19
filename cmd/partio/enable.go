@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/partio-io/cli/internal/checkpoint"
 	"github.com/partio-io/cli/internal/config"
 	"github.com/partio-io/cli/internal/git"
 	githooks "github.com/partio-io/cli/internal/git/hooks"
@@ -246,37 +247,12 @@ func appendIgnoreLine(path, entry string) error {
 	return closeErr
 }
 
+// createCheckpointBranch creates the orphan checkpoint branch in the current
+// repository unless it already exists.
 func createCheckpointBranch() error {
-	const branchName = "partio/checkpoints/v1"
-
-	// Check if branch already exists
-	_, err := git.ExecGit("rev-parse", "--verify", branchName)
-	if err == nil {
-		return nil // already exists
-	}
-
-	// Create orphan branch with an empty initial commit using plumbing
-	// 1. Create empty tree
-	treeHash, err := git.ExecGit("hash-object", "-t", "tree", "/dev/null")
+	repoRoot, err := git.RepoRoot()
 	if err != nil {
-		// Alternative: write an empty tree
-		treeHash, err = git.ExecGit("mktree", "--missing")
-		if err != nil {
-			return fmt.Errorf("creating empty tree: %w", err)
-		}
+		return err
 	}
-
-	// 2. Create commit with no parent
-	commitHash, err := git.ExecGit("commit-tree", treeHash, "-m", "partio: initialize checkpoint storage")
-	if err != nil {
-		return fmt.Errorf("creating initial commit: %w", err)
-	}
-
-	// 3. Create the ref
-	_, err = git.ExecGit("update-ref", "refs/heads/"+branchName, commitHash)
-	if err != nil {
-		return fmt.Errorf("creating branch ref: %w", err)
-	}
-
-	return nil
+	return checkpoint.NewStore(repoRoot).InitBranch()
 }

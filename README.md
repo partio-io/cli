@@ -56,6 +56,7 @@ partio status
 | `partio rewind --list` | List all checkpoints |
 | `partio rewind --to <id>` | Restore to a checkpoint |
 | `partio explain <id>` | Show a checkpoint's details, including the functions, types and classes its diff added, removed, renamed or re-signed (Go and TypeScript/JavaScript) |
+| `partio sync-fork <pr>` | Copy the checkpoints a fork pull request references into the local checkpoint branch (see [Fork Contributions](#fork-contributions)) |
 | `partio doctor` | Check installation health |
 | `partio reset` | Reset the checkpoint branch |
 | `partio clean` | Remove orphaned data |
@@ -85,6 +86,52 @@ Checkpoints are still written to the local `partio/checkpoints/v1` branch. Witho
 Repository settings outrank the global config, so a repository whose `.partio/settings.json` or `.partio/settings.local.json` sets `strategy_options.push_sessions: true` or `strategy_options.disable_trailers: false` is not in stealth mode. `partio enable --stealth` checks the effective config after writing the global file and prints a warning naming the file and key that override stealth, for example `.partio/settings.json sets strategy_options.push_sessions=true; stealth is not in effect in this repo`. It never edits repository settings to force stealth; change them yourself if you want stealth in that repository. `partio status` shows no `Mode:` line there.
 
 To leave stealth mode, edit `~/.config/partio/settings.json` and remove or change `push_sessions` and `disable_trailers` under `strategy_options`. If the checkpoint branch was pushed to `origin` before you turned stealth on, it stays on the remote until you delete it by hand.
+
+## Fork Contributions
+
+A commit made with partio carries a `Partio-Checkpoint` trailer, but the checkpoint it names lives on the `partio/checkpoints/v1` branch of the repository the contributor pushes to. For a pull request from a fork that is the fork, so `partio explain <id>` in the upstream repository cannot find it until the checkpoint is synced upstream. `partio sync-fork` does that sync. It only reads from the fork: it fetches the fork's checkpoint branch as data, copies just the checkpoints the pull request's commits reference, and never writes to the fork.
+
+### Contributors
+
+- Keep `strategy_options.push_sessions` set to `true` (the default). Do not use [stealth mode](#stealth-mode): it neither pushes the checkpoint branch nor adds trailers, so there is nothing to sync.
+- Push to your fork. On `git push`, partio pushes `partio/checkpoints/v1` to `origin`, which for a fork contributor is normally the fork. Where contributors push checkpoints may change (see #532 and #624).
+
+### Maintainers: automatic sync
+
+The workflow template [`docs/workflows/partio-sync-fork.yml`](docs/workflows/partio-sync-fork.yml) runs `partio sync-fork` whenever a fork pull request is opened, updated or reopened, then pushes `partio/checkpoints/v1`.
+
+1. Copy it to `.github/workflows/partio-sync-fork.yml` (workflow files must end in `.yml` or `.yaml` and live in `.github/workflows/` to run).
+2. Set `PARTIO_VERSION` at the top of the file to a Partio release that ships `sync-fork`. The job refuses to run with the placeholder, and it never installs `@latest`.
+3. On a public repository, add an Actions event policy that explicitly allows `pull_request_target` for this workflow. GitHub's default policy blocks `pull_request_target` on public repositories from 2026-12-02, and without the allow policy the workflow silently never runs. Private and internal repositories are not affected.
+
+The job asks for `contents: write`, to push the checkpoint branch, and `pull-requests: read`, to list the pull request's commits. `pull_request_target` runs with a token that can write to your repository, which is safe here because the job never runs fork code: it checks out only the base repository, installs a pinned Partio release, and reads the fork only as fetched git objects. Each copied checkpoint is checked before it is added: it must hold a `metadata.json` whose ID matches the trailer, and only regular files and directories (no symlinks, submodules or executables). A checkpoint that already exists upstream is never overwritten.
+
+Runs share one concurrency group, so they queue rather than cancel each other. A rejected push is retried after a re-fetch and re-sync, up to three times, and is never forced. On GitHub Enterprise Server, remove `queue: max` (it is not available there); the retry loop then guards racing pushes.
+
+### Maintainers: manual sync
+
+Without the workflow, sync a pull request by hand and push the result:
+
+```bash
+partio sync-fork https://github.com/<owner>/<repo>/pull/<n>   # or <owner>/<repo>#<n>
+git push origin partio/checkpoints/v1
+```
+
+Fetch the upstream branch first if your local copy is behind (see below). The command reads a GitHub token from `GH_TOKEN`, then `GITHUB_TOKEN`; without one it works on public repositories within GitHub's unauthenticated limit of 60 requests per hour. For GitHub Enterprise Server, set `GITHUB_API_URL` to your API root. It prints `synced N, already present M, conflicts C, missing K`, and exits 0 with a one-line reason when there is nothing to sync (not a fork, a deleted fork, a fork without a checkpoint branch, or no checkpoint trailers).
+
+### Reviewers
+
+Fetch the upstream checkpoint branch, then explain the checkpoint named in a commit's trailer:
+
+```bash
+git fetch origin partio/checkpoints/v1:partio/checkpoints/v1
+git log -1 --format='%(trailers:key=Partio-Checkpoint,valueonly)' <commit>
+partio explain <id>
+```
+
+`partio explain` reads only the local branch and needs no network access, so a synced fork checkpoint resolves exactly like a local one.
+
+Known limitation: if your local `partio/checkpoints/v1` has commits that the upstream branch does not (for example checkpoints from your own work that you have not pushed), the fetch fails as non-fast-forward. partio offers no automatic merge or force workaround for this. You can still read the upstream copy without touching your local branch: `git fetch origin` updates `origin/partio/checkpoints/v1`, and `git show origin/partio/checkpoints/v1:<shard>/<rest>/metadata.json` reads a checkpoint from it.
 
 ## Git Worktrees
 

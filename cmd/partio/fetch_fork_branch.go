@@ -1,0 +1,65 @@
+package main
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"log/slog"
+	"os/exec"
+	"strings"
+
+	"github.com/partio-io/cli/internal/git"
+)
+
+// syncForkRefPrefix is where fetched fork branches are parked. It sits
+// outside refs/heads/ so the data never shows up as a local branch.
+const syncForkRefPrefix = "refs/partio/sync-fork/"
+
+// fetchForkBranch fetches the checkpoint branch of the repository at
+// cloneURL into a temporary ref unique to this run. The fork is only ever
+// read. The returned cleanup deletes the ref and must be called on success
+// and on error alike; it is non-nil even when the fetch fails.
+func fetchForkBranch(dir, cloneURL string) (ref string, cleanup func(), err error) {
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		return "", func() {}, fmt.Errorf("generating temporary ref name: %w", err)
+	}
+	ref = syncForkRefPrefix + hex.EncodeToString(b)
+	cleanup = func() {
+		del := exec.Command("git", "update-ref", "-d", ref)
+		del.Dir = dir
+		if out, delErr := del.CombinedOutput(); delErr != nil {
+			slog.Warn("could not delete temporary ref", "ref", ref, "error", delErr, "output", strings.TrimSpace(string(out)))
+		}
+	}
+
+	refspec := "+refs/heads/" + git.CheckpointBranch + ":" + ref
+	// "--" keeps a hostile URL from being read as an option.
+	cmd := exec.Command("git", "fetch", "--no-tags", "--no-write-fetch-head", "--", cloneURL, refspec)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return ref, cleanup, fmt.Errorf("fetching %s from %s: %w: %s", git.CheckpointBranch, cloneURL, err, strings.TrimSpace(string(out)))
+	}
+	return ref, cleanup, nil
+}
+
+// forkHasCheckpointBranch reports whether the repository at cloneURL has a
+// checkpoint branch, so that an absent branch is told apart from a broken
+// fetch without parsing git's error text. It only reads the fork.
+func forkHasCheckpointBranch(dir, cloneURL string) (bool, error) {
+	// "--" keeps a hostile URL from being read as an option.
+	cmd := exec.Command("git", "ls-remote", "--exit-code", "--", cloneURL, "refs/heads/"+git.CheckpointBranch)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		return true, nil
+	}
+	// ls-remote --exit-code exits 2 when the remote answered but has no
+	// matching ref.
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ExitCode() == 2 {
+		return false, nil
+	}
+	return false, fmt.Errorf("checking %s on %s: %w: %s", git.CheckpointBranch, cloneURL, err, strings.TrimSpace(string(out)))
+}
