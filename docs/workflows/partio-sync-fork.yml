@@ -1,0 +1,146 @@
+# Partio: sync checkpoints from fork pull requests
+#
+# A template, not a live workflow. Copy it to
+# .github/workflows/partio-sync-fork.yml in the repository that receives
+# fork pull requests, and set PARTIO_VERSION below.
+#
+# When a fork pull request is opened, updated or reopened, this job runs
+# `partio sync-fork`, which reads the Partio-Checkpoint trailers of the
+# pull request's commits, fetches the fork's partio/checkpoints/v1 branch
+# as data, and copies only the referenced checkpoints into this
+# repository's partio/checkpoints/v1. The job then pushes that branch, so
+# reviewers can fetch it and run `partio explain <id>`.
+#
+# PUBLIC REPOSITORIES: GitHub's default Actions event policy blocks
+# `pull_request_target` on public repositories, enforced from 2026-12-02.
+# Without an event policy that explicitly allows `pull_request_target`
+# for this workflow, the job silently never runs. Add that allow policy
+# in the repository's (or organisation's) Actions settings, or skip this
+# workflow and sync by hand:
+#
+#   partio sync-fork <pr-url>
+#   git push origin partio/checkpoints/v1
+#
+# Private and internal repositories are not affected by that policy.
+#
+# Why `pull_request_target` is safe here: the job holds a token that can
+# write to this repository, so it must never run code from the fork. It
+# checks out only the base repository (no `ref:` pointing at the pull
+# request's head), installs a pinned Partio release, and treats the fork
+# purely as a source of git objects that are fetched and validated, never
+# checked out or executed. Nothing is ever written to the fork.
+
+name: Partio sync fork checkpoints
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+# contents: write to push partio/checkpoints/v1; pull-requests: read to
+# list the pull request's commits.
+permissions:
+  contents: write
+  pull-requests: read
+
+# Every run pushes the same branch, so runs are serialized and never
+# cancelled: a sync queued behind another must not be dropped.
+#
+# `queue` is available on github.com and GHEC only. On GHES remove it; the
+# default there can cancel a pending run when a newer one queues, and the
+# fetch, re-sync and push retry below is the safeguard for racing pushes.
+# A dropped run's checkpoints then sync on that pull request's next push,
+# or by hand.
+concurrency:
+  group: partio-checkpoints
+  cancel-in-progress: false
+  queue: max
+
+env:
+  # The Partio release to install: the first release that ships
+  # `sync-fork`, or a later one you have reviewed. Never `latest` — this
+  # job holds a write token and must not run unreviewed code.
+  PARTIO_VERSION: vX.Y.Z
+
+jobs:
+  sync:
+    # Same-repository pull requests already push their checkpoints here.
+    if: github.event.pull_request.head.repo.fork
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # The base repository only. Never set `ref:` to the pull request's
+      # head: fork content is read as data by `partio sync-fork`, never
+      # checked out.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Install partio
+        run: |
+          case "${PARTIO_VERSION}" in
+            "" | latest | vX.Y.Z)
+              echo "::error::set PARTIO_VERSION to a pinned Partio release tag"
+              exit 1
+              ;;
+          esac
+          go install "github.com/partio-io/cli/cmd/partio@${PARTIO_VERSION}"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      # sync-fork commits with the configured identity and never invents
+      # one; a fresh runner has none.
+      - name: Set git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # Fetch origin's checkpoint branch (when it exists), sync, push.
+      # A rejected push means another run pushed first: re-fetch, re-sync
+      # (sync-fork is idempotent) and push again, up to 3 attempts. The
+      # push is never forced; after the last attempt the job fails.
+      - name: Sync and push checkpoints
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+          branch=partio/checkpoints/v1
+
+          fetch_upstream() {
+            # Exit code 2 means origin has no such branch yet; any other
+            # failure is a real error and fails the job.
+            status=0
+            git ls-remote --exit-code origin "refs/heads/${branch}" >/dev/null || status=$?
+            case "${status}" in
+              0)
+                # Forced into the local branch only: it discards a local
+                # sync commit that lost the race, never anything remote.
+                git fetch --no-tags origin "+refs/heads/${branch}:refs/heads/${branch}"
+                ;;
+              2)
+                echo "origin has no ${branch} yet"
+                ;;
+              *)
+                echo "::error::git ls-remote origin failed (exit ${status})"
+                exit "${status}"
+                ;;
+            esac
+          }
+
+          for attempt in 1 2 3; do
+            fetch_upstream
+            partio sync-fork "${PR_URL}"
+            if ! git show-ref --verify --quiet "refs/heads/${branch}"; then
+              echo "nothing synced and no ${branch} to push"
+              exit 0
+            fi
+            if git push origin "${branch}"; then
+              exit 0
+            fi
+            echo "push rejected (attempt ${attempt}/3); re-fetching and re-syncing"
+          done
+          echo "::error::could not push ${branch} after 3 attempts"
+          exit 1
