@@ -1,0 +1,5 @@
+This execution failed: https://github.com/partio-io/cli/issues/43
+
+---
+
+yes
