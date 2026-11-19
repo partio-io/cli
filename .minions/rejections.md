@@ -477,3 +477,19 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3180`
 - reason: `irrelevant`
 - note: The PR extends Entire's `entire agent-help` command to list the plugins in its managed plugin dir and to record `description` and `agent_help` from each plugin's `entire-plugin.yml` at install. Partio has no plugin system and no agent-help command: cmd/partio holds only local commands (enable, disable, status, explain, rewind, resume, prune, reset, clean, doctor, hook, version), and a grep of cmd and internal for plugin and agent_help finds nothing.
+
+## Bump lipgloss, betterleaks, ogen, posthog-go and golang.org/x/crypto in the go-dependencies group
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3182`
+- reason: `irrelevant`
+- note: A Dependabot bump of Entire's own dependencies (lipgloss 2.1.1, betterleaks 1.10.1 for a brotli CVE, ogen 1.25.0, posthog-go 1.44.1, x/crypto 0.59.0). Partio depends on none of them: go.mod requires only github.com/google/uuid and github.com/spf13/cobra (plus mousetrap and pflag, indirect), and a grep of the Go sources for lipgloss, betterleaks, ogen-go, posthog and x/crypto finds nothing.
+
+## Lifecycle turn-end handler logs a warning and returns nil when the event carries no transcript path
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3183`
+- reason: `irrelevant`
+- note: The PR fixes entireio-cli-issues #3181, already logged above as irrelevant: Entire's agent-side Stop/stop-failure hook failed when a Claude-compatible runtime such as Devin sent an empty `transcript_path`. Partio installs no agent-side hooks and has no lifecycle events: `partio _hook` (cmd/partio/hook.go) dispatches only pre-commit, post-commit and pre-push, and a grep of cmd and internal for transcript_path and TurnEnd finds nothing. Partio discovers the session itself, and when no session can be read post-commit logs a warning and goes on without failing the commit (internal/hooks/postcommit.go, the FindLatestSession call).
