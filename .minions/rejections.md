@@ -501,3 +501,11 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3184`
 - reason: `irrelevant`
 - note: The PR fixes entireio-cli-issues #3121, which an earlier run already logged as irrelevant (see "issues #2932–#3143" above). It adds a `server/discover` handler to Entire's `entire mcp` server. Partio has no MCP server: cmd/partio holds only local commands (enable, disable, status, explain, rewind, resume, prune, reset, clean, doctor, hook, version), and a grep of cmd and internal for mcp and server/discover finds nothing.
+
+## Bring your own inference keys (Fireworks, Anthropic, OpenAI-compatible) for trail runners, skipping credit metering
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3186`
+- reason: `irrelevant`
+- note: The issue asks Entire to let orgs supply their own inference credentials for its hosted trail runners and preset Agents, so that runs bypass Entire's billed credits and are not paused on `credit_exhausted`. Partio runs no inference, hosts no runners and meters no credits: it is a local git-hook tool, cmd/partio holds only local commands (enable, disable, status, explain, rewind, resume, prune, reset, clean, doctor, hook, version), and a grep of cmd and internal for anthropic, openai, api_key, inference, fireworks and credit finds only a doc comment naming the Codex CLI detector (internal/agent/codex/codex.go) and a redaction pattern (internal/redact/redact.go). There are no provider credentials for Partio to configure.
