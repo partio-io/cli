@@ -349,3 +349,179 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #1882–#2073 (dependency updates, CI hang fix, trail backend retirement, dispatch routing, telemetry, release channel, OpenCode plugin, Cursor/Codex subagent fixes, search TUI changes, changelog PRs)`
 - reason: `irrelevant`
 - note: The bulk of PRs in this range are dependency version bumps, CI configuration fixes (e.g. #2072 apt hang), platform routing changes (e.g. #2046–#2051 cell targets, dispatch), telemetry (#2023–#2024), trail backend retirement (#2021, #2037), OpenCode plugin changes (#2018, #2027, #2053), Cursor/Codex subagent bug fixes (#2066–#2071), search TUI updates (#2022, #2044), and changelog/credit PRs (#2039, #2050, #2073). None of these map to Partio's domain of git hook-based session capture and checkpoint storage.
+
+## changelog 0.10.3–0.13.4: Entire forge and platform commands
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.10.3–0.13.4 (trails, project agents, service accounts, repo/mirror/clone/cluster/org/grant commands, git-remote-entire, dispatch, search, recap, activity, review, plugins such as graph/brain/rsl/investigate/stream, auth/login/logout/contexts/keyring, install.sh/install.ps1/release mirror, telemetry)`
+- reason: `irrelevant`
+- note: These are features of Entire's hosted forge and its control plane. Partio has no server, login, review, search or plugin system, and nothing in cmd/partio maps to them. They make up most of the changelog lines in this range.
+
+## changelog 0.10.3–0.13.4: agent integrations Partio does not have
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.10.3–0.13.4 (OpenCode 1/2, Pi, Antigravity, Factory Droid, Copilot CLI, Cursor, Gemini removal; Codex tool-result fields; subagent task records and SubagentStart/SubagentStop/StopFailure Claude hooks; Claude Code hook timeouts and ${CLAUDE_PROJECT_DIR} quoting; agent homes such as CLAUDE_CONFIG_DIR)`
+- reason: `irrelevant`
+- note: Partio registers only claude-code and codex (internal/agent/claude/register.go, internal/agent/codex/register.go). It installs no agent-side hooks, only git hooks, and has no subagent model. These fixes all assume agent-hook capture and transcript conversion that Partio does not do.
+
+## changelog 0.10.3–0.13.4: Entire storage backend and session-engine internals
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.10.3–0.13.4 (git-refs backend push chunking/queues, manual push policy, shadow-branch removal, legacy v1 migration, case-folded shard refs, partial-clone lazy fetch, per-ref locks, --no-optional-locks on git status, zombie-session sweep, write-ahead checkpoint IDs, full.jsonl staging release, prefix-reuse redaction, line attribution removal, session_token_usage)`
+- reason: `irrelevant`
+- note: Partio writes one orphan branch with plumbing in post-commit only. It has no per-checkpoint refs, shadow branches, turn-end writes, background sweeper or staging buffer, and it runs no git status. The overlapping ideas (outgoing checkpoints, checkpoint delete, redone-commit links, no-change sessions, token usage, enable commit listing, dangling trailer) are already proposed (#598, #461, #266, #753, #223, #808, #793, #815).
+
+## changelog 0.11.0–0.13.4: Entire PII, OPF and engine-specific redaction fixes
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.11.0–0.13.4 (PII ip/phone/address categories, OpenAI Privacy Filter, betterleaks engine bumps and multi-part rules, image data URI rule, blanking of injected system prompts, instruction files and session_context attachments)`
+- reason: `irrelevant`
+- note: Partio's redaction is the two layers in internal/redact (regex patterns plus entropy). It has no PII layer, OPF or betterleaks engine to fix. The new-pattern ideas from this range are already open (#784, #790, #805, #711, #796, #816, #830, #803). Blanking injected Claude context depends on Claude JSONL record types that no fixture or parser in this tree covers.
+
+## issues #2932–#3143: Entire forge, Windows test and agent-specific bugs
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #2932–#3143 (#2932, #2942, #2949, #2957, #2960, #2981, #2989, #2990, #3000, #3032 forge/plugins/web app; #3090–#3100 Windows test isolation; #3052, #3053 Windows process trees; #3058 keyring; #3059, #3128 OpenCode; #3121 MCP; #3130, #3132 token ledger; #3134 git-remote-entire; #2933, #2979, #3011, #3014, #3025, #3030, #3050, #3054, #3069, #3079, #3142 Entire session engine; #3081, #3111, #3126, #3139, #3143, #2976, #2977 Entire PII and redaction internals)`
+- reason: `irrelevant`
+- note: Each of these is a bug in a subsystem Partio does not have: the forge, plugins, Windows test harness, OpenCode, MCP, the token ledger, the remote helper, process-identity linking, stamp records, the session sweeper or the PII layer. Partio lists no untracked files and keeps one pre-commit state file per worktree. The items in this range with a Partio analog (#3029, #3120, #3138, #3077, #2951, #2965) matched existing proposals (#815, #711, #796, #786, #811).
+
+## pulls #3045–#3160: fixes for the issues above, Entire tests and dependency bumps
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3045–#3160 (fixes for the issues above in redact, strategy, hooks, opencode, codex, copilot, proclive, execx, osroot, git-remote-entire; trail/finding UI; e2e and Windows test fixes; betterleaks bump)`
+- reason: `irrelevant`
+- note: These PRs implement Entire's fixes for issues #2932–#3143 and changelog 0.13.x. Partio either lacks the subsystem, or the idea was already proposed or filed in this run: #3048 password flags (#711), #3046 hook chain re-wrap (#810), #3073/#3110/#3051 moved hook copies and Trunk launchers (no Partio counterpart), #3045 Codex worktree hook location (Partio installs no Codex hooks).
+
+## Session author shows 'Unknown author' on Entire-native repos with no GitHub mirror
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3162`
+- reason: `irrelevant`
+- note: The bug is in entire.com's session-summary enrichment, which resolves a forge username and has none to resolve for an Entire-native repository. Partio has no hosted session summary and no forge username lookup, and no command shows an author: grep for author in cmd/partio and internal/checkpoint finds nothing, and review #50 found that partio explain shows no author. Each checkpoint stores commit_hash, so the git author already comes from the commit.
+
+## Codex hooks: emit native commandWindows and keep user fields in .codex/hooks.json
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3163`
+- reason: `irrelevant`
+- note: The PR changes how Entire writes Codex's agent-side hook file, .codex/hooks.json, for Windows shells, and how it keeps user fields in that file. Partio installs only git hooks and writes no Codex hook file: grep for hooks.json, .codex/ and commandWindows in the Go sources finds nothing, and internal/agent/codex holds only process detection, session discovery and JSONL parsing.
+
+## Resolve repository identity through SSH host aliases (ssh -G) for remotes like git@github-work:owner/repo
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3164`
+- reason: `irrelevant`
+- note: The PR teaches Entire's forge-identity resolver (search, dispatch, trails, mirror inference, checkpoint push matching) to see through custom SSH host aliases. Partio never maps a remote URL to a forge or owner/repo identity: internal/git/has_remote.go only checks that `git remote get-url origin` succeeds, and internal/git/push_branch.go pushes the checkpoint branch by remote name, so git and OpenSSH resolve the alias themselves. A grep of cmd/partio and internal for ParseURL, ssh -G and sshCommand finds nothing. The only URL builder, internal/patchapply/remote.go, is minion tooling that composes an HTTPS URL from config.
+
+## grant add sends allow_invitation and reports invitations for Entire Core access grants
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3165`
+- reason: `irrelevant`
+- note: The PR changes how Entire's `org|project|repo grant add` commands call Entire Core, its hosted access-control API, so that an account outside the scope gets an invitation instead of direct access. Partio has no hosted service, no accounts and no access grants: cmd/partio holds only local commands (enable, disable, status, explain, rewind, resume, prune, reset, clean, doctor, hook, version), and a grep for grant, invite and invitation in cmd and internal finds only test comments in internal/premise.
+
+## Bump betterleaks, posthog-go and golang.org/x/crypto in the go-dependencies group
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3166`
+- reason: `irrelevant`
+- note: A Dependabot bump of Entire's own dependencies. Partio depends on none of them: go.mod requires only github.com/google/uuid and github.com/spf13/cobra (plus mousetrap and pflag, indirect), so there is no betterleaks, posthog-go or x/crypto to update.
+
+## pulls #3168–#3171, #3176–#3178: client-side chunking of large blobs in git-remote-entire (CDC chunker, xorb store, upload, dedup and fetch rebuild)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3168, #3169, #3170, #3171, #3176, #3177, #3178`
+- reason: `irrelevant`
+- note: The PRs build Entire's git remote helper, git-remote-entire. It splits large blobs into content-defined chunks, packs them into xorbs, uploads and dedups them against entiredb, and rebuilds blobs from recipes on fetch. Partio has no remote helper and no hosted git server: cmd/ holds only partio and the minion-* tools, and a grep of the Go sources for xorb and remotehelper finds nothing. Partio pushes its checkpoint branch with a plain `git push --no-verify` (internal/git/push_branch.go) and leaves transport to git.
+
+## Reference external agent plugin for hummin, a fork of the pi coding agent
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3173`
+- reason: `irrelevant`
+- note: The PR adds a Node script that implements Entire's external agent protocol for hummin, a personal fork of pi, and changes no Go code. Partio has no external agent protocol and no pi agent: internal/agent/registry.go registers only the compiled-in detectors claude-code and codex, and a grep for hummin and opencode in the Go sources finds nothing. The one PR in this batch with a Partio counterpart, entireio-cli-pulls #3174 (a Wait that blocks on stderr held by a grandchild), was filed as #841.
+
+## Bump betterleaks, ogen, posthog-go and golang.org/x/crypto in the go-dependencies group
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3179`
+- reason: `irrelevant`
+- note: A Dependabot bump of Entire's own dependencies (betterleaks 1.10.1 for a brotli CVE, ogen 1.25.0, posthog-go, x/crypto). Partio depends on none of them: go.mod requires only github.com/google/uuid and github.com/spf13/cobra (plus mousetrap and pflag, indirect), and a grep of the Go sources for betterleaks, ogen-go, posthog and x/crypto finds nothing.
+
+## hooks claude-code stop should exit 0, not 1, when a hook-compat runtime sends no transcript_path
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3181`
+- reason: `irrelevant`
+- note: The bug is in Entire's Claude Code agent-side Stop hook, which reads `transcript_path` from the payload that runtimes such as Devin send on stdin. Partio installs no agent-side hooks and reads no hook payload: `partio _hook` (cmd/partio/hook.go) dispatches only the git hooks pre-commit, post-commit and pre-push, and a grep of cmd and internal for transcript_path and a Stop hook finds nothing. Partio finds the session itself under ~/.claude/projects (internal/agent/claude/find_session_dir.go), and post-commit already logs a warning and returns nil when no session can be read (internal/hooks/postcommit.go).
+
+## agent-help lists installed plugins and points at those that declare agent_help
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3180`
+- reason: `irrelevant`
+- note: The PR extends Entire's `entire agent-help` command to list the plugins in its managed plugin dir and to record `description` and `agent_help` from each plugin's `entire-plugin.yml` at install. Partio has no plugin system and no agent-help command: cmd/partio holds only local commands (enable, disable, status, explain, rewind, resume, prune, reset, clean, doctor, hook, version), and a grep of cmd and internal for plugin and agent_help finds nothing.
+
+## Bump lipgloss, betterleaks, ogen, posthog-go and golang.org/x/crypto in the go-dependencies group
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3182`
+- reason: `irrelevant`
+- note: A Dependabot bump of Entire's own dependencies (lipgloss 2.1.1, betterleaks 1.10.1 for a brotli CVE, ogen 1.25.0, posthog-go 1.44.1, x/crypto 0.59.0). Partio depends on none of them: go.mod requires only github.com/google/uuid and github.com/spf13/cobra (plus mousetrap and pflag, indirect), and a grep of the Go sources for lipgloss, betterleaks, ogen-go, posthog and x/crypto finds nothing.
+
+## Lifecycle turn-end handler logs a warning and returns nil when the event carries no transcript path
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3183`
+- reason: `irrelevant`
+- note: The PR fixes entireio-cli-issues #3181, already logged above as irrelevant: Entire's agent-side Stop/stop-failure hook failed when a Claude-compatible runtime such as Devin sent an empty `transcript_path`. Partio installs no agent-side hooks and has no lifecycle events: `partio _hook` (cmd/partio/hook.go) dispatches only pre-commit, post-commit and pre-push, and a grep of cmd and internal for transcript_path and TurnEnd finds nothing. Partio discovers the session itself, and when no session can be read post-commit logs a warning and goes on without failing the commit (internal/hooks/postcommit.go, the FindLatestSession call).
+
+## entire mcp answers the MCP server/discover probe with versions, capabilities and server identity
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3184`
+- reason: `irrelevant`
+- note: The PR fixes entireio-cli-issues #3121, which an earlier run already logged as irrelevant (see "issues #2932–#3143" above). It adds a `server/discover` handler to Entire's `entire mcp` server. Partio has no MCP server: cmd/partio holds only local commands (enable, disable, status, explain, rewind, resume, prune, reset, clean, doctor, hook, version), and a grep of cmd and internal for mcp and server/discover finds nothing.
+
+## Bring your own inference keys (Fireworks, Anthropic, OpenAI-compatible) for trail runners, skipping credit metering
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3186`
+- reason: `irrelevant`
+- note: The issue asks Entire to let orgs supply their own inference credentials for its hosted trail runners and preset Agents, so that runs bypass Entire's billed credits and are not paused on `credit_exhausted`. Partio runs no inference, hosts no runners and meters no credits: it is a local git-hook tool, cmd/partio holds only local commands (enable, disable, status, explain, rewind, resume, prune, reset, clean, doctor, hook, version), and a grep of cmd and internal for anthropic, openai, api_key, inference, fireworks and credit finds only a doc comment naming the Codex CLI detector (internal/agent/codex/codex.go) and a redaction pattern (internal/redact/redact.go). There are no provider credentials for Partio to configure.
+
+## Bump actions/setup-go from 7.0.0 to 7.1.0 in Entire's CI workflows
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3187`
+- reason: `irrelevant`
+- note: A Dependabot bump of a GitHub Action in Entire's own CI. It is not a feature in Partio's domain (git workflows, agent sessions, attribution, checkpoints), and the version range does not apply here: Partio's workflows pin the major tag `actions/setup-go@v5` (.github/workflows/checks.yml lines 54 and 95, .github/workflows/release.yml line 21), not the 7.x release Entire moved within.
+
+## Bump Entire's go-dependencies group (lipgloss, betterleaks, ogen, posthog-go, x/crypto, x/net)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3188`
+- reason: `irrelevant`
+- note: A Dependabot bump of Entire's own dependencies (lipgloss 2.1.1, betterleaks 1.10.1, ogen 1.25.0, posthog-go 1.44.1, x/crypto 0.59.0, x/net 0.63.0), the same set already logged for entireio-cli-pulls #3182 plus x/net. Partio depends on none of them: go.mod requires only github.com/google/uuid and github.com/spf13/cobra (plus mousetrap and pflag, indirect), and a grep of the Go sources for lipgloss, betterleaks, ogen-go, posthog, golang.org/x/crypto and golang.org/x/net finds nothing.
