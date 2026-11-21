@@ -509,3 +509,19 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-issues #3186`
 - reason: `irrelevant`
 - note: The issue asks Entire to let orgs supply their own inference credentials for its hosted trail runners and preset Agents, so that runs bypass Entire's billed credits and are not paused on `credit_exhausted`. Partio runs no inference, hosts no runners and meters no credits: it is a local git-hook tool, cmd/partio holds only local commands (enable, disable, status, explain, rewind, resume, prune, reset, clean, doctor, hook, version), and a grep of cmd and internal for anthropic, openai, api_key, inference, fireworks and credit finds only a doc comment naming the Codex CLI detector (internal/agent/codex/codex.go) and a redaction pattern (internal/redact/redact.go). There are no provider credentials for Partio to configure.
+
+## Bump actions/setup-go from 7.0.0 to 7.1.0 in Entire's CI workflows
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3187`
+- reason: `irrelevant`
+- note: A Dependabot bump of a GitHub Action in Entire's own CI. It is not a feature in Partio's domain (git workflows, agent sessions, attribution, checkpoints), and the version range does not apply here: Partio's workflows pin the major tag `actions/setup-go@v5` (.github/workflows/checks.yml lines 54 and 95, .github/workflows/release.yml line 21), not the 7.x release Entire moved within.
+
+## Bump Entire's go-dependencies group (lipgloss, betterleaks, ogen, posthog-go, x/crypto, x/net)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3188`
+- reason: `irrelevant`
+- note: A Dependabot bump of Entire's own dependencies (lipgloss 2.1.1, betterleaks 1.10.1, ogen 1.25.0, posthog-go 1.44.1, x/crypto 0.59.0, x/net 0.63.0), the same set already logged for entireio-cli-pulls #3182 plus x/net. Partio depends on none of them: go.mod requires only github.com/google/uuid and github.com/spf13/cobra (plus mousetrap and pflag, indirect), and a grep of the Go sources for lipgloss, betterleaks, ogen-go, posthog, golang.org/x/crypto and golang.org/x/net finds nothing.
