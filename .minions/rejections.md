@@ -533,3 +533,11 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3189`
 - reason: `irrelevant`
 - note: A second PR for entireio-cli-issues #3181, the same fix as entireio-cli-pulls #3183, which is already logged above as irrelevant: Entire's `handleLifecycleTurnEnd` now warns and returns nil when a Claude-compatible runtime sends an empty `transcript_path` to `entire hooks claude-code stop`. Partio installs no agent-side hooks and has no lifecycle events: `partio _hook` (cmd/partio/hook.go) dispatches only pre-commit, post-commit and pre-push, and a grep of cmd and internal for transcript_path and TurnEnd finds nothing.
+
+## Refresh stale Go API names, mise commands and tech-stack notes in Entire's developer docs
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3191`
+- reason: `irrelevant`
+- note: A docs-only PR against Entire's own developer documentation (.github/copilot-instructions.md, docs/architecture/agent-guide.md, docs/development/git-safety.md, docs/development/testing.md): it replaces removed helpers such as `HardResetWithProtection` and `paths.RepoRoot()`, adds `ctx` to `DetectPresence` and `ChunkTranscript` examples, and drops a non-existent `mise run lint:full` task. None of those files or symbols exist here: .github holds only workflows, docs holds only minion design notes, and a grep of the Go and Markdown sources for HardResetWithProtection, WorktreeRoot and "mise run" finds nothing. It proposes no feature in Partio's domain.
