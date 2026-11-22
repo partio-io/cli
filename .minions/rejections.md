@@ -525,3 +525,11 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3188`
 - reason: `irrelevant`
 - note: A Dependabot bump of Entire's own dependencies (lipgloss 2.1.1, betterleaks 1.10.1, ogen 1.25.0, posthog-go 1.44.1, x/crypto 0.59.0, x/net 0.63.0), the same set already logged for entireio-cli-pulls #3182 plus x/net. Partio depends on none of them: go.mod requires only github.com/google/uuid and github.com/spf13/cobra (plus mousetrap and pflag, indirect), and a grep of the Go sources for lipgloss, betterleaks, ogen-go, posthog, golang.org/x/crypto and golang.org/x/net finds nothing.
+
+## Claude Code stop hook exits 0 when transcript_path is empty
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3189`
+- reason: `irrelevant`
+- note: A second PR for entireio-cli-issues #3181, the same fix as entireio-cli-pulls #3183, which is already logged above as irrelevant: Entire's `handleLifecycleTurnEnd` now warns and returns nil when a Claude-compatible runtime sends an empty `transcript_path` to `entire hooks claude-code stop`. Partio installs no agent-side hooks and has no lifecycle events: `partio _hook` (cmd/partio/hook.go) dispatches only pre-commit, post-commit and pre-push, and a grep of cmd and internal for transcript_path and TurnEnd finds nothing.
