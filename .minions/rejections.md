@@ -549,3 +549,43 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-issues #3192`
 - reason: `irrelevant`
 - note: A request for Entire's `entire review` command to post its findings to an explicitly named trail (and to exit non-zero when posting fails), so a review run in a detached worktree can still post. Partio has neither concept: its user commands (cmd/partio: clean, cleanup, disable, doctor, enable, explain, prune, reset, resume, rewind, status, version, plus the internal `_hook`) include no review command, and a grep of cmd/partio, internal/hooks and internal/checkpoint for trail and findings finds nothing. The only review code here (internal/review, cmd/minion-review) is the minion proposal-review tooling, which posts to GitHub issues, not to trails.
+
+## Store every checkpoint ref under its lowercase shard on case-insensitive filesystems, and rename refs that fold
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3193`
+- reason: `irrelevant`
+- note: Entire's ref backend keeps one git ref per checkpoint, sharded by its ID's first two characters, and mixes lowercase hex IDs with uppercase ULIDs, so on macOS or Windows one shard can be spelled `6b` and `6B` and the loose and packed refs fold. Partio has none of that: every checkpoint lives in the tree of one orphan branch, written with a single `update-ref refs/heads/<checkpoint branch>` (internal/checkpoint/write.go line 111, prune.go line 116), its shard is a tree directory inside that commit and never a ref or a file on disk, and `NewID` (internal/checkpoint/checkpoint.go) makes only lowercase hex IDs. A grep of internal and cmd for ignorecase and pack-refs finds nothing.
+
+## Guard both refs of a diverged split checkpoint under manual push
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3194`
+- reason: `irrelevant`
+- note: A follow-up to entireio-cli-pulls #3193: Entire's pre-push policy that refuses an outer push of commits still held in its checkpoint push queue now reads the tips of both shard spellings of a checkpoint ref (`SpellingTips`). Partio has no per-checkpoint refs, no shard spellings and no push queue: pre-push pushes the one checkpoint branch (internal/hooks/prepush.go), and a grep of internal and cmd for a push queue or ref spelling finds nothing.
+
+## Add `entire review --trail` and `entire review --findings <handle> --json`
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3195`
+- reason: `irrelevant`
+- note: The PR that implements entireio-cli-issues #3192, already logged above as irrelevant: it posts `entire review` findings to a named trail and prints a saved review run's findings as JSON. Partio has no review command, no trails and no saved review runs: cmd/partio holds clean, cleanup, disable, doctor, enable, explain, prune, reset, resume, rewind, status and version plus the internal `_hook`, and the only review code (internal/review, cmd/minion-review) is the minion proposal-review tooling.
+
+## Bump actions/create-github-app-token from 3.3.0 to 3.4.0 in Entire's CI workflows
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3196`
+- reason: `irrelevant`
+- note: A Dependabot bump of a GitHub Action in Entire's own CI. It is not a feature in Partio's domain, and Partio does not use the action: a grep of .github for create-github-app-token finds nothing.
+
+## Bump Entire's go-dependencies group (bubbles, bubbletea, lipgloss, betterleaks, x/ansi, ogen, posthog-go, x/crypto, x/net)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3197`
+- reason: `irrelevant`
+- note: A Dependabot bump of Entire's own dependencies, the set already logged for entireio-cli-pulls #3188 plus the charm.land bubbles, bubbletea and charmbracelet x/ansi modules. Partio depends on none of them: go.mod requires only github.com/google/uuid and github.com/spf13/cobra (plus mousetrap and pflag, indirect), and a grep of the Go sources for bubbletea, bubbles, charmbracelet, lipgloss, betterleaks, ogen-go, posthog and golang.org/x/ finds nothing.
