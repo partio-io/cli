@@ -541,3 +541,11 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3191`
 - reason: `irrelevant`
 - note: A docs-only PR against Entire's own developer documentation (.github/copilot-instructions.md, docs/architecture/agent-guide.md, docs/development/git-safety.md, docs/development/testing.md): it replaces removed helpers such as `HardResetWithProtection` and `paths.RepoRoot()`, adds `ctx` to `DetectPresence` and `ChunkTranscript` examples, and drops a non-existent `mise run lint:full` task. None of those files or symbols exist here: .github holds only workflows, docs holds only minion design notes, and a grep of the Go and Markdown sources for HardResetWithProtection, WorktreeRoot and "mise run" finds nothing. It proposes no feature in Partio's domain.
+
+## Let `entire review --trail` post review findings to a named trail from a detached worktree
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3192`
+- reason: `irrelevant`
+- note: A request for Entire's `entire review` command to post its findings to an explicitly named trail (and to exit non-zero when posting fails), so a review run in a detached worktree can still post. Partio has neither concept: its user commands (cmd/partio: clean, cleanup, disable, doctor, enable, explain, prune, reset, resume, rewind, status, version, plus the internal `_hook`) include no review command, and a grep of cmd/partio, internal/hooks and internal/checkpoint for trail and findings finds nothing. The only review code here (internal/review, cmd/minion-review) is the minion proposal-review tooling, which posts to GitHub issues, not to trails.
