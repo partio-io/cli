@@ -589,3 +589,19 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3197`
 - reason: `irrelevant`
 - note: A Dependabot bump of Entire's own dependencies, the set already logged for entireio-cli-pulls #3188 plus the charm.land bubbles, bubbletea and charmbracelet x/ansi modules. Partio depends on none of them: go.mod requires only github.com/google/uuid and github.com/spf13/cobra (plus mousetrap and pflag, indirect), and a grep of the Go sources for bubbletea, bubbles, charmbracelet, lipgloss, betterleaks, ogen-go, posthog and golang.org/x/ finds nothing.
+
+## Let external agents declare a built-in transcript format, and unwrap Codex shell exit-code envelopes
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3198`
+- reason: `irrelevant`
+- note: Entire's external-agent protocol gains an optional `transcript_format` field in `info`, so plugin agents can reuse the CLI's built-in transcript converters; the Codex converter also reads the `{"output","metadata":{"exit_code"}}` envelope of shell tool output. Partio has no external-agent protocol: its only agents are the built-in `claude-code` and `codex` detectors registered in internal/agent/*/register.go. Its Codex parser (internal/agent/codex/parse_jsonl.go) reads only `message` response items and never parses tool calls or their output, so there is no exit-code envelope to unwrap.
+
+## Stop `entire review`'s judge phase hanging on a terminal background-colour probe and leaving the terminal raw
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3201`
+- reason: `irrelevant`
+- note: A fix to Entire's multi-agent `entire review` dashboard, where a termenv background-colour query raced the Bubble Tea input loop. Partio has no review command and no TUI: go.mod requires only github.com/google/uuid and github.com/spf13/cobra, and a grep of cmd and internal for termenv or bubbletea finds nothing.
