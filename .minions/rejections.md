@@ -605,3 +605,67 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3201`
 - reason: `irrelevant`
 - note: A fix to Entire's multi-agent `entire review` dashboard, where a termenv background-colour query raced the Bubble Tea input loop. Partio has no review command and no TUI: go.mod requires only github.com/google/uuid and github.com/spf13/cobra, and a grep of cmd and internal for termenv or bubbletea finds nothing.
+
+## Print rate-limited per-turn progress lines during a long history import with redirected output
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3202`
+- reason: `irrelevant`
+- note: Asks for opt-in plain progress lines (`session 1/184: processed 901/1239 turns`) from Entire's `entire import codex` when stdout is redirected. Partio has no history import: cmd/partio holds clean, cleanup_sessions, disable, doctor, enable, explain, prune, reset, resume, rewind, status and version plus the internal `_hook`, and none imports past agent sessions. Checkpoints are made only by the post-commit hook, one per commit, so there is no long-running import to report progress on.
+
+## Reuse session-invariant work across the turn checkpoints of a Codex history import
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3203`
+- reason: `irrelevant`
+- note: A performance request for Entire's Codex importer, which writes one checkpoint per past turn and re-sanitizes, re-chunks and re-hashes the full transcript for each. Partio has no importer (see entireio-cli-issues #3202 above) and writes one checkpoint per commit from the post-commit hook (`Store.Write` in internal/checkpoint/write.go), with no transcript chunking and no per-turn checkpoints, so there is no repeated per-turn work to reuse.
+
+## Keep Entire's turn-start context for every OpenCode model call in a turn, not just the title call
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3204`
+- reason: `irrelevant`
+- note: A fix to Entire's OpenCode plugin so text that Entire injects at turn start reaches the agent's model calls, not only OpenCode's title generator. Partio supports only the `claude` and `codex` agents (internal/agent/claude, internal/agent/codex), has no OpenCode integration, and injects nothing into an agent at turn start: a grep of cmd and internal for additionalContext, UserPromptSubmit, SessionStart and turn start finds nothing.
+
+## Mark capture degraded when the turn-end git status scan fails for any reason, not only on a budget breach
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3205`
+- reason: `irrelevant`
+- note: Entire's agent lifecycle walks `git status` at turn start and turn end to find changed files, and persists a `CaptureDegradedAt` marker that `entire status` warns about; this PR sets the marker on any failed walk. Partio has no turn lifecycle, no status scans and no degraded-capture marker: its hooks are pre-commit, post-commit and pre-push (internal/hooks), and a grep of cmd and internal for degraded or a `git status` call finds only a test in cmd/partio/enable_stealth_test.go.
+
+## Resolve a checkpoint's sessions by the root sessions list, not by folder position, when session folders have gaps
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3206`
+- reason: `irrelevant`
+- note: Entire's checkpoints hold several numbered session folders listed in a root `sessions[]` array, and older CLIs left gaps (0, 2, 3) that positional readers misread. Partio writes exactly one session folder per checkpoint, always named `0` (internal/checkpoint/write.go builds the checkpoint tree from `metadata.json` and the single subtree `0`), keeps no sessions list in its root metadata, and every reader reads `/0/` directly (internal/checkpoint/read.go, cmd/partio/rewind.go). A gap cannot arise.
+
+## Update Entire's go-git and go-billy dependencies to the latest v6 main
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3207`
+- reason: `irrelevant`
+- note: A dependency bump in Entire's go.mod. Partio does not use go-git: it drives git through the git binary (git plumbing via `ExecGit` and `Store.git`), and go.mod requires only github.com/google/uuid and github.com/spf13/cobra.
+
+## List installed plugin commands in `entire --help`
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3208`
+- reason: `irrelevant`
+- note: Adds a Plugin Commands section to Entire's root help, built from managed plugin manifests. Partio has no plugin system: cmd/partio registers only its built-in Cobra commands, and a grep of cmd and internal for plugin finds only test titles in internal/review/dupes_ranked_test.go.
+
+## Bump slackapi/slack-github-action from 4.0.0 to 4.1.0 in Entire's CI
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3209`
+- reason: `irrelevant`
+- note: A Dependabot bump of a GitHub Action in Entire's own CI. It is not a feature in Partio's domain, and Partio does not use the action: a grep of .github for slack finds nothing.
