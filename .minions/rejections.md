@@ -725,3 +725,35 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3216`
 - reason: `irrelevant`
 - note: Hardens the "couldn't reach the remote" line Entire prints from git's stderr during its pre-push checkpoint flush. Partio prints no such line and does not classify push errors: internal/hooks/prepush.go only logs `could not push checkpoint branch` with the error via slog.Warn, and `execGit` captures stdout only; a grep for unreachable and "failed to connect" finds no hook code.
+
+## After an agent pushes a branch with a trail, continue its turn until the trail's review findings arrive
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3217`
+- reason: `irrelevant`
+- note: Answers Entire's agent stop hook with a continuation that waits on server-side trail reviews (`entire trail finding wait`). Partio has no trails, no hosted review agents and no agent stop hook: it installs git hooks only, and a grep of cmd/partio and internal for trail (outside commit trailers), stop_hook and "decision" finds nothing.
+
+## Report an error when an explicit push of queued checkpoint refs stops early and leaves refs queued
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3218`
+- reason: `irrelevant`
+- note: Fixes Entire's chunked flush of a queue of per-checkpoint refs (`PushQueuedCheckpointRefs`, used by `entire doctor migrate`). Partio keeps no ref queue and pushes no batches: internal/hooks/prepush.go pushes the single branch `partio/checkpoints/v1` with `git.PushBranch` (internal/git/push_branch.go, one `git push --no-verify`), and a grep of cmd/partio and internal for queue finds nothing.
+
+## Let `entire review` run isolated reviewers without the checkout's agent hooks, and stop Codex firing Entire hooks twice
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3219`
+- reason: `irrelevant`
+- note: Changes the gating of Entire's multi-agent `entire review` profiles and disables duplicate Entire handlers in the user's Codex hook config. Partio ships no review command (cmd/partio holds enable, disable, status, rewind, resume, explain, doctor, prune, reset, clean, cleanup-sessions, hook and version), supports only Claude Code, and installs no agent hooks, so neither problem can arise.
+
+## Accept `https://entire.com/...` URLs wherever a repo ref is typed
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3220`
+- reason: `irrelevant`
+- note: Canonicalizes pasted web-app URLs for Entire's hosted repo, grant, mirror and service-account commands. Partio has no hosted service and no command that takes a repo ref; it works only on the local repository and its `origin` remote.
