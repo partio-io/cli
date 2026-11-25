@@ -669,3 +669,59 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3209`
 - reason: `irrelevant`
 - note: A Dependabot bump of a GitHub Action in Entire's own CI. It is not a feature in Partio's domain, and Partio does not use the action: a grep of .github for slack finds nothing.
+
+## Project list shows a reusable `et/<name>` / `gh/<owner>` reference, and `--project` accepts project IDs
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3210`
+- reason: `irrelevant`
+- note: Changes Entire's control-plane project and trail commands, which talk to Entire's hosted Core service. Partio has no hosted service, no projects and no `--project` flag: cmd/partio holds only enable, disable, status, rewind, resume, explain, doctor, prune, reset, clean, cleanup-sessions, hook and version.
+
+## Plugin runner waits for a plugin the terminal already sent Ctrl-C to, instead of killing it after 5 s
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3211`
+- reason: `irrelevant`
+- note: Tunes signal forwarding and `cmd.WaitDelay` for Entire's external plugin commands. Partio has no plugin system and never sets `WaitDelay`: a grep of cmd and internal for WaitDelay and plugin finds no runtime code.
+
+## Control-plane project commands accept `et/<name>` and refuse `gh/<owner>` mirror projects
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3212`
+- reason: `irrelevant`
+- note: A follow-up to #3210 for Entire's hosted project, repo, grant and service-account commands. Partio has none of these commands and no hosted control plane.
+
+## `entire trail finding list --wait` polls until a trail's review agents finish
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3213`
+- reason: `irrelevant`
+- note: Waits on Entire's server-side trail review runs. Partio has no trails, no server-side review agents and no findings API; it only captures sessions into checkpoints on a local orphan branch.
+
+## Keep the Ctrl+O drill-in hint in the review dashboard footer while the judge runs
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3214`
+- reason: `irrelevant`
+- note: Footer text in Entire's multi-agent `entire review` TUI. Partio ships no review command or TUI; a grep of cmd and internal for drill and judge finds nothing.
+
+## Give plink `-batch` instead of OpenSSH `-o BatchMode=yes` on non-interactive checkpoint pushes
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3215`
+- reason: `irrelevant`
+- note: Fixes Entire's `WithNonInteractiveSSH`, which appended OpenSSH-only options that plink rejects. Partio adds no SSH options at all: internal/git/push_branch.go runs plain `git push --no-verify <remote> <branch>` through `execGit` (internal/git/git.go), which sets no environment, and a grep of the Go sources for BatchMode, GIT_SSH and sshCommand finds nothing. The bug cannot arise here.
+
+## Strip bidi/format characters from the printed unreachable-remote line, and stop reading keyring errors as unreachable
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3216`
+- reason: `irrelevant`
+- note: Hardens the "couldn't reach the remote" line Entire prints from git's stderr during its pre-push checkpoint flush. Partio prints no such line and does not classify push errors: internal/hooks/prepush.go only logs `could not push checkpoint branch` with the error via slog.Warn, and `execGit` captures stdout only; a grep for unreachable and "failed to connect" finds no hook code.
