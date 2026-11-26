@@ -757,3 +757,11 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3220`
 - reason: `irrelevant`
 - note: Canonicalizes pasted web-app URLs for Entire's hosted repo, grant, mirror and service-account commands. Partio has no hosted service and no command that takes a repo ref; it works only on the local repository and its `origin` remote.
+
+## Show Entire-native Change stacks in `entire trail stack` output, with a PR number only when one exists
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3222`
+- reason: `irrelevant`
+- note: Changes how Entire's hosted trail/Change stacks are listed and makes their `pr_number` nullable. Partio has no hosted service, no trails and no stack command: cmd/partio holds clean, cleanup-sessions, disable, doctor, enable, explain, hook, prune, reset, resume, rewind, status and version, and the only Go hits for stack or PRNumber are in the minion tooling (cmd/minion-*, internal/auditgate, internal/patchapply, internal/repairround), not in the product.
