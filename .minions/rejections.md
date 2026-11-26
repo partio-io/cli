@@ -765,3 +765,35 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3222`
 - reason: `irrelevant`
 - note: Changes how Entire's hosted trail/Change stacks are listed and makes their `pr_number` nullable. Partio has no hosted service, no trails and no stack command: cmd/partio holds clean, cleanup-sessions, disable, doctor, enable, explain, hook, prune, reset, resume, rewind, status and version, and the only Go hits for stack or PRNumber are in the minion tooling (cmd/minion-*, internal/auditgate, internal/patchapply, internal/repairround), not in the product.
+
+## Stop `entire mcp` on the first SIGTERM while its host keeps stdin open
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3228`
+- reason: `irrelevant`
+- note: Reports that Entire's MCP server stays blocked in a stdin read after the first SIGTERM. Partio runs no MCP server and no long-lived stdin loop: a grep for mcp, jsonrpc or json-rpc in cmd/partio and the product packages under internal finds nothing, and every partio command is a one-shot cobra command or a git hook.
+
+## Interrupt the MCP server's blocked input read on cancellation so one SIGTERM shuts it down
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3229`
+- reason: `irrelevant`
+- note: The fix for entireio/cli#3228: gives Entire's MCP server a closeable, cancellable stdin. Partio has no MCP server (a grep for mcp and jsonrpc in cmd/partio and the product packages under internal finds nothing), so there is no blocked read to interrupt.
+
+## Choose which repositories global enable tracks (`entire track`: org rule, deny list, picker)
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3226`
+- reason: `irrelevant`
+- note: Narrows Entire's global enable, which records every git repository the user works in, to chosen orgs or repos. Partio has no global enable: `partio enable` installs git hooks into the current repository only (cmd/partio/enable.go calls githooks.Install(repoRoot)), and `--stealth` writes only push and trailer options to the global config. There is no machine-wide recording to narrow.
+
+## Manage org teams and grant project or repo access to `team:<name>` grantees
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3224`
+- reason: `irrelevant`
+- note: Adds team CRUD and team grants against Entire's hosted Core API. Partio has no hosted service, no orgs, no access grants and no API client; cmd/partio holds clean, cleanup-sessions, disable, doctor, enable, explain, hook, prune, reset, resume, rewind, status and version.
