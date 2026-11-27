@@ -797,3 +797,35 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3224`
 - reason: `irrelevant`
 - note: Adds team CRUD and team grants against Entire's hosted Core API. Partio has no hosted service, no orgs, no access grants and no API client; cmd/partio holds clean, cleanup-sessions, disable, doctor, enable, explain, hook, prune, reset, resume, rewind, status and version.
+
+## Keep commit-less condensation from deleting a newer turn's staged transcript and prompt
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-issues #3241`
+- reason: `irrelevant`
+- note: Reports a race in Entire's commit-less condensation, which deletes staged `full.jsonl` and `prompt.txt` copies by path after a newer turn has republished them. Partio stages no transcript copies and has no commit-less condensation: post-commit reads Claude's JSONL straight from the agent's session directory (`claude.ReadRawJSONL(sessionPath)` in internal/hooks/postcommit.go), and the only file deletions in the product code are the pre-commit state file, the session's `current.json`, hook scripts and `partio disable --remove-data`.
+
+## Check staged-file ownership before condensation cleanup, and lease a hook's publication until its turn state is saved
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3242`
+- reason: `irrelevant`
+- note: The fix for entireio/cli#3241, touching Entire's lifecycle staging and condensation cleanup. Partio has neither a staged transcript buffer nor TurnStart/Stop lifecycle hooks, so there is no published copy to protect and no cleanup to reorder.
+
+## Add `--web` flags that open repo, trail and agent-run views in the browser
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3236`
+- reason: `irrelevant`
+- note: Draft trail PR adding browser-open flags to Entire's hosted `repo view`, `trail show` and `project agent run show`. Its closed siblings #3233 to #3238 carry the same branches. Partio has no hosted service and none of these commands; cmd/partio holds clean, cleanup-sessions, disable, doctor, enable, explain, hook, prune, reset, resume, rewind, status and version.
+
+## Release notes for Entire 0.13.5
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3243`
+- reason: `irrelevant`
+- note: A CHANGELOG.md-only draft that collects the 0.13.5 notes from pull requests already numbered below this cursor and already read by earlier runs. It changes no code and proposes nothing of its own; the CHANGELOG on main still ends at 0.13.4, so the changelog source has no new version either.
