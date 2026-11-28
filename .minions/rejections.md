@@ -829,3 +829,59 @@ this file is the only record that the idea was seen at all.
 - source: `entireio-cli-pulls #3243`
 - reason: `irrelevant`
 - note: A CHANGELOG.md-only draft that collects the 0.13.5 notes from pull requests already numbered below this cursor and already read by earlier runs. It changes no code and proposes nothing of its own; the CHANGELOG on main still ends at 0.13.4, so the changelog source has no new version either.
+
+## Show a draft / ready-for-review line for each change in `entire trail show`
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.13.5 / PR #3086`
+- reason: `irrelevant`
+- note: Adds review readiness to Entire's hosted trails, which have approval gates. Partio has no trails, no review gates and no hosted service: a grep for trail or grant in cmd/partio finds nothing, and its commands are clean, cleanup-sessions, disable, doctor, enable, explain, hook, prune, reset, resume, rewind, status and version.
+
+## Collapse project and repo `grant list` to one row per grantee with its strongest role
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.13.5 / PR #3227`
+- reason: `irrelevant`
+- note: Changes the table of Entire's hosted access grants. Partio has no access grants, roles or API client, so there is no grant table to collapse.
+
+## Show a spinner while `repo|org|project|service-account delete` waits on the server
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.13.5 / PR #3240`
+- reason: `irrelevant`
+- note: A progress spinner for Entire's hosted delete calls, including the `--cascade` wait. Partio has none of these commands and makes no server calls from cmd/partio; `partio prune` and `partio reset` act on the local checkpoint branch with git plumbing.
+
+## Externalize Codex-generated images and redact the rest of the image record
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.13.5 / PR #3151`
+- reason: `irrelevant`
+- note: Fixes Codex image records under Entire's existing `redaction.externalize_images` option. Partio has no image externalization to fix: a grep for externaliz or drop_images over the Go tree finds nothing, and the Codex parser (internal/agent/codex/parse_jsonl.go) reads only session_meta, user_message, agent_message, token_count and message records.
+
+## Streaming Codex rollout adapter in the transcript library, and E2E resume tests from `drop_images` checkpoints
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.13.5 housekeeping / PRs #2953 and #3153`
+- reason: `irrelevant`
+- note: Internal work on Entire's shared transcript library and its multi-agent end-to-end suite. Partio has no live transcript reader and no `drop_images` checkpoints, and the two items propose no user-facing behaviour.
+
+## Remaining 0.13.5 entries whose pull requests earlier runs already read
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli changelog 0.13.5 (PRs #3165, #3220, #3208, #3193, #3194, #3211, #3222, #3201, #3214, #3206, #3205)`
+- reason: `irrelevant`
+- note: Each of these changelog bullets describes a pull request numbered below the pulls cursor, and each one already has its own entry in this log under `entireio-cli-pulls`. The release notes add nothing to those pull requests, so they are not judged a second time. The other 0.13.5 bullets are logged above, except two: the escape-sequence stripping of #3221 and #3231 is already proposed in partio-io/cli#849, and the prek hook chaining of #3028 became the proposal partio-io/cli#852.
+
+## List installed plugins that declare agent guidance in `entire agent-help`
+
+<!-- partio:rejection:v1 -->
+
+- source: `entireio-cli-pulls #3244`
+- reason: `irrelevant`
+- note: Reads an `agent_help` flag from Entire's plugin manifest and names those plugins in `entire agent-help`. Partio has no plugin system and no agent-help command; cmd/partio holds clean, cleanup-sessions, disable, doctor, enable, explain, hook, prune, reset, resume, rewind, status and version.
